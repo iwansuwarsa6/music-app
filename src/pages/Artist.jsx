@@ -117,7 +117,7 @@ export default function Artist() {
   const [featured, setFeatured] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const API_BASE = `http://${window.location.hostname}:5000`;
+  const API_BASE = "https://music-app-production-278c.up.railway.app";
 
   const fetchSection = async (query, limit = 10) => {
     try {
