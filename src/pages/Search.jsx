@@ -23,8 +23,8 @@ export default function Search() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // Pastikan ambil IP yang sama dengan yang di App.jsx
-  const API_BASE = `http://${window.location.hostname}:5000`;
+  // 🔥 URL SUDAH DIGANTI KE RAILWAY 🔥
+  const API_BASE = "https://music-app-production-278c.up.railway.app";
 
   const jalankanPencarian = async (kataKunci) => {
     if (kataKunci.trim().length < 2) return;
