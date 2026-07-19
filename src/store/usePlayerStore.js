@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 
+// Ganti URL ini dengan URL Railway lu
+const BACKEND_URL = "https://music-app-production-278c.up.railway.app";
+
 export const usePlayerStore = create((set, get) => ({
   currentSong: null,
   isPlaying: false,
-  queue: [], // Antrean lagu (Playlist)
-  currentIndex: -1, // Posisi lagu yang sedang diputar
+  queue: [], 
+  currentIndex: -1,
 
   playSong: (song, queue = [], index = -1) => set({
     currentSong: song,
@@ -22,14 +25,14 @@ export const usePlayerStore = create((set, get) => ({
 
     let nextIndex;
     if (isShuffle) {
-      nextIndex = Math.floor(Math.random() * queue.length); // Acak
+      nextIndex = Math.floor(Math.random() * queue.length); 
     } else {
-      nextIndex = currentIndex + 1 < queue.length ? currentIndex + 1 : 0; // Lanjut atau ngulang ke awal list
+      nextIndex = currentIndex + 1 < queue.length ? currentIndex + 1 : 0;
     }
 
     const nextSong = queue[nextIndex];
     set({
-      currentSong: { ...nextSong, url: `http://localhost:5000/api/audio?id=${nextSong.id}` },
+      currentSong: { ...nextSong, url: `${BACKEND_URL}/api/audio?id=${nextSong.id}` },
       currentIndex: nextIndex,
       isPlaying: true
     });
@@ -43,7 +46,7 @@ export const usePlayerStore = create((set, get) => ({
     const prevIndex = currentIndex - 1 >= 0 ? currentIndex - 1 : queue.length - 1;
     const prevSong = queue[prevIndex];
     set({
-      currentSong: { ...prevSong, url: `http://localhost:5000/api/audio?id=${prevSong.id}` },
+      currentSong: { ...prevSong, url: `${BACKEND_URL}/api/audio?id=${prevSong.id}` },
       currentIndex: prevIndex,
       isPlaying: true
     });
