@@ -5,6 +5,9 @@ const ytDlp = require('yt-dlp-exec');
 const app = express();
 app.use(cors());
 
+// 🔥 PORT DINAMIS BUAT RAILWAY (Wajib pake process.env.PORT) 🔥
+const PORT = process.env.PORT || 5000;
+
 // 🔥 ENDPOINT AUDIO REDIRECT (MENDUKUNG GESER/SEEK WAKTU) 🔥
 app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
@@ -19,8 +22,7 @@ app.get('/api/audio', async (req, res) => {
             format: 'bestaudio'
         });
 
-        // Redirect HP lu langsung ke server YouTube
-        // Server YouTube mensupport HTTP "Range", jadi lu bisa ngegeser (seek) lagunya sesuka hati!
+        // Redirect langsung ke server YouTube
         res.redirect(url.trim());
     } catch (error) {
         console.error("Gagal dapat URL:", error.message);
@@ -32,7 +34,10 @@ app.get('/api/download', async (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID lagu kosong');
     try {
-        const url = await ytDlp(`https://www.youtube.com/watch?v=${videoId}`, { getUrl: true, format: 'bestaudio' });
+        const url = await ytDlp(`https://www.youtube.com/watch?v=${videoId}`, { 
+            getUrl: true, 
+            format: 'bestaudio' 
+        });
         res.redirect(url.trim());
     } catch (err) {
         console.error(err.message);
@@ -40,6 +45,6 @@ app.get('/api/download', async (req, res) => {
     }
 });
 
-app.listen(5000, () => {
-    console.log(`🔥 SERVER STREAMING VVIP JALAN DI PORT 5000 🔥`);
+app.listen(PORT, () => {
+    console.log(`🔥 SERVER STREAMING VVIP JALAN DI PORT ${PORT} 🔥`);
 });
