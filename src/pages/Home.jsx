@@ -193,6 +193,7 @@ export default function Home() {
     };
   }, [activeCategory]); 
 
+  // 🔥 URL SUDAH DIGANTI KE RAILWAY 🔥
   const handlePlay = (song, sectionTracks, index) => {
     if (currentSong?.id === song.id) {
       togglePlay();
@@ -200,7 +201,7 @@ export default function Home() {
     }
     playSong({
       ...song,
-      url: `http://${window.location.hostname}:5000/api/audio?id=${song.id}` 
+      url: `https://music-app-production-278c.up.railway.app/api/audio?id=${song.id}` 
     }, sectionTracks, index);
   };
 
