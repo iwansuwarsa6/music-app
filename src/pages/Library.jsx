@@ -11,7 +11,8 @@ export default function Library() {
   const [likedSongs, setLikedSongs] = useState([]);
   const [historySongs, setHistorySongs] = useState([]);
 
-  const API_BASE = `http://${window.location.hostname}:5000`;
+  // 🔥 URL SUDAH DIGANTI KE RAILWAY 🔥
+  const API_BASE = "https://music-app-production-278c.up.railway.app";
 
   const tabs = ['Daftar putar', 'Lagu', 'Album', 'Artis', 'Podcasts'];
 
