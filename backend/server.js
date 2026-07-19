@@ -5,7 +5,9 @@ const ytDlp = require('yt-dlp-exec');
 const app = express();
 app.use(cors());
 
-const PORT = process.env.PORT || 5000;
+// Railway memaksa aplikasi dengerin di PORT yang dia kasih, 
+// kalau gak ada, default ke 3000
+const PORT = process.env.PORT || 3000;
 
 app.get('/api/audio', (req, res) => {
     const videoId = req.query.id;
@@ -13,23 +15,36 @@ app.get('/api/audio', (req, res) => {
 
     console.log(`[▶️] STREAMING VVIP lagu ID: ${videoId}...`);
 
-    // Wajib set header biar web tau ini file audio
+    // Set header agar browser tahu ini stream audio
     res.setHeader('Content-Type', 'audio/webm');
 
-    // Buka jalur yt-dlp langsung, tanpa disave ke file
+    // Menjalankan yt-dlp untuk streaming
     const stream = ytDlp.exec(`https://www.youtube.com/watch?v=${videoId}`, {
         format: 'bestaudio',
-        output: '-' // Tanda strip '-' artinya langsung dialirin ke output
+        output: '-', // Streaming ke stdout
+        quiet: true, // Biar log gak penuh
     });
 
-    // Alirin suaranya dari server Railway LANGSUNG ke Vercel lu!
+    // Alirkan data ke response
     stream.stdout.pipe(res);
 
+    // KUNCI PENTING: Matikan proses yt-dlp kalau user tutup web/ganti lagu
+    // Biar server gak penuh memori (zombie process)
+    req.on('close', () => {
+        console.log('User disconnect, killing stream process...');
+        stream.kill();
+    });
+
     stream.on('error', (err) => {
-        console.error('Ada error dari yt-dlp:', err.message);
+        console.error('yt-dlp error:', err.message);
+        // Kalau belum terlanjur ngirim data, kirim error
+        if (!res.headersSent) {
+            res.status(500).send('Gagal streaming dari YouTube');
+        }
     });
 });
 
-app.listen(PORT, () => {
+// KUNCI PENTING: '0.0.0.0' adalah alamat wajib biar Railway bisa ngerouting traffic
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`🔥 SERVER STREAMING VVIP JALAN DI PORT ${PORT} 🔥`);
 });
