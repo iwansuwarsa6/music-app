@@ -65,7 +65,8 @@ export default function App() {
   const ghostAudioRef = useRef(null); 
   const adzanAudioRef = useRef(null); 
   
-  const API_BASE = `http://${window.location.hostname}:5000`;
+  // 🔥 URL SUDAH DIGANTI KE RAILWAY 🔥
+  const API_BASE = "https://music-app-production-278c.up.railway.app";
 
   const [currentTime, setCurrentTime] = useState(0);
   const currentTimeRef = useRef(0);
