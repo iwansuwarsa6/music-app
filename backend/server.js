@@ -10,53 +10,62 @@ app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID kosong');
 
-    console.log(`[▶️] HACK VIDEO-AS-AUDIO YOUTUBE ID: ${videoId}`);
+    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    console.log(`[▶️] OPERASI MULTI-COBALT YOUTUBE ID: ${videoId}`);
 
-    const instances = [
-        'https://invidious.jing.rocks',
-        'https://inv.tux.pizza',
-        'https://invidious.nerdvpn.de'
+    // KUMPULAN SERVER COBALT TERBARU & AKTIF (Anti-Mati)
+    const cobaltServers = [
+        'https://api.cobalt.tools',           // Server Utama Resmi (Baru)
+        'https://cobalt-api.kwiatekm.dev',    // Server Cadangan 1
+        'https://cobalt.qwyzex.net',          // Server Cadangan 2
+        'https://co.eepy.today'               // Server Cadangan 3
     ];
 
     let finalUrl = null;
 
-    for (const instance of instances) {
+    // Sistem loncat otomatis kalau ada server yang down
+    for (const server of cobaltServers) {
         try {
-            console.log(`Mencoba nembus lewat: ${instance}...`);
-            const response = await fetch(`${instance}/api/v1/videos/${videoId}`);
-            
-            if (!response.ok) continue;
+            console.log(`Menembak via Cobalt: ${server}...`);
+            const response = await fetch(`${server}/api/json`, {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    url: youtubeUrl,
+                    aFormat: 'mp3',
+                    isAudioOnly: true
+                })
+            });
+
+            if (!response.ok) {
+                console.log(`❌ ${server} nolak, ganti senjata...`);
+                continue;
+            }
 
             const data = await response.json();
 
-            // RAHASIA UTAMA: Kita ambil format Video MP4 standar, BUKAN audio-only.
-            // formatStreams berisi video lengkap dengan suara yang jarang diblokir YouTube.
-            if (data.formatStreams && data.formatStreams.length > 0) {
-                // Ambil kualitas paling burik (360p) biar server/kuota nggak jebol
-                const lowestQualityVideo = data.formatStreams.sort((a, b) => {
-                    const resA = parseInt(a.resolution) || 999;
-                    const resB = parseInt(b.resolution) || 999;
-                    return resA - resB;
-                })[0];
-                
-                finalUrl = lowestQualityVideo.url;
-                console.log(`✅ BERHASIL DAPAT LINK (Format Video 360p) DARI: ${instance}`);
-                break;
+            if (data && data.url) {
+                finalUrl = data.url;
+                console.log(`✅ BERHASIL TEMBUS DI SERVER: ${server}`);
+                break; // Langsung stop nyari kalau udah dapet linknya
             }
         } catch (err) {
-            console.log(`❌ ${instance} gagal, lanjut server lain...`);
+            console.log(`❌ ${server} down/timeout, lanjut server berikutnya...`);
         }
     }
 
     if (finalUrl) {
-        console.log('✅ MENGALIHKAN KE PLAYER...');
+        console.log('✅ LINK AUDIO DIDAPATKAN! Mengalihkan ke Vercel...');
         res.redirect(finalUrl);
     } else {
-        console.error('❌ SEMUA JALUR TUMBANG');
-        res.status(500).send('Gagal menembus API');
+        console.error('❌ SEMUA SERVER COBALT TUMBANG');
+        res.status(500).send('Gagal menembus pertahanan YouTube');
     }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔥 SERVER HACK JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER MULTI-COBALT JALAN DI PORT ${PORT} 🔥`);
 });
