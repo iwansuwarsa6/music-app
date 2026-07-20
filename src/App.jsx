@@ -16,26 +16,14 @@ import Developer from './pages/Developer';
 
 import rndLogo from './store/rndigital.jpg';
 
+// 🔥 LOGO MASJID ESTETIK (Hanya 1 logo tanpa coretan) 🔥
 const MosqueIcon = ({ size = 24, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M12 2c-1.5 2-2.5 3.5-2.5 5.5V10h5V7.5C14.5 5.5 13.5 4 12 2z"/>
-    <path d="M9 21v-4a3 3 0 0 1 6 0v4"/>
-    <path d="M4 12v9"/>
-    <path d="M20 12v9"/>
-    <path d="M2 21h20"/>
-    <path d="M5 12h14"/>
-  </svg>
-);
-
-const MosqueOffIcon = ({ size = 24, className = "" }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M12 2c-1.5 2-2.5 3.5-2.5 5.5V10h5V7.5C14.5 5.5 13.5 4 12 2z"/>
-    <path d="M9 21v-4a3 3 0 0 1 6 0v4"/>
-    <path d="M4 12v9"/>
-    <path d="M20 12v9"/>
-    <path d="M2 21h20"/>
-    <path d="M5 12h14"/>
-    <line x1="3" y1="3" x2="21" y2="21" />
+    <path d="M12 2c-1.5 2.5-2.5 5-2.5 8.5V21h5v-10.5c0-3.5-1-6-2.5-8.5Z" />
+    <path d="M9 21v-3a3 3 0 0 1 6 0v3" />
+    <path d="M5 21V11" />
+    <path d="M19 21V11" />
+    <path d="M3 21h18" />
   </svg>
 );
 
@@ -964,8 +952,8 @@ export default function App() {
               const newMode = !adzanMode;
               setAdzanMode(newMode);
               showToast(newMode ? "Mode Adzan Aktif 🕌" : "Mode Adzan Dimatikan");
-          }} className={`transition-colors ${adzanMode ? 'text-[#3ea6ff]' : 'text-zinc-400 hover:text-white'}`} title="Mode Adzan (Auto Pause)">
-            {adzanMode ? <MosqueIcon size={24} /> : <MosqueOffIcon size={24} />}
+          }} className={`transition-all duration-300 ${adzanMode ? 'text-[#3ea6ff] drop-shadow-[0_0_8px_rgba(62,166,255,0.4)]' : 'text-zinc-500 hover:text-zinc-300'}`} title="Mode Adzan">
+            <MosqueIcon size={24} />
           </button>
           <Cast size={24} className="text-zinc-400 hover:text-white cursor-pointer" />
           <User size={24} className="text-zinc-400 hover:text-white cursor-pointer" />
@@ -1109,8 +1097,8 @@ export default function App() {
                const newMode = !adzanMode;
                setAdzanMode(newMode);
                showToast(newMode ? "Mode Adzan Aktif 🕌" : "Mode Adzan Dimatikan");
-            }} className={`p-2 rounded-full hover:bg-white/10 transition-colors ${adzanMode ? 'text-[#3ea6ff]' : 'text-white'}`} title="Auto Pause Adzan">
-               {adzanMode ? <MosqueIcon size={24} /> : <MosqueOffIcon size={24} />}
+            }} className={`p-2 rounded-full hover:bg-white/10 transition-all duration-300 ${adzanMode ? 'text-[#3ea6ff] drop-shadow-[0_0_8px_rgba(62,166,255,0.4)]' : 'text-zinc-500 hover:text-white'}`} title="Mode Adzan">
+               <MosqueIcon size={24} />
             </button>
             <button className="p-2 rounded-full hover:bg-white/10 hidden md:block"><Cast size={24} /></button>
             <button onClick={(e) => {
@@ -1126,38 +1114,38 @@ export default function App() {
             
             <div className="flex-1 min-h-0 flex items-center justify-center w-full mx-auto relative p-2 md:p-8">
                <div className={`relative bg-black shadow-2xl rounded-2xl overflow-hidden transition-all duration-500 flex items-center justify-center w-full h-full ${mediaMode === 'audio' ? 'aspect-square max-h-[45vh] md:max-h-[500px]' : 'aspect-video max-w-5xl max-h-full'}`}>
-                  
-                  {/* 🔥 THE YOUTUBE IFRAME DENGAN MUTE BAWAAN 🔥 */}
-                  <iframe
-                    ref={iframeRef} onLoad={handleIframeLoad}
-                    width="100%" height="100%"
-                    src={currentSong?.id ? `https://www.youtube.com/embed/${currentSong.id}?autoplay=1&mute=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&fs=0&playsinline=1&enablejsapi=1&origin=${window.location.origin}` : ''}
-                    title="YouTube Video" frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen
-                    className={`absolute inset-0 w-full h-full pointer-events-auto transition-opacity duration-300 z-10 ${mediaMode === 'video' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-                  ></iframe>
+                 
+                 {/* 🔥 THE YOUTUBE IFRAME DENGAN MUTE BAWAAN 🔥 */}
+                 <iframe
+                   ref={iframeRef} onLoad={handleIframeLoad}
+                   width="100%" height="100%"
+                   src={currentSong?.id ? `https://www.youtube.com/embed/${currentSong.id}?autoplay=1&mute=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&fs=0&playsinline=1&enablejsapi=1&origin=${window.location.origin}` : ''}
+                   title="YouTube Video" frameBorder="0"
+                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen
+                   className={`absolute inset-0 w-full h-full pointer-events-auto transition-opacity duration-300 z-10 ${mediaMode === 'video' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                 ></iframe>
 
-                  <div className={`absolute inset-0 bg-zinc-900 flex items-center justify-center z-20 transition-opacity duration-300 ${mediaMode === 'audio' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-                      {currentSong?.image && <img src={currentSong.image} className="w-full h-full object-cover opacity-60 blur-2xl absolute inset-0" alt="bg" />}
-                      {currentSong?.image ? (
-                        <img src={currentSong.image} className="w-full h-full object-cover shadow-2xl z-30" alt="cover" />
-                      ) : (
-                        <div className="w-full h-full shadow-2xl z-30 bg-white/5 flex items-center justify-center text-zinc-500 backdrop-blur-md">
-                          <Music size={64} />
-                        </div>
-                      )}
-                      
-                      {isBuffering && mediaMode === 'audio' && (
-                          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-40 rounded-2xl">
-                              <Loader2 className="animate-spin text-white w-12 h-12 mb-2" />
-                              <p className="text-sm font-bold text-white tracking-widest uppercase mt-2">Menyiapkan Audio...</p>
-                          </div>
-                      )}
-                  </div>
-                  
-                  <div onClick={handleTogglePlayLocal} className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 cursor-pointer">
-                    {isPlaying ? <Pause fill="white" size={64} /> : <Play className="ml-2" fill="white" size={64} />}
-                  </div>
+                 <div className={`absolute inset-0 bg-zinc-900 flex items-center justify-center z-20 transition-opacity duration-300 ${mediaMode === 'audio' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                     {currentSong?.image && <img src={currentSong.image} className="w-full h-full object-cover opacity-60 blur-2xl absolute inset-0" alt="bg" />}
+                     {currentSong?.image ? (
+                       <img src={currentSong.image} className="w-full h-full object-cover shadow-2xl z-30" alt="cover" />
+                     ) : (
+                       <div className="w-full h-full shadow-2xl z-30 bg-white/5 flex items-center justify-center text-zinc-500 backdrop-blur-md">
+                         <Music size={64} />
+                       </div>
+                     )}
+                     
+                     {isBuffering && mediaMode === 'audio' && (
+                         <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center z-40 rounded-2xl">
+                             <Loader2 className="animate-spin text-white w-12 h-12 mb-2" />
+                             <p className="text-sm font-bold text-white tracking-widest uppercase mt-2">Menyiapkan Audio...</p>
+                         </div>
+                     )}
+                 </div>
+                 
+                 <div onClick={handleTogglePlayLocal} className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-30 cursor-pointer">
+                   {isPlaying ? <Pause fill="white" size={64} /> : <Play className="ml-2" fill="white" size={64} />}
+                 </div>
                </div>
             </div>
 
