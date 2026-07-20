@@ -15,7 +15,8 @@
     "react-dom": "^19.2.7",
     "react-player": "^3.4.0",
     "react-router-dom": "^7.18.1",
-    "zustand": "^5.0.14"
+    "zustand": "^5.0.14",
+    "yt-dlp-exec": "latest"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
