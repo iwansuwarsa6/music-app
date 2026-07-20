@@ -7,53 +7,73 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
-app.get('/api/audio', (req, res) => {
+// Pasukan Server Cadangan. Kalau satu mati/kena Cloudflare, otomatis ganti yang lain!
+const PIPED_INSTANCES = [
+    'https://pipedapi.tokhmi.xyz',
+    'https://pipedapi.syncpundit.io',
+    'https://api.piped.projectsegfau.lt',
+    'https://pipedapi.kavin.rocks'
+];
+
+async function cariLaguNgotot(videoId, indexServer = 0) {
+    if (indexServer >= PIPED_INSTANCES.length) {
+        throw new Error('Semua server cadangan mati atau diblokir.');
+    }
+
+    const baseUrl = PIPED_INSTANCES[indexServer];
+    const apiUrl = `${baseUrl}/streams/${videoId}`;
+    console.log(`[▶️] Mencoba tembus lewat server: ${baseUrl}...`);
+
+    return new Promise((resolve, reject) => {
+        https.get(apiUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+        }, (res) => {
+            let data = '';
+            res.on('data', chunk => data += chunk);
+            res.on('end', () => {
+                // Kalau dapet HTML (Kena Cloudflare/Error), langsung pindah server!
+                if (data.trim().startsWith('<')) {
+                    console.log(`[⚠️] Server ${baseUrl} kena Cloudflare. Ganti target...`);
+                    return resolve(cariLaguNgotot(videoId, indexServer + 1));
+                }
+
+                try {
+                    const json = JSON.parse(data);
+                    if (json.error || !json.audioStreams || json.audioStreams.length === 0) {
+                        console.log(`[⚠️] Server ${baseUrl} kosong. Ganti target...`);
+                        return resolve(cariLaguNgotot(videoId, indexServer + 1));
+                    }
+                    
+                    // Sukses dapet URL lagunya!
+                    resolve(json.audioStreams[0].url);
+                } catch (e) {
+                    console.log(`[⚠️] Server ${baseUrl} error JSON. Ganti target...`);
+                    resolve(cariLaguNgotot(videoId, indexServer + 1));
+                }
+            });
+        }).on('error', () => {
+            console.log(`[⚠️] Server ${baseUrl} Down. Ganti target...`);
+            resolve(cariLaguNgotot(videoId, indexServer + 1));
+        });
+    });
+}
+
+app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID kosong');
 
-    console.log(`[▶️] MINTA LINK RAHASIA KE PIPED API: ${videoId}`);
-
-    // Kita pakai server Piped API (Jauh lebih stabil dan tahan banting)
-    const apiUrl = `https://pipedapi.kavin.rocks/streams/${videoId}`;
-
-    https.get(apiUrl, (apiRes) => {
-        let data = '';
+    try {
+        const audioUrl = await cariLaguNgotot(videoId);
+        console.log('✅ DAPET LINK RAHASIANYA! Mengalihkan Vercel ke lagu asli...');
         
-        apiRes.on('data', chunk => data += chunk);
-        
-        apiRes.on('end', () => {
-            try {
-                const json = JSON.parse(data);
-                
-                if (json.error) {
-                    console.error('❌ Piped Error:', json.error);
-                    return res.status(500).send('Video diblokir atau tidak ditemukan');
-                }
-
-                if (!json.audioStreams || json.audioStreams.length === 0) {
-                    console.error('❌ Stream audio kosong dari Piped');
-                    return res.status(500).send('Audio tidak tersedia');
-                }
-
-                // Ambil audio kualitas terbaik dari Piped
-                const bestAudio = json.audioStreams[0];
-                console.log('✅ DAPET LINKNYA! Langsung di-lempar ke Vercel (Redirect)...');
-                
-                // TRIK DEWA: Langsung alihkan frontend lu ke URL audio aslinya!
-                // Player di Vercel lu bakal otomatis muter link ini tanpa mikir.
-                res.redirect(bestAudio.url);
-
-            } catch (e) {
-                console.error('❌ Gagal baca API Piped:', e.message);
-                if (!res.headersSent) res.status(500).send('Gagal parsing data');
-            }
-        });
-    }).on('error', (err) => {
-        console.error('❌ Server Piped API mati:', err.message);
-        if (!res.headersSent) res.status(500).send('Server bypass down');
-    });
+        // Trik langsung lempar ke Vercel lu
+        res.redirect(audioUrl);
+    } catch (error) {
+        console.error('❌ GAGAL TOTAL:', error.message);
+        res.status(500).send('Mohon maaf, semua jalur sedang down.');
+    }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔥 SERVER CHEAT JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER ANTI-BADAI JALAN DI PORT ${PORT} 🔥`);
 });
