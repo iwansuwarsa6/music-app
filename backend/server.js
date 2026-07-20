@@ -11,10 +11,10 @@ app.get('/api/audio', (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID kosong');
 
-    console.log(`[▶️] MENCARI JALUR BYPASS UNTUK ID: ${videoId}`);
+    console.log(`[▶️] MINTA LINK RAHASIA KE PIPED API: ${videoId}`);
 
-    // Pintu Belakang: Pakai API Invidious publik biar IP Railway gak disentuh YouTube
-    const apiUrl = `https://vid.puffyan.us/api/v1/videos/${videoId}`;
+    // Kita pakai server Piped API (Jauh lebih stabil dan tahan banting)
+    const apiUrl = `https://pipedapi.kavin.rocks/streams/${videoId}`;
 
     https.get(apiUrl, (apiRes) => {
         let data = '';
@@ -26,40 +26,34 @@ app.get('/api/audio', (req, res) => {
                 const json = JSON.parse(data);
                 
                 if (json.error) {
-                    console.error('❌ Invidious Error:', json.error);
+                    console.error('❌ Piped Error:', json.error);
                     return res.status(500).send('Video diblokir atau tidak ditemukan');
                 }
 
-                // Cari link audio murni dari hasil bypass
-                const audioFormat = json.adaptiveFormats.find(f => f.type.includes('audio'));
-                
-                if (!audioFormat || !audioFormat.url) {
-                    console.error('❌ Format audio tidak ketemu di jalur bypass');
-                    return res.status(500).send('Gagal mengekstrak audio');
+                if (!json.audioStreams || json.audioStreams.length === 0) {
+                    console.error('❌ Stream audio kosong dari Piped');
+                    return res.status(500).send('Audio tidak tersedia');
                 }
 
-                console.log('✅ JALUR BYPASS TEMBUS! Mengalirkan audio ke Vercel lu...');
+                // Ambil audio kualitas terbaik dari Piped
+                const bestAudio = json.audioStreams[0];
+                console.log('✅ DAPET LINKNYA! Langsung di-lempar ke Vercel (Redirect)...');
                 
-                // Sedot URL audio rahasianya dan lempar langsung ke web lu
-                https.get(audioFormat.url, (audioRes) => {
-                    res.setHeader('Content-Type', 'audio/webm');
-                    audioRes.pipe(res);
-                }).on('error', (err) => {
-                    console.error('❌ Gagal menyedot stream bypass:', err.message);
-                    if (!res.headersSent) res.status(500).send('Stream terputus');
-                });
+                // TRIK DEWA: Langsung alihkan frontend lu ke URL audio aslinya!
+                // Player di Vercel lu bakal otomatis muter link ini tanpa mikir.
+                res.redirect(bestAudio.url);
 
             } catch (e) {
-                console.error('❌ Gagal membaca jalur bypass:', e.message);
+                console.error('❌ Gagal baca API Piped:', e.message);
                 if (!res.headersSent) res.status(500).send('Gagal parsing data');
             }
         });
     }).on('error', (err) => {
-        console.error('❌ Server bypass mati:', err.message);
+        console.error('❌ Server Piped API mati:', err.message);
         if (!res.headersSent) res.status(500).send('Server bypass down');
     });
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔥 SERVER BYPASS JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER CHEAT JALAN DI PORT ${PORT} 🔥`);
 });
