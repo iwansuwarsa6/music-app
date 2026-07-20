@@ -1,44 +1,38 @@
 const express = require('express');
 const cors = require('cors');
-const { spawn } = require('child_process');
+const play = require('play-dl'); // Kita pake keajaiban ini sekarang
 
 const app = express();
 app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
-app.get('/api/audio', (req, res) => {
+app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID kosong');
 
-    console.log(`[▶️] STREAMING lagu ID: ${videoId}...`);
-    res.setHeader('Content-Type', 'audio/webm');
+    console.log(`[▶️] STREAMING lagu ID: ${videoId} pakai play-dl...`);
 
-    // Manggil yt-dlp lokal hasil download dari package.json
-    const ytDlpPath = './yt-dlp'; 
-    
-    const args = [
-        `https://www.youtube.com/watch?v=${videoId}`,
-        '-f', 'bestaudio',
-        '-o', '-'
-    ];
+    try {
+        // Ambil stream murni pakai Javascript, BYPASS yt-dlp dan OS
+        const stream = await play.stream(`https://www.youtube.com/watch?v=${videoId}`);
+        
+        // Set header otomatis dari play-dl
+        res.setHeader('Content-Type', stream.type || 'audio/webm');
+        
+        // Alirkan langsung ke frontend lu
+        stream.stream.pipe(res);
 
-    const stream = spawn(ytDlpPath, args);
+        req.on('close', () => {
+            if (!stream.stream.destroyed) {
+                stream.stream.destroy();
+            }
+        });
 
-    stream.stdout.pipe(res);
-
-    stream.stderr.on('data', (data) => {
-        console.error(`yt-dlp stderr: ${data}`);
-    });
-
-    req.on('close', () => {
-        stream.kill();
-    });
-
-    stream.on('error', (err) => {
-        console.error('PROSES GAGAL (PATH MUNGKIN SALAH):', err.message);
-        if (!res.headersSent) res.status(500).send('Gagal streaming: yt-dlp tidak ditemukan');
-    });
+    } catch (error) {
+        console.error('PROSES GAGAL (PLAY-DL ERROR):', error.message);
+        if (!res.headersSent) res.status(500).send('Gagal streaming lagu');
+    }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
