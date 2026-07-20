@@ -6,72 +6,77 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
+// RAHASIA VIP: Masukin semua API Key dari akun-akun tumbal lu ke sini
+const apiKeys = [
+    'MASUKIN_API_KEY_AKUN_1_DISINI',
+    'MASUKIN_API_KEY_AKUN_2_DISINI',
+    'MASUKIN_API_KEY_AKUN_3_DISINI'
+];
+
+let currentKeyIndex = 0; // Mulai dari akun pertama
+
 app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID kosong');
 
-    console.log(`[▶️] OPERASI CLUSTER PIPED YOUTUBE ID: ${videoId}`);
+    console.log(`[▶️] OPERASI ROTASI VIP YOUTUBE ID: ${videoId}`);
 
-    // Kumpulan 5 Server Piped beda negara biar kebal down
-    const pipedServers = [
-        'https://pipedapi.moomoo.me',
-        'https://pipedapi.syncpundit.io',
-        'https://piped-api.garudalinux.org',
-        'https://api.piped.projectsegfau.lt',
-        'https://pipedapi.kavin.rocks'
-    ];
+    const rapidApiHost = 'MASUKIN_HOST_API_NYA_DISINI';
+    const rapidApiUrl = `https://${rapidApiHost}/pintu-api-nya?id=${videoId}`;
 
     let audioUrl = null;
+    let attempts = 0;
 
-    for (const server of pipedServers) {
+    // Sistem bakal nyoba terus sebanyak jumlah akun lu
+    while (attempts < apiKeys.length) {
+        const activeKey = apiKeys[currentKeyIndex];
+        console.log(`Nyoba nembus pakai Akun API ke-${currentKeyIndex + 1}...`);
+
         try {
-            console.log(`Mengetuk jalur tikus: ${server}...`);
-            
-            const response = await fetch(`${server}/streams/${videoId}`);
+            const response = await fetch(rapidApiUrl, {
+                method: 'GET',
+                headers: {
+                    'X-RapidAPI-Key': activeKey,
+                    'X-RapidAPI-Host': rapidApiHost
+                }
+            });
+
+            // Kalau dapet error 429 (Limit Habis), langsung ganti ke akun berikutnya
+            if (response.status === 429) {
+                console.log(`⚠️ Kuota Akun ke-${currentKeyIndex + 1} HABIS! Ganti akun...`);
+                currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
+                attempts++;
+                continue;
+            }
 
             if (!response.ok) {
-                console.log(`❌ ${server} nolak (HTTP ${response.status}), ganti jalur...`);
-                continue;
+                console.log(`❌ Server nolak dengan status: ${response.status}`);
+                break; // Kalau error lain, berhentiin pencarian
             }
 
-            // RAHASIA ANTI-CRASH: Ambil text dulu, jangan langsung di-JSON-in
-            const text = await response.text();
+            const data = await response.json();
             
-            // Pastikan balasannya beneran JSON (diawali kurung kurawal) biar gak error "Unexpected end of JSON"
-            if (!text.startsWith('{')) {
-                console.log(`❌ ${server} ngasih web error HTML, skip server ini!`);
-                continue;
+            // Sesuaikan "data.link" dengan format dari API yang lu pilih
+            if (data && data.link) {
+                audioUrl = data.link;
+                break; // Lagu dapet, keluar dari loop
             }
 
-            const data = JSON.parse(text);
-
-            if (data.error) {
-                console.log(`❌ ${server} diblokir YouTube: ${data.error}`);
-                continue;
-            }
-
-            // Sortir dan ambil format audio dengan kualitas paling jernih (bitrate tertinggi)
-            if (data.audioStreams && data.audioStreams.length > 0) {
-                const bestAudio = data.audioStreams.sort((a, b) => b.bitrate - a.bitrate)[0];
-                audioUrl = bestAudio.url;
-                
-                console.log(`✅ BERHASIL TEMBUS DI SERVER: ${server}`);
-                break; 
-            }
         } catch (err) {
-            console.log(`❌ ${server} down/timeout, meluncur ke server cadangan...`);
+            console.log(`❌ Gagal konek pakai akun ke-${currentKeyIndex + 1}, lanjut...`);
+            attempts++;
+            currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
         }
     }
 
     if (audioUrl) {
-        console.log('✅ LINK AUDIO MURNI DIDAPATKAN! Mengalihkan...');
+        console.log('✅ LINK AUDIO ROTASI VIP DIDAPATKAN! Mengalihkan...');
         res.redirect(audioUrl);
     } else {
-        console.error('❌ SEMUA 5 CLUSTER PIPED TUMBANG');
-        res.status(500).send('Gagal menembus API YouTube, semua jalur tikus mati');
+        res.status(500).send('Gagal menembus API, atau semua kuota akun lu udah abis total');
     }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔥 SERVER CLUSTER PIPED JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER ROTASI VIP JALAN DI PORT ${PORT} 🔥`);
 });
