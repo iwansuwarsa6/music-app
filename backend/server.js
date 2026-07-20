@@ -33,7 +33,8 @@ app.get('/api/audio', async (req, res) => {
             throw new Error('URL kosong dari yt-dlp');
         }
     } catch (error) {
-        console.error('❌ YT-DLP Gagal:', error.message);
+        // Hapus .message biar wujud error aslinya telanjang semua di log
+        console.error('❌ YT-DLP Gagal:', error);
         res.status(500).send('Gagal menembus API YouTube');
     }
 });
