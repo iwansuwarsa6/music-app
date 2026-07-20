@@ -11,27 +11,29 @@ app.get('/api/audio', async (req, res) => {
     if (!videoId) return res.status(400).send('ID kosong');
 
     const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    console.log(`[▶️] OPERASI MULTI-COBALT YOUTUBE ID: ${videoId}`);
+    console.log(`[▶️] OPERASI COBALT MENYAMAR YOUTUBE ID: ${videoId}`);
 
-    // KUMPULAN SERVER COBALT TERBARU & AKTIF (Anti-Mati)
     const cobaltServers = [
-        'https://api.cobalt.tools',           // Server Utama Resmi (Baru)
-        'https://cobalt-api.kwiatekm.dev',    // Server Cadangan 1
-        'https://cobalt.qwyzex.net',          // Server Cadangan 2
-        'https://co.eepy.today'               // Server Cadangan 3
+        'https://api.cobalt.tools',           
+        'https://cobalt-api.kwiatekm.dev',    
+        'https://cobalt.qwyzex.net',          
+        'https://co.eepy.today'               
     ];
 
     let finalUrl = null;
 
-    // Sistem loncat otomatis kalau ada server yang down
     for (const server of cobaltServers) {
         try {
-            console.log(`Menembak via Cobalt: ${server}...`);
+            console.log(`Nyamar jadi manusia pakai Chrome ke: ${server}...`);
             const response = await fetch(`${server}/api/json`, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    // RAHASIA BARU: Topeng User-Agent biar dikira manusia pakai PC
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Origin': 'https://cobalt.tools',
+                    'Referer': 'https://cobalt.tools/'
                 },
                 body: JSON.stringify({
                     url: youtubeUrl,
@@ -41,7 +43,7 @@ app.get('/api/audio', async (req, res) => {
             });
 
             if (!response.ok) {
-                console.log(`❌ ${server} nolak, ganti senjata...`);
+                console.log(`❌ ${server} nolak (HTTP ${response.status}), ganti senjata...`);
                 continue;
             }
 
@@ -50,7 +52,7 @@ app.get('/api/audio', async (req, res) => {
             if (data && data.url) {
                 finalUrl = data.url;
                 console.log(`✅ BERHASIL TEMBUS DI SERVER: ${server}`);
-                break; // Langsung stop nyari kalau udah dapet linknya
+                break; 
             }
         } catch (err) {
             console.log(`❌ ${server} down/timeout, lanjut server berikutnya...`);
@@ -61,7 +63,7 @@ app.get('/api/audio', async (req, res) => {
         console.log('✅ LINK AUDIO DIDAPATKAN! Mengalihkan ke Vercel...');
         res.redirect(finalUrl);
     } else {
-        console.error('❌ SEMUA SERVER COBALT TUMBANG');
+        console.error('❌ SEMUA SERVER COBALT TUMBANG ATAU NOLAK');
         res.status(500).send('Gagal menembus pertahanan YouTube');
     }
 });
