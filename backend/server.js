@@ -11,7 +11,7 @@ app.get('/api/audio', async (req, res) => {
     if (!videoId) return res.status(400).send('ID kosong');
 
     const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    console.log(`[▶️] OPERASI COBALT V10 YOUTUBE ID: ${videoId}`);
+    console.log(`[▶️] OPERASI COBALT V10 (REVISI BERSIH) ID: ${videoId}`);
 
     const cobaltServers = [
         'https://api.cobalt.tools',           
@@ -24,9 +24,10 @@ app.get('/api/audio', async (req, res) => {
 
     for (const server of cobaltServers) {
         try {
-            // RAHASIA UTAMA: Endpoint sekarang cuma "/" BUKAN "/api/json"
-            console.log(`Menembak pintu utama: ${server}...`);
-            const response = await fetch(`${server}/`, { 
+            console.log(`Mengetuk pintu: ${server}...`);
+            
+            // Nembak langsung ke root URL servernya tanpa embel-embel
+            const response = await fetch(server, { 
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
@@ -35,9 +36,9 @@ app.get('/api/audio', async (req, res) => {
                 },
                 body: JSON.stringify({
                     url: youtubeUrl,
-                    aFormat: 'mp3',
-                    isAudioOnly: true,
-                    downloadMode: 'audio' // Parameter wajib untuk Cobalt v10+
+                    audioFormat: 'mp3', // Nama parameter resmi v10
+                    isAudioOnly: true   // Nama parameter resmi v10
+                    // Kita HAPUS downloadMode dan aFormat biar satpamnya nggak marah (HTTP 400)
                 })
             });
 
@@ -48,7 +49,6 @@ app.get('/api/audio', async (req, res) => {
 
             const data = await response.json();
 
-            // Sesuai respons Cobalt v10, link ada di data.url
             if (data && data.url) {
                 finalUrl = data.url;
                 console.log(`✅ BERHASIL TEMBUS DI SERVER: ${server}`);
@@ -69,5 +69,5 @@ app.get('/api/audio', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔥 SERVER COBALT V10 JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER COBALT REVISI JALAN DI PORT ${PORT} 🔥`);
 });
