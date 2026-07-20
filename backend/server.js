@@ -44,7 +44,9 @@ app.get('/api/audio', (req, res) => {
     console.log(`[▶️] STREAMING lagu ID: ${videoId}`);
     res.setHeader('Content-Type', 'audio/webm');
 
-    const stream = spawn(ytDlpPath, [
+    // Kita jalankan yt-dlp secara eksplisit pakai python3 biar aman di Linux
+    const stream = spawn('python3', [
+        ytDlpPath,
         `https://www.youtube.com/watch?v=${videoId}`,
         '-f', 'bestaudio',
         '-o', '-'
@@ -52,8 +54,13 @@ app.get('/api/audio', (req, res) => {
 
     stream.stdout.pipe(res);
 
+    // INI TAMBAHAN PALING PENTING: Penangkap log error dari yt-dlp
+    stream.stderr.on('data', (data) => {
+        console.error(`[YT-DLP LOG]: ${data.toString().trim()}`);
+    });
+
     stream.on('error', (err) => {
-        console.error('❌ PROSES GAGAL:', err.message);
+        console.error('❌ PROSES GAGAL SPAWN:', err.message);
         if (!res.headersSent) res.status(500).send('Gagal memutar lagu');
     });
 
