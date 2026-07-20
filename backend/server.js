@@ -11,7 +11,7 @@ app.get('/api/audio', async (req, res) => {
     if (!videoId) return res.status(400).send('ID kosong');
 
     const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    console.log(`[▶️] OPERASI COBALT V10 (REVISI BERSIH) ID: ${videoId}`);
+    console.log(`[▶️] OPERASI COBALT V10 FINAL ID: ${videoId}`);
 
     const cobaltServers = [
         'https://api.cobalt.tools',           
@@ -26,19 +26,17 @@ app.get('/api/audio', async (req, res) => {
         try {
             console.log(`Mengetuk pintu: ${server}...`);
             
-            // Nembak langsung ke root URL servernya tanpa embel-embel
             const response = await fetch(server, { 
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     url: youtubeUrl,
-                    audioFormat: 'mp3', // Nama parameter resmi v10
-                    isAudioOnly: true   // Nama parameter resmi v10
-                    // Kita HAPUS downloadMode dan aFormat biar satpamnya nggak marah (HTTP 400)
+                    // INI KUNCI UTAMANYA: Pakai downloadMode, BUKAN isAudioOnly
+                    downloadMode: 'audio', 
+                    audioFormat: 'mp3'
                 })
             });
 
@@ -60,7 +58,7 @@ app.get('/api/audio', async (req, res) => {
     }
 
     if (finalUrl) {
-        console.log('✅ LINK AUDIO DIDAPATKAN! Mengalihkan ke Vercel...');
+        console.log('✅ LINK AUDIO DIDAPATKAN! Mengalihkan...');
         res.redirect(finalUrl);
     } else {
         console.error('❌ SEMUA SERVER COBALT TUMBANG ATAU NOLAK');
@@ -69,5 +67,5 @@ app.get('/api/audio', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔥 SERVER COBALT REVISI JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER COBALT FINAL JALAN DI PORT ${PORT} 🔥`);
 });
