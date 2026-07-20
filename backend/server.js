@@ -10,40 +10,56 @@ app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID kosong');
 
-    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    console.log(`[▶️] MINTA BANTUAN COBALT API BUAT YOUTUBE ID: ${videoId}`);
+    console.log(`[▶️] INVIDIOUS MENGHAJAR YOUTUBE ID: ${videoId}`);
 
-    try {
-        // Kita tembak API publik Cobalt. Mereka yang bakal berdarah-darah nembus YouTube
-        const response = await fetch('https://co.wuk.sh/api/json', {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                url: youtubeUrl,
-                isAudioOnly: true, // Minta audionya aja
-                aFormat: 'mp3'     // Format paling aman
-            })
-        });
+    // Kita sediain 3 server cadangan. Mati satu, otomatis ganti yang lain!
+    const instances = [
+        'https://invidious.jing.rocks',
+        'https://inv.tux.pizza',
+        'https://invidious.nerdvpn.de'
+    ];
 
-        const data = await response.json();
+    let audioUrl = null;
 
-        // Kalau Cobalt berhasil, dia bakal ngasih URL direct-nya
-        if (data && data.url) {
-            console.log('✅ LINK AUDIO DARI COBALT DAPAT! Mengalihkan...');
-            res.redirect(data.url);
-        } else {
-            console.error('Cobalt Error Response:', data);
-            throw new Error('Cobalt gagal mengekstrak data');
+    for (const instance of instances) {
+        try {
+            console.log(`Mencoba jalur tikus: ${instance}...`);
+            const response = await fetch(`${instance}/api/v1/videos/${videoId}`);
+            
+            // Kalau server ini error/mati, langsung skip ke server berikutnya
+            if (!response.ok) {
+                console.log(`❌ ${instance} gagal, mencari jalan lain...`);
+                continue; 
+            }
+
+            const data = await response.json();
+
+            // Cari daftar stream khusus audio
+            if (data.adaptiveFormats) {
+                const audioFormats = data.adaptiveFormats.filter(f => f.type && f.type.includes('audio'));
+                if (audioFormats.length > 0) {
+                    // Sortir dari kualitas/bitrate yang paling tinggi
+                    const bestAudio = audioFormats.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+                    audioUrl = bestAudio.url;
+                    
+                    console.log(`✅ BERHASIL TEMBUS LEWAT: ${instance}`);
+                    break; // Berhenti nyari kalau udah dapet linknya
+                }
+            }
+        } catch (err) {
+            console.log(`❌ ${instance} down/timeout, lanjut ke server cadangan...`);
         }
-    } catch (error) {
-        console.error('❌ COBALT Gagal:', error.message);
-        res.status(500).send('Semua jalur API tumbang');
+    }
+
+    if (audioUrl) {
+        console.log('✅ LINK AUDIO MURNI DIDAPATKAN! Mengalihkan...');
+        res.redirect(audioUrl);
+    } else {
+        console.error('❌ SEMUA JALUR INVIDIOUS TUMBANG');
+        res.status(500).send('Gagal menembus semua server cadangan');
     }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔥 SERVER COBALT JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER INVIDIOUS JALAN DI PORT ${PORT} 🔥`);
 });
