@@ -10,13 +10,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "lucide-react": "^1.25.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-player": "^3.4.0",
     "react-router-dom": "^7.18.1",
-    "zustand": "^5.0.14",
-    "yt-dlp-exec": "latest"
+    "youtube-dl-exec": "^3.1.9",
+    "yt-dlp-exec": "latest",
+    "zustand": "^5.0.14"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
