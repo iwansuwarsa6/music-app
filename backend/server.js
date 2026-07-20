@@ -1,50 +1,49 @@
 const express = require('express');
 const cors = require('cors');
-const { Innertube, UniversalCache } = require('youtubei.js');
 
 const app = express();
 app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
-// Variabel untuk nyimpen sistem Innertube
-let yt;
-
-// Panasin mesin youtubei.js pas server baru nyala
-Innertube.create({ cache: new UniversalCache(false) })
-    .then((instance) => {
-        yt = instance;
-        console.log('✅ MESIN YOUTUBEI.JS SIAP TEMPUR!');
-    })
-    .catch((err) => console.error('Gagal inisialisasi Youtubei:', err));
-
 app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID kosong');
 
-    console.log(`[▶️] YOUTUBEI.JS MENGHAJAR YOUTUBE ID: ${videoId}`);
-
-    if (!yt) return res.status(500).send('Sistem belum siap, tunggu sebentar...');
+    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    console.log(`[▶️] MINTA BANTUAN COBALT API BUAT YOUTUBE ID: ${videoId}`);
 
     try {
-        // RAHASIA BYPASS: Nyamar jadi HP Android biar nggak diblokir
-        const info = await yt.getInfo(videoId, { client: 'ANDROID' });
-        
-        // Minta format audio terbaik
-        const format = info.chooseFormat({ type: 'audio', quality: 'best' });
+        // Kita tembak API publik Cobalt. Mereka yang bakal berdarah-darah nembus YouTube
+        const response = await fetch('https://co.wuk.sh/api/json', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: youtubeUrl,
+                isAudioOnly: true, // Minta audionya aja
+                aFormat: 'mp3'     // Format paling aman
+            })
+        });
 
-        if (format && format.url) {
-            console.log('✅ LINK AUDIO MURNI DIDAPATKAN! Mengalihkan...');
-            res.redirect(format.url);
+        const data = await response.json();
+
+        // Kalau Cobalt berhasil, dia bakal ngasih URL direct-nya
+        if (data && data.url) {
+            console.log('✅ LINK AUDIO DARI COBALT DAPAT! Mengalihkan...');
+            res.redirect(data.url);
         } else {
-            throw new Error('Gagal mengekstrak format audio dari YouTubei');
+            console.error('Cobalt Error Response:', data);
+            throw new Error('Cobalt gagal mengekstrak data');
         }
     } catch (error) {
-        console.error('❌ YOUTUBEI Gagal:', error.message);
-        res.status(500).send('Gagal menembus tameng YouTube');
+        console.error('❌ COBALT Gagal:', error.message);
+        res.status(500).send('Semua jalur API tumbang');
     }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔥 SERVER YOUTUBEI JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER COBALT JALAN DI PORT ${PORT} 🔥`);
 });
