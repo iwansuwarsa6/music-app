@@ -23,10 +23,9 @@ app.get('/api/audio', async (req, res) => {
 
         res.setHeader('Content-Type', 'audio/webm');
 
-        // Tarik stream audionya
+        // Tarik stream audionya (tanpa paksaan highestaudio biar nggak kena blokir)
         const stream = ytdl(url, {
-            filter: 'audioonly',
-            quality: 'highestaudio' // Cari kualitas paling waras
+            filter: 'audioonly'
         });
 
         // Alirkan ke frontend
