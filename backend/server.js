@@ -11,21 +11,19 @@ app.get('/api/audio', (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID kosong');
 
-    console.log(`[▶️] NIXPACKS MENGHAJAR YOUTUBE ID: ${videoId}`);
+    console.log(`[▶️] EKSEKUSI BINARY MANUAL YOUTUBE ID: ${videoId}`);
     const url = `https://www.youtube.com/watch?v=${videoId}`;
 
-    // Jalankan perintah yt-dlp secara native di OS Railway
-    // -f bestaudio = ambil audio terbaik
-    // -g = get url (hanya ambil link, jangan didownload)
-    const command = `yt-dlp -f bestaudio -g "${url}"`;
+    // PERHATIKAN: Panggil ./yt-dlp di folder sendiri
+    const command = `./yt-dlp -f bestaudio -g "${url}"`;
 
     exec(command, (error, stdout, stderr) => {
         if (error) {
             console.error('❌ YT-DLP Gagal:', error.message);
+            console.error('LOG ERROR:', stderr);
             return res.status(500).send('Gagal menembus API YouTube');
         }
 
-        // stdout berisi link mentah dari YouTube
         const directUrl = stdout.trim();
         
         if (directUrl) {
