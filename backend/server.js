@@ -44,9 +44,8 @@ app.get('/api/audio', (req, res) => {
     console.log(`[▶️] STREAMING lagu ID: ${videoId}`);
     res.setHeader('Content-Type', 'audio/webm');
 
-    // Kita jalankan yt-dlp secara eksplisit pakai python3 biar aman di Linux
-    const stream = spawn('python3', [
-        ytDlpPath,
+    // Kita balikin ke cara panggil normal tanpa "python3"
+    const stream = spawn(ytDlpPath, [
         `https://www.youtube.com/watch?v=${videoId}`,
         '-f', 'bestaudio',
         '-o', '-'
@@ -54,7 +53,7 @@ app.get('/api/audio', (req, res) => {
 
     stream.stdout.pipe(res);
 
-    // INI TAMBAHAN PALING PENTING: Penangkap log error dari yt-dlp
+    // Penangkap log error tetep hidup biar kita tau kalau ada masalah
     stream.stderr.on('data', (data) => {
         console.error(`[YT-DLP LOG]: ${data.toString().trim()}`);
     });
