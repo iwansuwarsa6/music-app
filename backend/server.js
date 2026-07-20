@@ -14,9 +14,8 @@ app.get('/api/audio', (req, res) => {
     console.log(`[▶️] STREAMING lagu ID: ${videoId}...`);
     res.setHeader('Content-Type', 'audio/webm');
 
-    // Kita panggil langsung 'yt-dlp' saja (tanpa path lengkap)
-    // Biar sistem yang nyari di PATH (lokasi nixpacks)
-    const ytDlpPath = 'yt-dlp'; 
+    // Manggil yt-dlp lokal hasil download dari package.json
+    const ytDlpPath = './yt-dlp'; 
     
     const args = [
         `https://www.youtube.com/watch?v=${videoId}`,
