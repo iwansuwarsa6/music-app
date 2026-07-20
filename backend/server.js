@@ -27,8 +27,8 @@ app.get('/api/audio', async (req, res) => {
     if (!yt) return res.status(500).send('Sistem belum siap, tunggu sebentar...');
 
     try {
-        // Ambil data langsung dari jantung YouTube
-        const info = await yt.getBasicInfo(videoId);
+        // RAHASIA BYPASS: Nyamar jadi HP Android biar nggak diblokir
+        const info = await yt.getInfo(videoId, { client: 'ANDROID' });
         
         // Minta format audio terbaik
         const format = info.chooseFormat({ type: 'audio', quality: 'best' });
