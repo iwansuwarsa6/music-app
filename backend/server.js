@@ -11,7 +11,7 @@ app.get('/api/audio', async (req, res) => {
     if (!videoId) return res.status(400).send('ID kosong');
 
     const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    console.log(`[▶️] OPERASI COBALT MENYAMAR YOUTUBE ID: ${videoId}`);
+    console.log(`[▶️] OPERASI COBALT V10 YOUTUBE ID: ${videoId}`);
 
     const cobaltServers = [
         'https://api.cobalt.tools',           
@@ -24,21 +24,20 @@ app.get('/api/audio', async (req, res) => {
 
     for (const server of cobaltServers) {
         try {
-            console.log(`Nyamar jadi manusia pakai Chrome ke: ${server}...`);
-            const response = await fetch(`${server}/api/json`, {
+            // RAHASIA UTAMA: Endpoint sekarang cuma "/" BUKAN "/api/json"
+            console.log(`Menembak pintu utama: ${server}...`);
+            const response = await fetch(`${server}/`, { 
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
                     'Content-Type': 'application/json',
-                    // RAHASIA BARU: Topeng User-Agent biar dikira manusia pakai PC
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                    'Origin': 'https://cobalt.tools',
-                    'Referer': 'https://cobalt.tools/'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
                 },
                 body: JSON.stringify({
                     url: youtubeUrl,
                     aFormat: 'mp3',
-                    isAudioOnly: true
+                    isAudioOnly: true,
+                    downloadMode: 'audio' // Parameter wajib untuk Cobalt v10+
                 })
             });
 
@@ -49,6 +48,7 @@ app.get('/api/audio', async (req, res) => {
 
             const data = await response.json();
 
+            // Sesuai respons Cobalt v10, link ada di data.url
             if (data && data.url) {
                 finalUrl = data.url;
                 console.log(`✅ BERHASIL TEMBUS DI SERVER: ${server}`);
@@ -69,5 +69,5 @@ app.get('/api/audio', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔥 SERVER MULTI-COBALT JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER COBALT V10 JALAN DI PORT ${PORT} 🔥`);
 });
