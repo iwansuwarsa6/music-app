@@ -13,22 +13,22 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg}']
       },
       manifest: {
-        name: 'rndmusic Premium',
-        short_name: 'rndmusic',
-        description: 'Aplikasi streaming musik premium',
+        name: 'RnCmusic Premium',
+        short_name: 'RnCmusic',
+        description: 'Aplikasi streaming musik premium dari RNC Tech',
         theme_color: '#0f0f0f',
         background_color: '#000000',
         display: 'standalone',
         icons: [
           {
-            src: '/rndigital.jpg', // 👉 Ngambil dari folder public
+            src: '/rnctech.jpg', // 👉 Udah diganti ke logo RNC Tech
             sizes: '192x192',
-            type: 'image/jpeg'     // 👉 Diubah jadi jpeg
+            type: 'image/jpeg'     
           },
           {
-            src: '/rndigital.jpg', // 👉 Pake gambar yang sama aja gapapa
+            src: '/rnctech.jpg', // 👉 Udah diganti ke logo RNC Tech
             sizes: '512x512',
-            type: 'image/jpeg',    // 👉 Diubah jadi jpeg
+            type: 'image/jpeg',    
             purpose: 'any maskable'
           }
         ]
