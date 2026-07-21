@@ -16,7 +16,7 @@ import Developer from './pages/Developer';
 
 import rndLogo from './store/rndigital.jpg';
 
-// 🔥 LOGO MASJID ESTETIK (Hanya 1 logo tanpa coretan) 🔥
+// 🔥 LOGO MASJID ESTETIK 🔥
 const MosqueIcon = ({ size = 24, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 2c-1.5 2.5-2.5 5-2.5 8.5V21h5v-10.5c0-3.5-1-6-2.5-8.5Z" />
@@ -53,7 +53,6 @@ export default function App() {
   const ghostAudioRef = useRef(null); 
   const adzanAudioRef = useRef(null); 
   
-  // 🔥 URL SUDAH DIGANTI KE RAILWAY 🔥
   const API_BASE = "https://music-app-production-278c.up.railway.app";
 
   const [currentTime, setCurrentTime] = useState(0);
@@ -85,8 +84,11 @@ export default function App() {
   const [adzanMode, setAdzanMode] = useState(() => JSON.parse(localStorage.getItem('ytm_adzan_mode') || 'false'));
   const [isAdzanPlaying, setIsAdzanPlaying] = useState(false);
   const [prayerTimes, setPrayerTimes] = useState([]);
+  
   const lastAdzanTriggered = useRef("");
   const wasPlayingBeforeAdzan = useRef(false);
+  const isAdzanPlayingRef = useRef(false); // 🔥 Lapis 1: Sync State untuk Worker
+  const forceFinishAdzanRef = useRef(null); // 🔥 Fungsi Tembus Blokir
 
   const [relatedSongs, setRelatedSongs] = useState([]);
   const [isLoadingRelated, setIsLoadingRelated] = useState(false);
@@ -96,22 +98,59 @@ export default function App() {
       setTimeout(() => setToastMsg(""), 3500);
   };
 
-  // =========================================================================
-  // 🔥 TOMBOL KONTROL YANG LEBIH SINKRON DENGAN STATE BAWAAN STORE LU 🔥
-  // =========================================================================
+  // Sinkronisasi state React ke Ref biar bisa dibaca Worker dengan akurat
+  useEffect(() => {
+      isAdzanPlayingRef.current = isAdzanPlaying;
+  }, [isAdzanPlaying]);
+
+  // 🔥 FUNGSI PEMAKSA BERHENTI ADZAN & LANJUT MUSIK 🔥
+  useEffect(() => {
+      forceFinishAdzanRef.current = () => {
+          if (!isAdzanPlayingRef.current) return;
+          isAdzanPlayingRef.current = false;
+          setIsAdzanPlaying(false);
+          
+          if (adzanAudioRef.current) {
+              adzanAudioRef.current.pause();
+              adzanAudioRef.current.currentTime = 0;
+          }
+          
+          if (wasPlayingBeforeAdzan.current) {
+              usePlayerStore.setState({ isPlaying: true });
+              if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+              audioRef.current?.play().catch(()=>{});
+              showToast('▶️ Adzan selesai. Melanjutkan musik...');
+          } else {
+              showToast('▶️ Adzan selesai.');
+          }
+      };
+  }, [mediaMode]);
+
+  // 🔥 LAPIS 3: ESCAPE HATCH (BYPASS BUG NYANGKUT) 🔥
+  const checkAdzanActive = () => {
+      if (isAdzanPlayingRef.current) {
+          // Kalau statusnya Adzan tapi HP ngebunuh/ngepause audionya
+          if (adzanAudioRef.current && adzanAudioRef.current.paused) {
+              console.log("Bug HP terdeteksi: Membuka paksa blokiran adzan!");
+              forceFinishAdzanRef.current && forceFinishAdzanRef.current();
+              return false; // Udah gak adzan lagi, bebas jalan!
+          }
+          showToast("🕌 Sedang Adzan, harap tunggu sebentar...");
+          return true; // Beneran lagi adzan
+      }
+      return false;
+  };
+
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
-      if (isAdzanPlaying) return showToast("🕌 Sedang Adzan, harap tunggu sebentar...");
-      
-      // Pancingan Unlock Audio iOS sebelum React muter lagunya
+      if (checkAdzanActive()) return; 
       if (audioRef.current && audioRef.current.paused) audioRef.current.play().catch(()=>{});
       usePlayerStore.getState().playNext(isShuffle);
   };
 
   const handlePrevLocal = (e) => {
       if (e) e.stopPropagation();
-      if (isAdzanPlaying) return showToast("🕌 Sedang Adzan, harap tunggu sebentar...");
-
+      if (checkAdzanActive()) return;
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
       } else {
@@ -122,7 +161,7 @@ export default function App() {
 
   const handleTogglePlayLocal = (e) => {
       if (e) e.stopPropagation();
-      if (isAdzanPlaying) return showToast("🕌 Sedang Adzan, harap tunggu sebentar...");
+      if (checkAdzanActive()) return;
 
       if (isPlaying) {
           audioRef.current?.pause();
@@ -137,12 +176,23 @@ export default function App() {
 
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
-      if (isAdzanPlaying) return showToast("🕌 Sedang Adzan, harap tunggu sebentar...");
-      
+      if (checkAdzanActive()) return;
       if (audioRef.current && audioRef.current.paused) audioRef.current.play().catch(()=>{});
       playSong(song, list, idx); 
   };
-  // =========================================================================
+
+  const handleSeek = (e) => {
+    if (checkAdzanActive()) return; 
+    const seekTime = parseFloat(e.target.value);
+    setCurrentTime(seekTime);
+    currentTimeRef.current = seekTime;
+    if (mediaMode === 'audio' && audioRef.current) {
+        audioRef.current.currentTime = seekTime;
+    }
+    if (mediaMode === 'video' && iframeRef.current && iframeRef.current.contentWindow) {
+      iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [seekTime, true] }), '*');
+    }
+  };
 
   useEffect(() => {
     const nextSong = queue[currentIndex + 1];
@@ -155,8 +205,10 @@ export default function App() {
     }
   }, [queue, currentIndex, API_BASE]);
 
+  // 🔥 LAPIS 2: FULL UNLOCK AUDIO CONTEXT 🔥
   useEffect(() => {
     const unlockAudioContext = () => {
+      // Unlock Musik Utama
       if (audioRef.current && audioRef.current.paused && !currentSong?.id) {
          audioRef.current.src = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
          audioRef.current.play().then(() => {
@@ -164,9 +216,16 @@ export default function App() {
              audioRef.current.src = '';
          }).catch(() => {});
       }
-      if (adzanAudioRef.current && adzanAudioRef.current.paused) {
-          adzanAudioRef.current.load(); // Pemanasan audio adzan
+      
+      // Unlock Adzan (Mute 1ms lalu Pause biar dapet izin HP)
+      if (adzanAudioRef.current && adzanAudioRef.current.paused && adzanAudioRef.current.currentTime === 0) {
+          adzanAudioRef.current.volume = 0; 
+          adzanAudioRef.current.play().then(() => {
+              adzanAudioRef.current.pause();
+              adzanAudioRef.current.volume = 1; 
+          }).catch(() => {});
       }
+      
       document.removeEventListener('click', unlockAudioContext);
       document.removeEventListener('touchstart', unlockAudioContext);
     };
@@ -178,7 +237,6 @@ export default function App() {
     };
   }, [currentSong]);
 
-  // 🔥 JURUS PELACAK LOKASI OTOMATIS (IP BROWSER) 🔥
   useEffect(() => {
     localStorage.setItem('ytm_adzan_mode', JSON.stringify(adzanMode));
     if (adzanMode) {
@@ -186,7 +244,6 @@ export default function App() {
         .then(res => res.json())
         .then(locationData => {
             const userCity = locationData.city || 'Jakarta'; 
-            
             return fetch(`https://api.aladhan.com/v1/timingsByCity?city=${userCity}&country=Indonesia&method=11`)
                 .then(res => res.json())
                 .then(data => {
@@ -195,7 +252,6 @@ export default function App() {
                     console.log(`📍 Jadwal Adzan aktif untuk wilayah: ${userCity}`);
                 });
         }).catch(e => {
-            console.error("Gagal melacak lokasi, pakai default Jakarta", e);
             fetch('https://api.aladhan.com/v1/timingsByCity?city=Jakarta&country=Indonesia&method=11')
             .then(res => res.json())
             .then(data => {
@@ -206,24 +262,29 @@ export default function App() {
     }
   }, [adzanMode]);
 
-  // 🔥 ======================================================= 🔥
-  // 🔥 TEKNIK PEKERJA SILUMAN (WEB WORKER) + KUDA TROYA AUDIO 🔥
-  // 🔥 ======================================================= 🔥
+  // 🔥 LAPIS 1: PEKERJA SILUMAN (WEB WORKER) 🔥
   useEffect(() => {
     if (!adzanMode || prayerTimes.length === 0) return;
 
-    // Bikin thread di luar jangkauan pembekuan OS HP
     const workerCode = `
       let timer;
+      let adzanTimer;
       self.onmessage = function(e) {
         if (e.data === 'start') {
           timer = setInterval(() => {
             const now = new Date();
             const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-            postMessage(timeStr);
+            postMessage({ type: 'time_check', time: timeStr });
           }, 10000);
         } else if (e.data === 'stop') {
           clearInterval(timer);
+          clearTimeout(adzanTimer);
+        } else if (e.data === 'start_adzan') {
+          clearTimeout(adzanTimer);
+          // Set 4 menit (240000ms) pemaksa berhenti kebal Sleep HP
+          adzanTimer = setTimeout(() => {
+             postMessage({ type: 'adzan_done' });
+          }, 240000);
         }
       };
     `;
@@ -231,40 +292,36 @@ export default function App() {
     const worker = new Worker(URL.createObjectURL(blob));
 
     worker.onmessage = (e) => {
-      const timeStr = e.data;
-      if (prayerTimes.includes(timeStr) && lastAdzanTriggered.current !== timeStr) {
-          lastAdzanTriggered.current = timeStr;
-          
-          wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
-          setIsAdzanPlaying(true);
-          
-          if (wasPlayingBeforeAdzan.current) {
-              usePlayerStore.setState({ isPlaying: false });
-              if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
+      const data = e.data;
+      if (data.type === 'time_check') {
+          const timeStr = data.time;
+          if (prayerTimes.includes(timeStr) && lastAdzanTriggered.current !== timeStr) {
+              lastAdzanTriggered.current = timeStr;
               
-              if (audioRef.current) {
-                  audioRef.current.pause(); // Stop musik utama
-                  showToast('🕌 Adzan Tiba! Membajak jalur background...');
+              wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
+              isAdzanPlayingRef.current = true;
+              setIsAdzanPlaying(true);
+              worker.postMessage('start_adzan'); // Suruh worker ngitung mundur!
+              
+              if (wasPlayingBeforeAdzan.current) {
+                  usePlayerStore.setState({ isPlaying: false });
+                  if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
                   
-                  // Panggil audio adzan yg udah pre-load
-                  adzanAudioRef.current.play().catch(err => {
-                      console.log("Kuda troya diblokir, masuk mode timer", err);
-                      // Mode Timer Darurat (kalau OS tetep ngeyel)
-                      setTimeout(() => {
-                          setIsAdzanPlaying(false);
-                          if (wasPlayingBeforeAdzan.current) {
-                              usePlayerStore.setState({ isPlaying: true });
-                              if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
-                              audioRef.current?.play().catch(()=>{});
-                              showToast('▶️ Adzan selesai. Melanjutkan...');
-                          }
-                      }, 240000); 
-                  });
+                  if (audioRef.current) {
+                      audioRef.current.pause(); 
+                      showToast('🕌 Adzan Tiba! Mengambil alih audio...');
+                      adzanAudioRef.current.play().catch(err => {
+                          console.log("OS Memblokir Adzan!", err);
+                      });
+                  }
+              } else {
+                  showToast('🕌 Waktu Adzan tiba!');
+                  adzanAudioRef.current.play().catch(()=>{});
               }
-          } else {
-              showToast('🕌 Waktu Adzan tiba!');
-              adzanAudioRef.current.play().catch(()=>{});
           }
+      } else if (data.type === 'adzan_done') {
+          // Paksa udahan dari Worker
+          forceFinishAdzanRef.current && forceFinishAdzanRef.current();
       }
     };
 
@@ -275,32 +332,25 @@ export default function App() {
       worker.terminate();
     };
   }, [adzanMode, prayerTimes, mediaMode]);
-  // 🔥 ======================================================= 🔥
 
   useEffect(() => {
     const handleOpenMenu = (e) => {
         const { event, song } = e.detail;
         let x = event.clientX;
         let y = event.clientY;
-        
         const menuWidth = 260;
         const menuHeight = 320; 
-
         if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
         if (y + menuHeight > window.innerHeight) {
             y = event.clientY - menuHeight;
             if (y < 10) y = 10;
         }
-
         setContextMenu({ isOpen: true, x, y, song });
     };
-
     const handleCloseMenu = () => setContextMenu(prev => ({ ...prev, isOpen: false }));
-    
     window.addEventListener('openSongMenu', handleOpenMenu);
     window.addEventListener('click', handleCloseMenu);
     window.addEventListener('scroll', handleCloseMenu, true);
-    
     return () => {
         window.removeEventListener('openSongMenu', handleOpenMenu);
         window.removeEventListener('click', handleCloseMenu);
@@ -375,18 +425,15 @@ export default function App() {
     window.dispatchEvent(new Event('likedSongsUpdated'));
   };
 
-  // 🔥 SISTEM INGATAN (CACHE) UNTUK RADIO MIX 🔥
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
     let cleanArtist = (baseSong.artist || 'Official').split('-')[0].trim();
     cleanArtist = cleanArtist.replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
     
-    // Cek di ingatan
     const cacheKey = `radiomix_${cleanArtist}`;
     const cachedMix = sessionStorage.getItem(cacheKey);
     
     if (cachedMix) {
-        console.log("⚡ Hemat Kuota! Mengambil mix dari ingatan.");
         usePlayerStore.setState(state => ({ queue: [baseSong, ...JSON.parse(cachedMix)] }));
         return;
     }
@@ -414,7 +461,7 @@ export default function App() {
 
         mix = mix.sort(() => Math.random() - 0.5).slice(0, 25);
         if (mix.length > 0) {
-            sessionStorage.setItem(cacheKey, JSON.stringify(mix)); // Simpan ke ingatan
+            sessionStorage.setItem(cacheKey, JSON.stringify(mix)); 
             usePlayerStore.setState(state => ({ queue: [baseSong, ...mix] }));
         }
     } catch (e) {}
@@ -444,14 +491,12 @@ export default function App() {
     if (q) setSearchQuery(q);
   }, [location.search]);
 
-  // 🔥 SISTEM INGATAN (CACHE) UNTUK PENCARIAN 🔥
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (searchQuery.trim().length > 2) {
         setIsFetchingSuggestions(true);
         const qLower = searchQuery.trim().toLowerCase();
         
-        // Cek di ingatan
         const cacheKey = `search_${qLower}`;
         const cachedSearch = sessionStorage.getItem(cacheKey);
 
@@ -484,8 +529,6 @@ export default function App() {
 
             setTextSuggestions(finalTexts);
             setLiveSuggestions(finalLives); 
-            
-            // Simpan ke ingatan
             sessionStorage.setItem(cacheKey, JSON.stringify({ texts: finalTexts, lives: finalLives }));
           }
         } catch (error) {} finally { setIsFetchingSuggestions(false); }
@@ -541,7 +584,7 @@ export default function App() {
           iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
       } else {
           iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
-          if (isPlaying && !isAdzanPlaying) iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+          if (isPlaying && !isAdzanPlayingRef.current) iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
       }
     }
   };
@@ -549,7 +592,7 @@ export default function App() {
   useEffect(() => {
       const syncMedia = () => {
           if (!iframeRef.current?.contentWindow) return;
-          if (isAdzanPlaying) return; 
+          if (isAdzanPlayingRef.current) return; 
 
           if (mediaMode === 'audio') {
               if (audioRef.current) audioRef.current.muted = false;
@@ -572,7 +615,7 @@ export default function App() {
       syncMedia();
       const t1 = setTimeout(syncMedia, 500);
       return () => { clearTimeout(t1); };
-  }, [mediaMode, isPlaying, currentSong?.id, isAdzanPlaying]);
+  }, [mediaMode, isPlaying, currentSong?.id]);
 
   useEffect(() => {
     const handleMessage = (event) => {
@@ -588,7 +631,7 @@ export default function App() {
               
               if (data.info.playerState !== undefined) {
                  const state = data.info.playerState;
-                 if (state === 1 && !usePlayerStore.getState().isPlaying && !isAdzanPlaying) {
+                 if (state === 1 && !usePlayerStore.getState().isPlaying && !isAdzanPlayingRef.current) {
                      usePlayerStore.setState({ isPlaying: true }); 
                  } else if (state === 2 && usePlayerStore.getState().isPlaying) {
                      usePlayerStore.setState({ isPlaying: false }); 
@@ -612,9 +655,8 @@ export default function App() {
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [isDragging, mediaMode, isAdzanPlaying]);
+  }, [isDragging, mediaMode]);
 
-  // 🔥 SISTEM INGATAN (CACHE) UNTUK ARTIS TERKAIT 🔥
   useEffect(() => {
       if (activeTab === 'artist' && displayArtist && displayArtist !== "Artis") {
           const cacheKey = `related_${displayArtist}`;
@@ -637,7 +679,7 @@ export default function App() {
                           return { id: vid, title: cleanT.trim(), artist: displayArtist, image: t.thumbnail, url: `https://www.youtube.com/watch?v=${vid}` };
                       }).filter(t => t.id);
                       setRelatedSongs(tracks);
-                      sessionStorage.setItem(cacheKey, JSON.stringify(tracks)); // Simpan ke ingatan
+                      sessionStorage.setItem(cacheKey, JSON.stringify(tracks)); 
                   }
               })
               .catch(err => console.error(err))
@@ -675,7 +717,7 @@ export default function App() {
             audioRef.current.src = expectedUrl;
             audioRef.current.load();
             setIsBuffering(true);
-            if (isPlaying && !isAdzanPlaying) {
+            if (isPlaying && !isAdzanPlayingRef.current) {
                 audioRef.current.play().catch(()=>{});
             }
         }
@@ -738,19 +780,6 @@ export default function App() {
     }
   }, [currentTime, lyrics, activeLyricIndex, lyricOffset, isSyncMode, lyricsMode]);
 
-  const handleSeek = (e) => {
-    if (isAdzanPlaying) return; 
-    const seekTime = parseFloat(e.target.value);
-    setCurrentTime(seekTime);
-    currentTimeRef.current = seekTime;
-    if (mediaMode === 'audio' && audioRef.current) {
-        audioRef.current.currentTime = seekTime;
-    }
-    if (mediaMode === 'video' && iframeRef.current && iframeRef.current.contentWindow) {
-      iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [seekTime, true] }), '*');
-    }
-  };
-
   const toggleRepeat = () => {
     usePlayerStore.setState(prev => {
       if (prev.repeatMode === 'off') return { repeatMode: 'all' };
@@ -797,7 +826,7 @@ export default function App() {
         handleSeek({ target: { value: details.seekTime } });
       });
     }
-  }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying, isAdzanPlaying]);
+  }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying]);
 
   return (
     <div className="h-screen bg-gradient-to-br from-[#13151f] via-[#0f0f0f] to-[#000000] text-white flex flex-col font-sans overflow-hidden relative">
@@ -818,7 +847,7 @@ export default function App() {
         }}
         onCanPlay={() => {
            setIsBuffering(false);
-           if (isPlaying && mediaMode === 'audio' && !isAdzanPlaying) audioRef.current.play().catch(() => console.log("Menunggu interaksi pengguna"));
+           if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) audioRef.current.play().catch(() => console.log("Menunggu interaksi pengguna"));
         }}
         onEnded={() => { 
            if (mediaMode === 'audio') {
@@ -836,7 +865,6 @@ export default function App() {
                setIsBuffering(false);
                usePlayerStore.setState({ isPlaying: false });
                
-               // 🔥 FITUR AUTO-SKIP ANTI STUCK 🔥
                showToast("❌ Audio diproteksi/gagal dimuat. Melompat ke lagu berikutnya...");
                setTimeout(() => {
                    handleNextLocal(null);
@@ -852,27 +880,11 @@ export default function App() {
       <audio
         ref={adzanAudioRef}
         src="https://raw.githubusercontent.com/islamic-network/cdn/master/audio/adhan/makkah.mp3"
-        onEnded={() => {
-            setIsAdzanPlaying(false);
-            if (wasPlayingBeforeAdzan.current) {
-                usePlayerStore.setState({ isPlaying: true });
-                if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
-                audioRef.current?.play().catch(()=>{});
-                showToast('▶️ Adzan selesai. Melanjutkan musik...');
-            } else {
-                showToast('▶️ Adzan selesai.');
-            }
-        }}
+        onEnded={() => { forceFinishAdzanRef.current && forceFinishAdzanRef.current(); }}
         className="hidden"
       />
 
-      <audio
-        ref={ghostAudioRef}
-        preload="auto"
-        muted
-        playsInline
-        className="hidden"
-      />
+      <audio ref={ghostAudioRef} preload="auto" muted playsInline className="hidden" />
 
       {toastMsg && (
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-6 py-3 rounded-full text-sm font-semibold shadow-2xl z-[99999] animate-in slide-in-from-bottom-5 whitespace-nowrap">
@@ -1215,7 +1227,6 @@ export default function App() {
             <div className="flex-1 min-h-0 flex items-center justify-center w-full mx-auto relative p-2 md:p-8">
                <div className={`relative bg-black shadow-2xl rounded-2xl overflow-hidden transition-all duration-500 flex items-center justify-center w-full h-full ${mediaMode === 'audio' ? 'aspect-square max-h-[45vh] md:max-h-[500px]' : 'aspect-video max-w-5xl max-h-full'}`}>
                  
-                 {/* 🔥 THE YOUTUBE IFRAME DENGAN MUTE BAWAAN 🔥 */}
                  <iframe
                    ref={iframeRef} onLoad={handleIframeLoad}
                    width="100%" height="100%"
