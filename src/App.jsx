@@ -653,17 +653,10 @@ export default function App() {
   // 🔥 FUNGSI MEDIA & LYRICS 🔥
   // =========================================================================
 
-  // 1. Dapatkan nama artis dari API (Channel YouTube-nya) biar gak ketuker sama judul
   const displayArtist = useMemo(() => {
     if (!currentSong) return "Artis";
-    
-    // Ambil dari nama channel bawaan YouTube (paling akurat)
     let a = currentSong.artist || "";
-    
-    // Bersihin nama channel dari embel-embel Vevo, Topic, dll biar bersih
     a = a.replace(/vevo|official|topic|music|channel/gi, '').replace(/-/g, '').trim();
-    
-    // Kalau dari sananya gak ada nama channel, baru terpaksa tebak dari potong judul
     if (!a || a.toLowerCase() === 'youtube') {
        if (currentSong.title && currentSong.title.includes('-')) {
            a = currentSong.title.split('-')[0].replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
@@ -672,27 +665,17 @@ export default function App() {
     return a.trim() || "Artis";
   }, [currentSong]);
 
-  // 2. Tentukan judul dengan membandingkannya dengan nama artis di atas
   const displayTitle = useMemo(() => {
     if (!currentSong?.title) return "Pilih Lagu";
-    
-    // Bersihin tanda kurung dll
     let t = currentSong.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
-    
     if (t.includes('-')) {
        let parts = t.split('-');
        let artistName = displayArtist.toLowerCase();
-       
-       // Kalau bagian depan itu nama artis, berarti sisanya adalah judul
        if (parts[0].toLowerCase().includes(artistName)) {
            t = parts.slice(1).join('-'); 
-       } 
-       // Kalau bagian belakang itu nama artis, berarti bagian depan adalah judul
-       else if (parts[1] && parts[1].toLowerCase().includes(artistName)) {
+       } else if (parts[1] && parts[1].toLowerCase().includes(artistName)) {
            t = parts[0];
-       } 
-       // Default tebakan YouTube: Artist - Title
-       else {
+       } else {
            t = parts.slice(1).join('-');
        }
     }
@@ -775,7 +758,7 @@ export default function App() {
       }
   }, [activeTab, displayArtist]);
 
-  // 🔥 UPDATE: BYPASS CORS LYRIST PAKAI CORSPROXY.IO 🔥
+  // 🔥 UPDATE: LOGIKA LIRIK SUPER PINTAR & AKURAT 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -820,8 +803,9 @@ export default function App() {
       setLyrics([]); 
       setActiveLyricIndex(-1);
 
-      const cleanTitleAPI = displayTitle.replace(/(hq|audio|official|music video|lyric video|lyrics|hd|mv|video|4k|8k)/gi, '').trim();
-      const cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,/i)[0].trim(); 
+      // Bersihin judul & artis dari embel-embel YouTube (Video, Audio, Official, kurung-kurung)
+      let cleanTitleAPI = displayTitle.replace(/(hq|audio|official|music video|lyric video|lyrics|hd|mv|video|4k|8k|\(.*\)|\[.*\])/gi, '').trim();
+      let cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,/i)[0].trim(); 
       const searchQueryAPI = `${cleanTitleAPI} ${cleanArtistAPI}`.trim();
       
       fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(searchQueryAPI)}`)
@@ -829,31 +813,63 @@ export default function App() {
         .then(async data => {
           let trackFound = false;
           if (Array.isArray(data) && data.length > 0) {
+            // Cari yang paling pas (utamakan yang punya syncedLyrics)
             const safeTitle = cleanTitleAPI.toLowerCase();
             const exactMatches = data.filter(t => t.trackName?.toLowerCase().includes(safeTitle) || safeTitle.includes(t.trackName?.toLowerCase()));
-            let track = exactMatches.length > 0 ? (exactMatches.find(t => t.syncedLyrics) || exactMatches.find(t => t.plainLyrics) || exactMatches[0]) : (data.find(t => t.syncedLyrics) || data.find(t => t.plainLyrics) || data[0]);
+            let track = exactMatches.length > 0 
+                ? (exactMatches.find(t => t.syncedLyrics) || exactMatches.find(t => t.plainLyrics) || exactMatches[0]) 
+                : (data.find(t => t.syncedLyrics) || data.find(t => t.plainLyrics) || data[0]);
 
             if (track) {
               trackFound = true;
               setLrclibDuration(track.duration || 0);
+              
               if (track.syncedLyrics) {
+                // 🔥 PARSING REGEX LEBIH AKURAT (BACA MILIDETIK) 🔥
                 const parsed = track.syncedLyrics.split('\n').map(line => {
-                  const match = line.match(/\[(\d{2}):(\d{2})\.(\d{2,3})\](.*)/);
-                  if (match && match[4].trim() !== '') return { time: parseInt(match[1]) * 60 + parseInt(match[2]), text: match[4].trim() };
+                  const match = line.match(/\[(\d{1,3}):(\d{1,2}(?:\.\d{1,3})?)\](.*)/);
+                  if (match && match[3].trim() !== '') {
+                      return { 
+                          time: parseInt(match[1], 10) * 60 + parseFloat(match[2]), 
+                          text: match[3].trim() 
+                      };
+                  }
                   return null;
                 }).filter(item => item !== null);
-                if (parsed.length > 0) { setLyrics(parsed); setLyricsMode('synced'); return; }
+                
+                if (parsed.length > 0) { 
+                    setLyrics(parsed); 
+                    setLyricsMode('synced'); 
+                    return; 
+                }
               }
               if (track.plainLyrics) {
                 const parsed = track.plainLyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
-                if (parsed.length > 0) { setLyrics(parsed); setLyricsMode('full'); return; }
+                if (parsed.length > 0) { 
+                    setLyrics(parsed); 
+                    setLyricsMode('full'); 
+                    return; 
+                }
               }
             }
           }
           
           if (!trackFound) {
-              console.log(`⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik untuk: ${searchQueryAPI}`);
+              console.log(`⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik`);
               try {
+                  // Fallback 1: ovh API (Bagus buat lagu universal/pop)
+                  const resOvh = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtistAPI)}/${encodeURIComponent(cleanTitleAPI)}`);
+                  const dataOvh = await resOvh.json();
+                  
+                  if (dataOvh && dataOvh.lyrics) {
+                      const parsed = dataOvh.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
+                      if (parsed.length > 0) { 
+                          setLyrics(parsed); setLyricsMode('full'); 
+                          return; 
+                      }
+                  }
+                  
+                  // Fallback 2: Lyrist via proxy (Jalur terakhir)
                   const targetUrl = `https://lyrist.vercel.app/api/${encodeURIComponent(searchQueryAPI)}`;
                   const fallbackRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
                   const fallbackData = await fallbackRes.json();
@@ -863,11 +879,10 @@ export default function App() {
                       if (parsed.length > 0) { 
                           setLyrics(parsed); 
                           setLyricsMode('full');
-                          console.log("✅ Lirik Jalur Darurat Berhasil Ditarik via corsproxy.io!");
                       }
                   }
               } catch(err) {
-                  console.log("❌ Lirik jalur darurat juga gagal:", err);
+                  console.log("❌ Lirik jalur darurat gagal total");
               }
           }
           
