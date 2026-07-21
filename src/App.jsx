@@ -101,8 +101,11 @@ export default function App() {
   const isAdzanPlayingRef = useRef(false); 
   const forceFinishAdzanRef = useRef(null); 
 
-  const [relatedSongs, setRelatedSongs] = useState([]);
-  const [isLoadingRelated, setIsLoadingRelated] = useState(false);
+  // 🔥 UPDATE: Simpan mediaMode ke ref biar worker gak bingung 🔥
+  const mediaModeRef = useRef(mediaMode);
+  useEffect(() => {
+      mediaModeRef.current = mediaMode;
+  }, [mediaMode]);
 
   const showToast = (msg) => {
       setToastMsg(msg);
@@ -126,23 +129,33 @@ export default function App() {
           
           if (wasPlayingBeforeAdzan.current) {
               usePlayerStore.setState({ isPlaying: true });
-              if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+              if (mediaModeRef.current === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
               getActiveAudio()?.play().catch(()=>{});
               showToast('▶️ Adzan selesai. Melanjutkan musik...');
           } else {
               showToast('▶️ Adzan selesai.');
           }
       };
-  }, [mediaMode]);
+  }, []); // Kosongin array biar ga di-render ulang
 
+  // 🔥 UPDATE: Benerin fungsi dismiss adzan 🔥
   const dismissAdzanIfActive = () => {
       if (isAdzanPlayingRef.current) {
-          forceFinishAdzanRef.current && forceFinishAdzanRef.current();
+          isAdzanPlayingRef.current = false;
+          setIsAdzanPlaying(false);
+          if (adzanAudioRef.current) {
+              adzanAudioRef.current.pause();
+              adzanAudioRef.current.currentTime = 0;
+          }
+          showToast('Adzan dihentikan manual.');
           return true;
       }
       return false;
   };
 
+  // =========================================================================
+  // 🔥 TOMBOL KONTROL & PING PONG MANUAL 🔥
+  // =========================================================================
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       dismissAdzanIfActive(); 
@@ -179,11 +192,10 @@ export default function App() {
 
   const handleTogglePlayLocal = (e) => {
       if (e) e.stopPropagation();
-      if (dismissAdzanIfActive()) {
-          usePlayerStore.setState({ isPlaying: true });
-          getActiveAudio()?.play().catch(()=>{});
-          return;
-      }
+      
+      // 🔥 UPDATE: Cek kalau adzan nyala, matiin adzan aja, gausah play musik! 🔥
+      if (dismissAdzanIfActive()) return; 
+
       if (isPlaying) {
           getActiveAudio()?.pause();
           if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
@@ -221,6 +233,7 @@ export default function App() {
     }
   };
 
+  // 🔥 CURI START DOWNLOAD (PRELOAD) KE MESIN CADANGAN 🔥
   useEffect(() => {
     const nextSong = queue[currentIndex + 1];
     if (nextSong && nextSong.id) {
@@ -295,6 +308,40 @@ export default function App() {
     }
   }, [adzanMode]);
 
+  // 🔥 UPDATE: Fungsi Tembak Test Adzan biar gak tumpang tindih 🔥
+  const triggerTestAdzan = () => {
+      if (isAdzanPlayingRef.current) return;
+      
+      wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
+      isAdzanPlayingRef.current = true;
+      setIsAdzanPlaying(true);
+      
+      if (wasPlayingBeforeAdzan.current) {
+          usePlayerStore.setState({ isPlaying: false });
+          if (mediaModeRef.current === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
+          
+          const active = getActiveAudio();
+          if (active) active.pause(); 
+          
+          showToast('🔊 Test Adzan! Menghentikan musik...');
+      } else {
+          showToast('🔊 Test Adzan dimulai!');
+      }
+
+      if (adzanAudioRef.current) {
+          adzanAudioRef.current.currentTime = 0;
+          adzanAudioRef.current.volume = 1;
+          adzanAudioRef.current.play().catch((err) => {
+              console.error("Adzan diblokir browser:", err);
+              showToast("⚠️ Browser memblokir Adzan! Sentuh layar.");
+          });
+      }
+
+      setTimeout(() => {
+          forceFinishAdzanRef.current && forceFinishAdzanRef.current();
+      }, 240000);
+  };
+
   useEffect(() => {
     if (!adzanMode || prayerTimes.length === 0) return;
 
@@ -328,9 +375,9 @@ export default function App() {
               
               if (wasPlayingBeforeAdzan.current) {
                   usePlayerStore.setState({ isPlaying: false });
-                  if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
+                  if (mediaModeRef.current === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
                   
-                  const active = getActiveAudio();
+                  const active = activeEngine.current === 1 ? audio1Ref.current : audio2Ref.current;
                   if (active) active.pause(); 
                   
                   showToast('🕌 Adzan Tiba! Mengambil alih audio...');
@@ -338,9 +385,9 @@ export default function App() {
                   showToast('🕌 Waktu Adzan tiba!');
               }
 
-              // 🔥 UPDATE: DETEKSI PEMBLOKIRAN BROWSER 🔥
               if (adzanAudioRef.current) {
                   adzanAudioRef.current.currentTime = 0;
+                  adzanAudioRef.current.volume = 1;
                   adzanAudioRef.current.play().catch((err) => {
                       console.error("Adzan diblokir browser:", err);
                       showToast("⚠️ Browser memblokir Adzan! Sentuh layar untuk memutar.");
@@ -360,7 +407,7 @@ export default function App() {
       worker.postMessage('stop');
       worker.terminate();
     };
-  }, [adzanMode, prayerTimes, mediaMode]);
+  }, [adzanMode, prayerTimes]);
 
   useEffect(() => {
     const handleOpenMenu = (e) => {
@@ -1118,25 +1165,11 @@ export default function App() {
              onClick={() => {
                  const newMode = !adzanMode;
                  setAdzanMode(newMode);
-                 
-                 // Pancing izin audio browser saat mode dinyalain
-                 if (newMode && adzanAudioRef.current) {
-                     adzanAudioRef.current.volume = 0;
-                     adzanAudioRef.current.play().then(() => {
-                         adzanAudioRef.current.pause();
-                         adzanAudioRef.current.volume = 1;
-                         adzanAudioRef.current.currentTime = 0;
-                     }).catch(() => {});
-                 }
+                 showToast(newMode ? "Mode Adzan Aktif 🕌" : "Mode Adzan Dimatikan");
              }}
              onDoubleClick={(e) => {
-                 // FITUR RAHASIA: Klik Kiri 2x Cepat buat ngetes Adzan
                  e.preventDefault();
-                 showToast("🔊 Test Audio Adzan...");
-                 if(adzanAudioRef.current) {
-                     adzanAudioRef.current.currentTime = 0;
-                     adzanAudioRef.current.play().catch(() => showToast("❌ Gagal, diblokir browser!"));
-                 }
+                 triggerTestAdzan();
              }}
              className={`transition-all duration-300 ${adzanMode ? 'text-[#3ea6ff] drop-shadow-[0_0_8px_rgba(62,166,255,0.4)]' : 'text-zinc-500 hover:text-zinc-300'}`} 
              title="Mode Adzan (Klik Kiri 2x Cepat untuk Test)"
@@ -1285,23 +1318,11 @@ export default function App() {
                onClick={() => {
                    const newMode = !adzanMode;
                    setAdzanMode(newMode);
-                   
-                   if (newMode && adzanAudioRef.current) {
-                       adzanAudioRef.current.volume = 0;
-                       adzanAudioRef.current.play().then(() => {
-                           adzanAudioRef.current.pause();
-                           adzanAudioRef.current.volume = 1;
-                           adzanAudioRef.current.currentTime = 0;
-                       }).catch(() => {});
-                   }
+                   showToast(newMode ? "Mode Adzan Aktif 🕌" : "Mode Adzan Dimatikan");
                }}
                onDoubleClick={(e) => {
                    e.preventDefault();
-                   showToast("🔊 Test Audio Adzan...");
-                   if(adzanAudioRef.current) {
-                       adzanAudioRef.current.currentTime = 0;
-                       adzanAudioRef.current.play().catch(() => showToast("❌ Gagal, diblokir browser!"));
-                   }
+                   triggerTestAdzan();
                }}
                className={`p-2 rounded-full hover:bg-white/10 transition-all duration-300 ${adzanMode ? 'text-[#3ea6ff] drop-shadow-[0_0_8px_rgba(62,166,255,0.4)]' : 'text-zinc-500 hover:text-white'}`} 
                title="Mode Adzan (Klik Kiri 2x Cepat untuk Test)"
