@@ -178,15 +178,31 @@ export default function App() {
     };
   }, [currentSong]);
 
+  // 🔥 JURUS PELACAK LOKASI OTOMATIS (IP BROWSER) 🔥
   useEffect(() => {
     localStorage.setItem('ytm_adzan_mode', JSON.stringify(adzanMode));
     if (adzanMode) {
-        fetch('https://api.aladhan.com/v1/timingsByCity?city=Jakarta&country=Indonesia&method=11')
+        fetch('https://get.geojs.io/v1/ip/geo.json')
         .then(res => res.json())
-        .then(data => {
-            const timings = data.data.timings;
-            setPrayerTimes([timings.Fajr, timings.Dhuhr, timings.Asr, timings.Maghrib, timings.Isha]);
-        }).catch(e => console.error("Gagal menarik jadwal adzan", e));
+        .then(locationData => {
+            const userCity = locationData.city || 'Jakarta'; 
+            
+            return fetch(`https://api.aladhan.com/v1/timingsByCity?city=${userCity}&country=Indonesia&method=11`)
+                .then(res => res.json())
+                .then(data => {
+                    const timings = data.data.timings;
+                    setPrayerTimes([timings.Fajr, timings.Dhuhr, timings.Asr, timings.Maghrib, timings.Isha]);
+                    console.log(`📍 Jadwal Adzan aktif untuk wilayah: ${userCity}`);
+                });
+        }).catch(e => {
+            console.error("Gagal melacak lokasi, pakai default Jakarta", e);
+            fetch('https://api.aladhan.com/v1/timingsByCity?city=Jakarta&country=Indonesia&method=11')
+            .then(res => res.json())
+            .then(data => {
+                const timings = data.data.timings;
+                setPrayerTimes([timings.Fajr, timings.Dhuhr, timings.Asr, timings.Maghrib, timings.Isha]);
+            });
+        });
     }
   }, [adzanMode]);
 
