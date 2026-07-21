@@ -143,21 +143,14 @@ export default function App() {
       return false;
   };
 
-  // =========================================================================
-  // 🔥 TOMBOL KONTROL & PING PONG MANUAL 🔥
-  // =========================================================================
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       dismissAdzanIfActive(); 
-      
-      if (e && keepAliveAudioRef.current) {
-          keepAliveAudioRef.current.play().catch(err => console.log("KeepAlive Error:", err));
-      }
+      if (e && keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       
       if (e) {
           const nextSong = queue[currentIndex + 1];
           const ghost = getGhostAudio();
-          // Kalau dipencet manual & lagu udah siap di mesin sebelahnya
           if (nextSong && ghost && ghost.src.includes(nextSong.id)) {
               getActiveAudio()?.pause();
               activeEngine.current = activeEngine.current === 1 ? 2 : 1;
@@ -168,7 +161,6 @@ export default function App() {
               getActiveAudio()?.pause();
           }
       }
-      
       usePlayerStore.getState().playNext(isShuffle);
   };
 
@@ -187,13 +179,11 @@ export default function App() {
 
   const handleTogglePlayLocal = (e) => {
       if (e) e.stopPropagation();
-      
       if (dismissAdzanIfActive()) {
           usePlayerStore.setState({ isPlaying: true });
           getActiveAudio()?.play().catch(()=>{});
           return;
       }
-
       if (isPlaying) {
           getActiveAudio()?.pause();
           if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
@@ -208,7 +198,6 @@ export default function App() {
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
-      
       if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       
       const active = getActiveAudio();
@@ -226,15 +215,12 @@ export default function App() {
     setCurrentTime(seekTime);
     currentTimeRef.current = seekTime;
     const active = getActiveAudio();
-    if (mediaMode === 'audio' && active) {
-        active.currentTime = seekTime;
-    }
+    if (mediaMode === 'audio' && active) active.currentTime = seekTime;
     if (mediaMode === 'video' && iframeRef.current && iframeRef.current.contentWindow) {
       iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [seekTime, true] }), '*');
     }
   };
 
-  // 🔥 CURI START DOWNLOAD (PRELOAD) KE MESIN CADANGAN 🔥
   useEffect(() => {
     const nextSong = queue[currentIndex + 1];
     if (nextSong && nextSong.id) {
@@ -279,9 +265,11 @@ export default function App() {
     };
   }, [currentSong]);
 
+  // 🔥 UPDATE: SISTEM SINKRONISASI JADWAL ADZAN SUPER CEREWET 🔥
   useEffect(() => {
     localStorage.setItem('ytm_adzan_mode', JSON.stringify(adzanMode));
     if (adzanMode) {
+        showToast("⏳ Sinkronisasi jadwal Adzan...");
         fetch('https://get.geojs.io/v1/ip/geo.json')
         .then(res => res.json())
         .then(locationData => {
@@ -291,6 +279,7 @@ export default function App() {
                 .then(data => {
                     const timings = data.data.timings;
                     setPrayerTimes([timings.Fajr, timings.Dhuhr, timings.Asr, timings.Maghrib, timings.Isha]);
+                    showToast(`✅ Jadwal Adzan ${userCity} Aktif!`);
                 });
         }).catch(e => {
             fetch('https://api.aladhan.com/v1/timingsByCity?city=Jakarta&country=Indonesia&method=11')
@@ -298,8 +287,11 @@ export default function App() {
             .then(data => {
                 const timings = data.data.timings;
                 setPrayerTimes([timings.Fajr, timings.Dhuhr, timings.Asr, timings.Maghrib, timings.Isha]);
+                showToast(`✅ Jadwal Adzan Jakarta Aktif! (Fallback)`);
             });
         });
+    } else {
+        setPrayerTimes([]);
     }
   }, [adzanMode]);
 
@@ -308,7 +300,6 @@ export default function App() {
 
     const workerCode = `
       let timer;
-      let adzanTimer;
       self.onmessage = function(e) {
         if (e.data === 'start') {
           timer = setInterval(() => {
@@ -318,12 +309,6 @@ export default function App() {
           }, 10000);
         } else if (e.data === 'stop') {
           clearInterval(timer);
-          clearTimeout(adzanTimer);
-        } else if (e.data === 'start_adzan') {
-          clearTimeout(adzanTimer);
-          adzanTimer = setTimeout(() => {
-             postMessage({ type: 'adzan_done' });
-          }, 240000);
         }
       };
     `;
@@ -340,25 +325,32 @@ export default function App() {
               wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
               isAdzanPlayingRef.current = true;
               setIsAdzanPlaying(true);
-              worker.postMessage('start_adzan'); 
               
               if (wasPlayingBeforeAdzan.current) {
                   usePlayerStore.setState({ isPlaying: false });
                   if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
                   
                   const active = getActiveAudio();
-                  if (active) {
-                      active.pause(); 
-                      showToast('🕌 Adzan Tiba! Mengambil alih audio...');
-                      adzanAudioRef.current.play().catch(()=>{});
-                  }
+                  if (active) active.pause(); 
+                  
+                  showToast('🕌 Adzan Tiba! Mengambil alih audio...');
               } else {
                   showToast('🕌 Waktu Adzan tiba!');
-                  adzanAudioRef.current.play().catch(()=>{});
               }
+
+              // 🔥 UPDATE: DETEKSI PEMBLOKIRAN BROWSER 🔥
+              if (adzanAudioRef.current) {
+                  adzanAudioRef.current.currentTime = 0;
+                  adzanAudioRef.current.play().catch((err) => {
+                      console.error("Adzan diblokir browser:", err);
+                      showToast("⚠️ Browser memblokir Adzan! Sentuh layar untuk memutar.");
+                  });
+              }
+
+              setTimeout(() => {
+                  forceFinishAdzanRef.current && forceFinishAdzanRef.current();
+              }, 240000); // 4 menit adzan
           }
-      } else if (data.type === 'adzan_done') {
-          forceFinishAdzanRef.current && forceFinishAdzanRef.current();
       }
     };
 
@@ -691,7 +683,6 @@ export default function App() {
       }
   }, [activeTab, displayArtist]);
 
-  // 🔥 UPDATE: MESIN LIRIK KEMBAR + MESIN CUCI PINTER 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -736,13 +727,10 @@ export default function App() {
       setLyrics([]); 
       setActiveLyricIndex(-1);
 
-      // 🔥 FILTER MESIN CUCI: Bersihin judul & artis dari embel-embel biar API paham 🔥
       const cleanTitleAPI = displayTitle.replace(/(hq|audio|official|music video|lyric video|lyrics|hd|mv|video|4k|8k)/gi, '').trim();
-      // Ambil nama artis utamanya aja, buang tulisan "feat", "ft", atau "x"
       const cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,/i)[0].trim(); 
       const searchQueryAPI = `${cleanTitleAPI} ${cleanArtistAPI}`.trim();
       
-      // MESIN 1: Cari Lirik Running Text (LRCLIB)
       fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(searchQueryAPI)}`)
         .then(res => res.json())
         .then(async data => {
@@ -770,7 +758,6 @@ export default function App() {
             }
           }
           
-          // 🔥 MESIN 2 (JALUR DARURAT): Kalau LRCLIB kosong, paksa tarik dari Scraper Genius 🔥
           if (!trackFound) {
               console.log(`⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik untuk: ${searchQueryAPI}`);
               try {
@@ -781,7 +768,7 @@ export default function App() {
                       const parsed = fallbackData.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
                       if (parsed.length > 0) { 
                           setLyrics(parsed); 
-                          setLyricsMode('full'); // Set ke Full Text otomatis
+                          setLyricsMode('full');
                           console.log("✅ Lirik Jalur Darurat Berhasil Ditarik!");
                       }
                   }
@@ -867,9 +854,6 @@ export default function App() {
     }
   }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying]);
 
-  // =========================================================================
-  // 🔥 FUNGSI EVENT HANDLER UNTUK MESIN KEMBAR 🔥
-  // =========================================================================
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
       if (!isDragging && mediaMode === 'audio') {
@@ -905,7 +889,6 @@ export default function App() {
       if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause(); 
   };
   
-  // 🔥 PING-PONG EXECUTION 🔥
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
@@ -951,6 +934,8 @@ export default function App() {
       <audio
         ref={adzanAudioRef}
         src="https://raw.githubusercontent.com/islamic-network/cdn/master/audio/adhan/makkah.mp3"
+        preload="auto"
+        crossOrigin="anonymous"
         onEnded={() => { forceFinishAdzanRef.current && forceFinishAdzanRef.current(); }}
         className="hidden"
       />
@@ -1129,11 +1114,33 @@ export default function App() {
         </div>
 
         <div className="flex items-center justify-end gap-5 w-[160px]">
-          <button onClick={() => {
-              const newMode = !adzanMode;
-              setAdzanMode(newMode);
-              showToast(newMode ? "Mode Adzan Aktif 🕌" : "Mode Adzan Dimatikan");
-          }} className={`transition-all duration-300 ${adzanMode ? 'text-[#3ea6ff] drop-shadow-[0_0_8px_rgba(62,166,255,0.4)]' : 'text-zinc-500 hover:text-zinc-300'}`} title="Mode Adzan">
+          <button 
+             onClick={() => {
+                 const newMode = !adzanMode;
+                 setAdzanMode(newMode);
+                 
+                 // Pancing izin audio browser saat mode dinyalain
+                 if (newMode && adzanAudioRef.current) {
+                     adzanAudioRef.current.volume = 0;
+                     adzanAudioRef.current.play().then(() => {
+                         adzanAudioRef.current.pause();
+                         adzanAudioRef.current.volume = 1;
+                         adzanAudioRef.current.currentTime = 0;
+                     }).catch(() => {});
+                 }
+             }}
+             onContextMenu={(e) => {
+                 // FITUR RAHASIA: Tahan/Klik Kanan icon masjid buat ngetes Adzan
+                 e.preventDefault();
+                 showToast("🔊 Test Audio Adzan...");
+                 if(adzanAudioRef.current) {
+                     adzanAudioRef.current.currentTime = 0;
+                     adzanAudioRef.current.play().catch(() => showToast("❌ Gagal, diblokir browser!"));
+                 }
+             }}
+             className={`transition-all duration-300 ${adzanMode ? 'text-[#3ea6ff] drop-shadow-[0_0_8px_rgba(62,166,255,0.4)]' : 'text-zinc-500 hover:text-zinc-300'}`} 
+             title="Mode Adzan (Tahan/Klik Kanan untuk Test)"
+          >
             <MosqueIcon size={24} />
           </button>
           <Cast size={24} className="text-zinc-400 hover:text-white cursor-pointer" />
@@ -1274,11 +1281,31 @@ export default function App() {
           </div>
           
           <div className="flex gap-2 md:gap-4 text-white px-2">
-            <button onClick={() => {
-               const newMode = !adzanMode;
-               setAdzanMode(newMode);
-               showToast(newMode ? "Mode Adzan Aktif 🕌" : "Mode Adzan Dimatikan");
-            }} className={`p-2 rounded-full hover:bg-white/10 transition-all duration-300 ${adzanMode ? 'text-[#3ea6ff] drop-shadow-[0_0_8px_rgba(62,166,255,0.4)]' : 'text-zinc-500 hover:text-white'}`} title="Mode Adzan">
+            <button 
+               onClick={() => {
+                   const newMode = !adzanMode;
+                   setAdzanMode(newMode);
+                   
+                   if (newMode && adzanAudioRef.current) {
+                       adzanAudioRef.current.volume = 0;
+                       adzanAudioRef.current.play().then(() => {
+                           adzanAudioRef.current.pause();
+                           adzanAudioRef.current.volume = 1;
+                           adzanAudioRef.current.currentTime = 0;
+                       }).catch(() => {});
+                   }
+               }}
+               onContextMenu={(e) => {
+                   e.preventDefault();
+                   showToast("🔊 Test Audio Adzan...");
+                   if(adzanAudioRef.current) {
+                       adzanAudioRef.current.currentTime = 0;
+                       adzanAudioRef.current.play().catch(() => showToast("❌ Gagal, diblokir browser!"));
+                   }
+               }}
+               className={`p-2 rounded-full hover:bg-white/10 transition-all duration-300 ${adzanMode ? 'text-[#3ea6ff] drop-shadow-[0_0_8px_rgba(62,166,255,0.4)]' : 'text-zinc-500 hover:text-white'}`} 
+               title="Mode Adzan (Tahan/Klik Kanan untuk Test)"
+            >
                <MosqueIcon size={24} />
             </button>
             <button className="p-2 rounded-full hover:bg-white/10 hidden md:block"><Cast size={24} /></button>
