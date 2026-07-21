@@ -691,7 +691,7 @@ export default function App() {
       }
   }, [activeTab, displayArtist]);
 
-  // 🔥 UPDATE: MESIN LIRIK KEMBAR (LRCLIB + GENIUS SCRAPER) 🔥
+  // 🔥 UPDATE: MESIN LIRIK KEMBAR + MESIN CUCI PINTER 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -735,14 +735,20 @@ export default function App() {
       setIsLoadingLyrics(true); 
       setLyrics([]); 
       setActiveLyricIndex(-1);
+
+      // 🔥 FILTER MESIN CUCI: Bersihin judul & artis dari embel-embel biar API paham 🔥
+      const cleanTitleAPI = displayTitle.replace(/(hq|audio|official|music video|lyric video|lyrics|hd|mv|video|4k|8k)/gi, '').trim();
+      // Ambil nama artis utamanya aja, buang tulisan "feat", "ft", atau "x"
+      const cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,/i)[0].trim(); 
+      const searchQueryAPI = `${cleanTitleAPI} ${cleanArtistAPI}`.trim();
       
       // MESIN 1: Cari Lirik Running Text (LRCLIB)
-      fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(`${displayTitle} ${displayArtist}`.trim())}`)
+      fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(searchQueryAPI)}`)
         .then(res => res.json())
         .then(async data => {
           let trackFound = false;
           if (Array.isArray(data) && data.length > 0) {
-            const safeTitle = displayTitle.toLowerCase().trim();
+            const safeTitle = cleanTitleAPI.toLowerCase();
             const exactMatches = data.filter(t => t.trackName?.toLowerCase().includes(safeTitle) || safeTitle.includes(t.trackName?.toLowerCase()));
             let track = exactMatches.length > 0 ? (exactMatches.find(t => t.syncedLyrics) || exactMatches.find(t => t.plainLyrics) || exactMatches[0]) : (data.find(t => t.syncedLyrics) || data.find(t => t.plainLyrics) || data[0]);
 
@@ -766,9 +772,9 @@ export default function App() {
           
           // 🔥 MESIN 2 (JALUR DARURAT): Kalau LRCLIB kosong, paksa tarik dari Scraper Genius 🔥
           if (!trackFound) {
-              console.log("⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik...");
+              console.log(`⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik untuk: ${searchQueryAPI}`);
               try {
-                  const fallbackRes = await fetch(`https://lyrist.vercel.app/api/${encodeURIComponent(displayTitle + ' ' + displayArtist)}`);
+                  const fallbackRes = await fetch(`https://lyrist.vercel.app/api/${encodeURIComponent(searchQueryAPI)}`);
                   const fallbackData = await fallbackRes.json();
                   
                   if (fallbackData && fallbackData.lyrics) {
