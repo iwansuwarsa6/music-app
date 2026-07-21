@@ -758,7 +758,7 @@ export default function App() {
       }
   }, [activeTab, displayArtist]);
 
-  // 🔥 UPDATE: LOGIKA LIRIK SUPER PINTAR & AKURAT 🔥
+  // 🔥 UPDATE: LOGIKA LIRIK SUPER PINTAR & ANTI-BLOKIR 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -803,9 +803,9 @@ export default function App() {
       setLyrics([]); 
       setActiveLyricIndex(-1);
 
-      // Bersihin judul & artis dari embel-embel YouTube (Video, Audio, Official, kurung-kurung)
-      let cleanTitleAPI = displayTitle.replace(/(hq|audio|official|music video|lyric video|lyrics|hd|mv|video|4k|8k|\(.*\)|\[.*\])/gi, '').trim();
-      let cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,/i)[0].trim(); 
+      // 🔥 BERSIHIN JUDUL DARI GARIS TEGAK (|), KURUNG (), DLL 🔥
+      let cleanTitleAPI = displayTitle.split(/\||\(|\[|"/)[0].replace(/(hq|audio|official|music video|lyric video|lyrics|hd|mv|video|4k|8k)/gi, '').trim();
+      let cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,|\|/i)[0].trim(); 
       const searchQueryAPI = `${cleanTitleAPI} ${cleanArtistAPI}`.trim();
       
       fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(searchQueryAPI)}`)
@@ -813,7 +813,6 @@ export default function App() {
         .then(async data => {
           let trackFound = false;
           if (Array.isArray(data) && data.length > 0) {
-            // Cari yang paling pas (utamakan yang punya syncedLyrics)
             const safeTitle = cleanTitleAPI.toLowerCase();
             const exactMatches = data.filter(t => t.trackName?.toLowerCase().includes(safeTitle) || safeTitle.includes(t.trackName?.toLowerCase()));
             let track = exactMatches.length > 0 
@@ -855,9 +854,9 @@ export default function App() {
           }
           
           if (!trackFound) {
-              console.log(`⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik`);
+              console.log(`⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik untuk: ${searchQueryAPI}`);
               try {
-                  // Fallback 1: ovh API (Bagus buat lagu universal/pop)
+                  // Fallback 1: ovh API 
                   const resOvh = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtistAPI)}/${encodeURIComponent(cleanTitleAPI)}`);
                   const dataOvh = await resOvh.json();
                   
@@ -869,9 +868,9 @@ export default function App() {
                       }
                   }
                   
-                  // Fallback 2: Lyrist via proxy (Jalur terakhir)
+                  // 🔥 Fallback 2: Lyrist via AllOrigins proxy (Anti 403) 🔥
                   const targetUrl = `https://lyrist.vercel.app/api/${encodeURIComponent(searchQueryAPI)}`;
-                  const fallbackRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
+                  const fallbackRes = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
                   const fallbackData = await fallbackRes.json();
                   
                   if (fallbackData && fallbackData.lyrics) {
@@ -965,7 +964,7 @@ export default function App() {
 
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
-      if (e.target.dataset.isAdzan === "true") return; // Abaikan update UI saat kaset adzan diputar
+      if (e.target.dataset.isAdzan === "true") return; 
       
       if (!isDragging && mediaMode === 'audio') {
           setCurrentTime(e.target.currentTime);
@@ -1003,7 +1002,6 @@ export default function App() {
   };
   
   const handleAudioEnded = (e) => {
-      // JIKA YANG BERAKHIR ADALAH KASET ADZAN
       if (e.target.dataset.isAdzan === "true") {
           e.target.dataset.isAdzan = "false";
           forceFinishAdzanRef.current && forceFinishAdzanRef.current();
@@ -1033,10 +1031,8 @@ export default function App() {
   return (
     <div className="h-screen bg-gradient-to-br from-[#13151f] via-[#0f0f0f] to-[#000000] text-white flex flex-col font-sans overflow-hidden relative">
       
-      {/* 🔥 PENAHAN NYAWA BACKGROUND (JEMBATAN BISU) 🔥 */}
       <audio ref={keepAliveAudioRef} src={SILENT_MP3} loop playsInline className="hidden" />
 
-      {/* 🔥 AUDIO MESIN KEMBAR (PING PONG ENGINE) 🔥 */}
       <audio
         ref={audio1Ref} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
@@ -1050,7 +1046,6 @@ export default function App() {
         onWaiting={handleWaiting} onPlaying={handlePlaying} className="hidden"
       />
 
-      {/* 🔥 AUDIO KHUSUS ADZAN MAKKAH 🔥 */}
       <audio
         ref={adzanAudioRef}
         src={ADZAN_URL}
@@ -1059,7 +1054,6 @@ export default function App() {
         className="hidden"
       />
 
-      {/* 🔥 OVERLAY BLOKIR ADZAN (MUNCUL KALAU HP NGEBLOKIR AUTOPLAY) 🔥 */}
       {adzanBlocked && (
         <div 
           className="fixed inset-0 bg-black/95 backdrop-blur-xl z-[999999] flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300"
