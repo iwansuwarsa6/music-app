@@ -16,6 +16,7 @@ import Developer from './pages/Developer';
 
 import rndLogo from './store/rndigital.jpg';
 
+// 🔥 LOGO MASJID ESTETIK 🔥
 const MosqueIcon = ({ size = 24, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 2c-1.5 2.5-2.5 5-2.5 8.5V21h5v-10.5c0-3.5-1-6-2.5-8.5Z" />
@@ -26,6 +27,7 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
   </svg>
 );
 
+// MP3 Kosong (Silent) buat nipu OS HP pas lagi buffering
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
 
 export default function App() {
@@ -59,8 +61,13 @@ export default function App() {
   const getActiveAudio = () => activeAudioRef.current === 1 ? audio1Ref.current : audio2Ref.current;
   const getGhostAudio = () => activeAudioRef.current === 1 ? audio2Ref.current : audio1Ref.current;
 
+  // 🔥 ALIAS AJAIB BIAR KODINGAN LAMA NGGAK CRASH (Mencegah Layar Blank Putih) 🔥
+  const audioRef = useMemo(() => ({
+      get current() { return getActiveAudio(); }
+  }), []);
+
   const adzanAudioRef = useRef(null); 
-  const keepAliveAudioRef = useRef(null); 
+  const keepAliveAudioRef = useRef(null); // Penahan Nyawa Background
   
   const API_BASE = "https://music-app-production-278c.up.railway.app";
 
@@ -150,16 +157,16 @@ export default function App() {
       const activeAudio = getActiveAudio();
 
       if (nextSong && ghostAudio && ghostAudio.src.includes(nextSong.id)) {
-          // Manual Ping-Pong (Lompat tanpa loading kalau udah ke-preload)
+          // Udah di-preload! Putar kemudi kembar!
           activeAudio?.pause();
-          activeAudioRef.current = activeAudioRef.current === 1 ? 2 : 1; // Putar kemudi mesin!
+          activeAudioRef.current = activeAudioRef.current === 1 ? 2 : 1; 
           
           getGhostAudio().currentTime = 0; 
           getActiveAudio().play().catch(()=>{});
           usePlayerStore.getState().playNext(isShuffle);
       } else {
-          // Kalau belum pre-load (misal lagu loncat jauh)
-          activeAudio?.play().catch(()=>{});
+          // Belum preload
+          activeAudio?.pause();
           usePlayerStore.getState().playNext(isShuffle);
       }
   };
@@ -221,19 +228,18 @@ export default function App() {
     }
   };
 
-  // 🔥 PRELOADER MESIN CADANGAN 🔥
+  // 🔥 PRELOADER MESIN CADANGAN (DOWNLOAD DIAM-DIAM) 🔥
   useEffect(() => {
     const nextSong = queue[currentIndex + 1];
     if (nextSong && nextSong.id) {
         const nextUrl = `${API_BASE}/api/audio?id=${nextSong.id}`;
         const ghostAudio = getGhostAudio();
-        // Curi start download ke mesin cadangan pas mesin utama lagi muter lagu
         if (ghostAudio && !ghostAudio.src.includes(nextSong.id)) {
             ghostAudio.src = nextUrl;
             ghostAudio.load(); 
         }
     }
-  }, [queue, currentIndex, API_BASE, currentSong]); // Update preload pas ganti lagu
+  }, [queue, currentIndex, API_BASE, currentSong]); 
 
   useEffect(() => {
     const unlockAudioContext = () => {
@@ -688,12 +694,9 @@ export default function App() {
         
         if (activeAudio && activeAudio.src !== expectedUrl) {
             activeAudio.src = expectedUrl;
-            // Kita gak manggil load() buat yang bukan ghost kalau nggak beneran diputar buat cegah reset
-            if (activeAudio === audio1Ref.current || activeAudio === audio2Ref.current) {
-               activeAudio.load();
-               setIsBuffering(true);
-               if (isPlaying && !isAdzanPlayingRef.current) activeAudio.play().catch(()=>{});
-            }
+            activeAudio.load();
+            setIsBuffering(true);
+            if (isPlaying && !isAdzanPlayingRef.current) activeAudio.play().catch(()=>{});
         }
     }
 
@@ -791,7 +794,6 @@ export default function App() {
     }
   }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying]);
 
-
   // =========================================================================
   // 🔥 FUNGSI EVENT HANDLER UNTUK MESIN KEMBAR 🔥
   // =========================================================================
@@ -833,7 +835,7 @@ export default function App() {
   // 🔥 PING-PONG EXECUTION 🔥
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
-      if (e.target !== getActiveAudio()) return; // Abaikan kalau mesin cadangan yg lapor
+      if (e.target !== getActiveAudio()) return; 
 
       if (usePlayerStore.getState().repeatMode === 'one') {
           e.target.currentTime = 0;
