@@ -802,7 +802,7 @@ export default function App() {
       const cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,/i)[0].trim(); 
       const searchQueryAPI = `${cleanTitleAPI} ${cleanArtistAPI}`.trim();
       
-      fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(searchQueryAPI)}`)
+      fetch(`/api/lyrics/search?q=${encodeURIComponent(searchQueryAPI)}`)
         .then(res => res.json())
         .then(async data => {
           let trackFound = false;
