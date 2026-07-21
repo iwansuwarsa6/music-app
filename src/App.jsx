@@ -753,7 +753,6 @@ export default function App() {
       }
   }, [activeTab, displayArtist]);
 
-  // 🔥 UPDATE: BYPASS CORS LYRIST PAKAI CORSPROXY.IO 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -832,7 +831,6 @@ export default function App() {
           if (!trackFound) {
               console.log(`⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik untuk: ${searchQueryAPI}`);
               try {
-                  // 🔥 PAKAI CORSPROXY.IO BIAR GAK ERROR 520 🔥
                   const targetUrl = `https://lyrist.vercel.app/api/${encodeURIComponent(searchQueryAPI)}`;
                   const fallbackRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
                   const fallbackData = await fallbackRes.json();
@@ -1478,9 +1476,8 @@ export default function App() {
                  <div className="flex flex-col px-6 py-6 animate-in fade-in duration-300">
                     <button 
                        onClick={() => { 
-                           // Disable sementara biar ga white screen karena Artist.jsx lu error
-                           // setIsExpanded(false); navigate(`/artist/${encodeURIComponent(displayArtist)}`); 
-                           showToast("🚧 Halaman Profil Artis sedang diperbaiki!");
+                           setIsExpanded(false); 
+                           navigate(`/artist/${encodeURIComponent(displayArtist)}`); 
                        }} 
                        className="flex items-center justify-center gap-2 w-full py-3.5 rounded-full bg-white text-black font-bold mb-8 hover:scale-105 transition-transform shadow-lg"
                     >
