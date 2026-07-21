@@ -6,11 +6,13 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
-// 🔥 INI DIA 3 NYAWA VIP LU 🔥
+// 🔥 INI DIA 5 NYAWA VIP LU SEKARANG 🔥
 const apiKeys = [
-    '937d750ff1msh90d3afecabf1714p10cbe5jsna5bc5d8d048c', // Akun 1 (Utama)
-    'bcbaddf86bmshec9743f2eb27790p1cbf3ajsnfa15a73d34fb', // Akun 2 (Cadangan Pertama)
-    '53e8414702msh6aab12dd31d3234p149546jsna80ea3f770ec'  // Akun 3 (Cadangan Terakhir)
+    'f4e914fa55msh291e6fc92994ebep169f6djsn6468bdf8ea71', // Akun Baru 1 (Utama sekarang)
+    '7095d94fbamshbbec24ad251fd30p1f2b8fjsnb78470892218', // Akun Baru 2 (Cadangan Pertama)
+    '937d750ff1msh90d3afecabf1714p10cbe5jsna5bc5d8d048c', // Akun Lama 1 (Nunggu reset bulan depan)
+    'bcbaddf86bmshec9743f2eb27790p1cbf3ajsnfa15a73d34fb', // Akun Lama 2 (Nunggu reset bulan depan)
+    '53e8414702msh6aab12dd31d3234p149546jsna80ea3f770ec'  // Akun Lama 3 (Nunggu reset bulan depan)
 ];
 
 // Memory untuk nginget sistem lagi pakai akun nomor berapa
@@ -28,7 +30,7 @@ app.get('/api/audio', async (req, res) => {
     let audioUrl = null;
     let attempts = 0;
 
-    // Mesin bakal nyoba terus maksimal 3 kali (sesuai jumlah akun lu)
+    // Mesin bakal nyoba terus maksimal 5 kali (sesuai jumlah total akun lu)
     while (attempts < apiKeys.length) {
         const activeKey = apiKeys[currentKeyIndex];
         console.log(`Mengetuk API menggunakan Akun ke-${currentKeyIndex + 1}...`);
@@ -83,10 +85,10 @@ app.get('/api/audio', async (req, res) => {
         console.log('✅ LINK AUDIO ROTASI DAPAT! Mengalihkan ke Vercel...');
         res.redirect(audioUrl);
     } else {
-        res.status(500).send('Gagal total! Semua kuota dari 3 akun VIP lu udah habis bulan ini.');
+        res.status(500).send(`Gagal total! Semua kuota dari ${apiKeys.length} akun VIP lu udah habis bulan ini.`);
     }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔥 SERVER 3 NYAWA ROTASI JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER ${apiKeys.length} NYAWA ROTASI JALAN DI PORT ${PORT} 🔥`);
 });
