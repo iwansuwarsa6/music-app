@@ -14,8 +14,6 @@ import Artist from './pages/Artist';
 import LibraryPage from './pages/Library';
 import Developer from './pages/Developer';
 
-import rndLogo from './store/rndigital.jpg';
-
 // 🔥 LOGO MASJID ESTETIK 🔥
 const MosqueIcon = ({ size = 24, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -944,7 +942,7 @@ export default function App() {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: displayTitle,
         artist: displayArtist,
-        album: 'RNmusic Premium',
+        album: 'RnCmusic Premium',
         artwork: [{ src: currentSong.image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }]
       });
       navigator.mediaSession.setActionHandler('play', () => { handleTogglePlayLocal(null); });
@@ -1091,9 +1089,11 @@ export default function App() {
       {/* NAVBAR ATAS */}
       <div className="hidden md:flex fixed top-0 left-0 right-0 h-[72px] bg-[#050505]/60 backdrop-blur-xl z-[45] items-center justify-between px-6 border-b border-white/5">
         <div className="flex items-center">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-            <img src={rndLogo} alt="RNmusic logo" className="w-8 h-8 rounded-full object-cover" />
-            <span className="text-xl font-bold tracking-tighter">RNmusic</span>
+          
+          {/* 🔥 LOGO & NAMA DIUBAH DI SINI 🔥 */}
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+            <img src="/rnctech.jpg" alt="RnCmusic logo" className="w-10 h-10 rounded-full object-cover shadow-[0_0_10px_rgba(62,166,255,0.3)]" />
+            <span className="text-2xl font-black tracking-tighter">RnCmusic</span>
           </div>
 
           <div className="flex items-center gap-8 ml-10">

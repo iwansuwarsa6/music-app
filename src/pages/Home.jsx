@@ -218,7 +218,7 @@ export default function Home() {
       {/* 🔥 LOGO KHUSUS TAMPILAN HP 🔥 */}
       <div className="md:hidden flex items-center gap-2 mb-3 pr-4 pt-2">
         <img src={rndLogo} alt="rndmusic logo" className="w-8 h-8 rounded-full object-cover" />
-        <span className="text-2xl font-bold tracking-tighter text-white">RNmusic</span>
+        <span className="text-2xl font-bold tracking-tighter text-white">RnCmusic</span>
       </div>
 
       {/* 🔥 KATEGORI & TOMBOL BACK 🔥 */}
