@@ -326,10 +326,22 @@ export default function App() {
     window.dispatchEvent(new Event('likedSongsUpdated'));
   };
 
+  // 🔥 SISTEM INGATAN (CACHE) UNTUK RADIO MIX 🔥
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
     let cleanArtist = (baseSong.artist || 'Official').split('-')[0].trim();
     cleanArtist = cleanArtist.replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
+    
+    // Cek di ingatan
+    const cacheKey = `radiomix_${cleanArtist}`;
+    const cachedMix = sessionStorage.getItem(cacheKey);
+    
+    if (cachedMix) {
+        console.log("⚡ Hemat Kuota! Mengambil mix dari ingatan.");
+        usePlayerStore.setState(state => ({ queue: [baseSong, ...JSON.parse(cachedMix)] }));
+        return;
+    }
+
     let queryPool = [`${cleanArtist} official music video`, `${cleanArtist} pop hits official audio`];
 
     try {
@@ -352,7 +364,10 @@ export default function App() {
         });
 
         mix = mix.sort(() => Math.random() - 0.5).slice(0, 25);
-        if (mix.length > 0) usePlayerStore.setState(state => ({ queue: [baseSong, ...mix] }));
+        if (mix.length > 0) {
+            sessionStorage.setItem(cacheKey, JSON.stringify(mix)); // Simpan ke ingatan
+            usePlayerStore.setState(state => ({ queue: [baseSong, ...mix] }));
+        }
     } catch (e) {}
   };
 
@@ -380,10 +395,25 @@ export default function App() {
     if (q) setSearchQuery(q);
   }, [location.search]);
 
+  // 🔥 SISTEM INGATAN (CACHE) UNTUK PENCARIAN 🔥
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (searchQuery.trim().length > 2) {
         setIsFetchingSuggestions(true);
+        const qLower = searchQuery.trim().toLowerCase();
+        
+        // Cek di ingatan
+        const cacheKey = `search_${qLower}`;
+        const cachedSearch = sessionStorage.getItem(cacheKey);
+
+        if (cachedSearch) {
+            const { texts, lives } = JSON.parse(cachedSearch);
+            setTextSuggestions(texts);
+            setLiveSuggestions(lives);
+            setIsFetchingSuggestions(false);
+            return;
+        }
+
         try {
           const queryPintar = encodeURIComponent(searchQuery.trim());
           const response = await fetch(`https://api.siputzx.my.id/api/s/youtube?query=${queryPintar}`);
@@ -394,14 +424,20 @@ export default function App() {
                 return { id: validId, title: track.title, artist: track.author?.name || 'YouTube', image: track.thumbnail };
               }).filter(track => track.id != null);
 
-            const qLower = searchQuery.trim().toLowerCase();
             const uniqueTexts = new Set();
             formattedResults.forEach(track => {
               let cleanT = track.title.toLowerCase().replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').replace(/(official|music video|lyrics?|audio|hd|hq)/gi, '').replace(/[^a-z0-9\s-]/gi, '').trim();
               if (cleanT.length > 2) uniqueTexts.add(cleanT);
             });
-            setTextSuggestions([qLower, ...Array.from(uniqueTexts).filter(t => t !== qLower)].slice(0, 6));
-            setLiveSuggestions(formattedResults.slice(0, 4)); 
+            
+            const finalTexts = [qLower, ...Array.from(uniqueTexts).filter(t => t !== qLower)].slice(0, 6);
+            const finalLives = formattedResults.slice(0, 4);
+
+            setTextSuggestions(finalTexts);
+            setLiveSuggestions(finalLives); 
+            
+            // Simpan ke ingatan
+            sessionStorage.setItem(cacheKey, JSON.stringify({ texts: finalTexts, lives: finalLives }));
           }
         } catch (error) {} finally { setIsFetchingSuggestions(false); }
       } else { setLiveSuggestions([]); setTextSuggestions([]); }
@@ -529,8 +565,17 @@ export default function App() {
     return () => window.removeEventListener('message', handleMessage);
   }, [isDragging, mediaMode, isAdzanPlaying]);
 
+  // 🔥 SISTEM INGATAN (CACHE) UNTUK ARTIS TERKAIT 🔥
   useEffect(() => {
       if (activeTab === 'artist' && displayArtist && displayArtist !== "Artis") {
+          const cacheKey = `related_${displayArtist}`;
+          const cachedRelated = sessionStorage.getItem(cacheKey);
+          
+          if (cachedRelated) {
+              setRelatedSongs(JSON.parse(cachedRelated));
+              return;
+          }
+
           setIsLoadingRelated(true);
           fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(displayArtist + " official audio")}`)
               .then(res => res.json())
@@ -543,6 +588,7 @@ export default function App() {
                           return { id: vid, title: cleanT.trim(), artist: displayArtist, image: t.thumbnail, url: `https://www.youtube.com/watch?v=${vid}` };
                       }).filter(t => t.id);
                       setRelatedSongs(tracks);
+                      sessionStorage.setItem(cacheKey, JSON.stringify(tracks)); // Simpan ke ingatan
                   }
               })
               .catch(err => console.error(err))
