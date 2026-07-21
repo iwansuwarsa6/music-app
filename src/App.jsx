@@ -16,7 +16,7 @@ import Developer from './pages/Developer';
 
 import rndLogo from './store/rndigital.jpg';
 
-// 🔥 LOGO MASJID ESTETIK 🔥
+// 🔥 LOGO MASJID ESTETIK (Hanya 1 logo tanpa coretan) 🔥
 const MosqueIcon = ({ size = 24, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
     <path d="M12 2c-1.5 2.5-2.5 5-2.5 8.5V21h5v-10.5c0-3.5-1-6-2.5-8.5Z" />
@@ -53,6 +53,7 @@ export default function App() {
   const ghostAudioRef = useRef(null); 
   const adzanAudioRef = useRef(null); 
   
+  // 🔥 URL SUDAH DIGANTI KE RAILWAY 🔥
   const API_BASE = "https://music-app-production-278c.up.railway.app";
 
   const [currentTime, setCurrentTime] = useState(0);
@@ -126,42 +127,58 @@ export default function App() {
       };
   }, [mediaMode]);
 
-  // 🔥 LAPIS 3: ESCAPE HATCH (BYPASS BUG NYANGKUT) 🔥
-  const checkAdzanActive = () => {
+  // 🔥 PENGHANCUR BUG NYANGKUT (Ultimate Override) 🔥
+  const dismissAdzanIfActive = () => {
       if (isAdzanPlayingRef.current) {
-          // Kalau statusnya Adzan tapi HP ngebunuh/ngepause audionya
-          if (adzanAudioRef.current && adzanAudioRef.current.paused) {
-              console.log("Bug HP terdeteksi: Membuka paksa blokiran adzan!");
-              forceFinishAdzanRef.current && forceFinishAdzanRef.current();
-              return false; // Udah gak adzan lagi, bebas jalan!
-          }
-          showToast("🕌 Sedang Adzan, harap tunggu sebentar...");
-          return true; // Beneran lagi adzan
+          forceFinishAdzanRef.current && forceFinishAdzanRef.current();
+          return true;
       }
       return false;
   };
 
+  // =========================================================================
+  // 🔥 BYPASS SINKRON ANTI-MATI SAAT LAYAR HP SLEEP 🔥
+  // =========================================================================
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
-      if (checkAdzanActive()) return; 
-      if (audioRef.current && audioRef.current.paused) audioRef.current.play().catch(()=>{});
+      dismissAdzanIfActive(); 
+      
+      // 1. Eksekusi logika ganti lagu di memori utama Store
       usePlayerStore.getState().playNext(isShuffle);
+      
+      // 2. SUNTIK LANGSUNG ke Audio Engine tanpa nunggu React loading!
+      const newSong = usePlayerStore.getState().currentSong;
+      if (newSong && newSong.id && audioRef.current) {
+          audioRef.current.src = `${API_BASE}/api/audio?id=${newSong.id}`;
+          audioRef.current.play().catch(err => console.log("Background muter diblokir:", err));
+      }
   };
 
   const handlePrevLocal = (e) => {
       if (e) e.stopPropagation();
-      if (checkAdzanActive()) return;
+      dismissAdzanIfActive(); 
+
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
       } else {
-          if (audioRef.current && audioRef.current.paused) audioRef.current.play().catch(()=>{});
-          playPrev();
+          usePlayerStore.getState().playPrev();
+          const newSong = usePlayerStore.getState().currentSong;
+          if (newSong && newSong.id && audioRef.current) {
+              audioRef.current.src = `${API_BASE}/api/audio?id=${newSong.id}`;
+              audioRef.current.play().catch(()=>{});
+          }
       }
   };
 
   const handleTogglePlayLocal = (e) => {
       if (e) e.stopPropagation();
-      if (checkAdzanActive()) return;
+      
+      // Kalau user mencet Play saat adzan, matikan adzan dan nyalakan musik!
+      if (dismissAdzanIfActive()) {
+          usePlayerStore.setState({ isPlaying: true });
+          audioRef.current?.play().catch(()=>{});
+          return;
+      }
 
       if (isPlaying) {
           audioRef.current?.pause();
@@ -176,13 +193,17 @@ export default function App() {
 
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
-      if (checkAdzanActive()) return;
-      if (audioRef.current && audioRef.current.paused) audioRef.current.play().catch(()=>{});
+      dismissAdzanIfActive(); 
+      
+      if (audioRef.current) {
+          audioRef.current.src = `${API_BASE}/api/audio?id=${song.id}`;
+          audioRef.current.play().catch(()=>{});
+      }
       playSong(song, list, idx); 
   };
 
   const handleSeek = (e) => {
-    if (checkAdzanActive()) return; 
+    dismissAdzanIfActive(); 
     const seekTime = parseFloat(e.target.value);
     setCurrentTime(seekTime);
     currentTimeRef.current = seekTime;
@@ -193,6 +214,7 @@ export default function App() {
       iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [seekTime, true] }), '*');
     }
   };
+  // =========================================================================
 
   useEffect(() => {
     const nextSong = queue[currentIndex + 1];
@@ -237,6 +259,7 @@ export default function App() {
     };
   }, [currentSong]);
 
+  // 🔥 JURUS PELACAK LOKASI OTOMATIS (IP BROWSER) 🔥
   useEffect(() => {
     localStorage.setItem('ytm_adzan_mode', JSON.stringify(adzanMode));
     if (adzanMode) {
@@ -244,6 +267,7 @@ export default function App() {
         .then(res => res.json())
         .then(locationData => {
             const userCity = locationData.city || 'Jakarta'; 
+            
             return fetch(`https://api.aladhan.com/v1/timingsByCity?city=${userCity}&country=Indonesia&method=11`)
                 .then(res => res.json())
                 .then(data => {
@@ -252,6 +276,7 @@ export default function App() {
                     console.log(`📍 Jadwal Adzan aktif untuk wilayah: ${userCity}`);
                 });
         }).catch(e => {
+            console.error("Gagal melacak lokasi, pakai default Jakarta", e);
             fetch('https://api.aladhan.com/v1/timingsByCity?city=Jakarta&country=Indonesia&method=11')
             .then(res => res.json())
             .then(data => {
@@ -266,6 +291,7 @@ export default function App() {
   useEffect(() => {
     if (!adzanMode || prayerTimes.length === 0) return;
 
+    // Bikin thread di luar jangkauan pembekuan OS HP
     const workerCode = `
       let timer;
       let adzanTimer;
@@ -310,8 +336,10 @@ export default function App() {
                   if (audioRef.current) {
                       audioRef.current.pause(); 
                       showToast('🕌 Adzan Tiba! Mengambil alih audio...');
+                      
+                      // Panggil audio adzan yg udah pre-load
                       adzanAudioRef.current.play().catch(err => {
-                          console.log("OS Memblokir Adzan!", err);
+                          console.log("OS Memblokir Adzan, nunggu user nekat nge-play!", err);
                       });
                   }
               } else {
@@ -338,19 +366,25 @@ export default function App() {
         const { event, song } = e.detail;
         let x = event.clientX;
         let y = event.clientY;
+        
         const menuWidth = 260;
         const menuHeight = 320; 
+
         if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
         if (y + menuHeight > window.innerHeight) {
             y = event.clientY - menuHeight;
             if (y < 10) y = 10;
         }
+
         setContextMenu({ isOpen: true, x, y, song });
     };
+
     const handleCloseMenu = () => setContextMenu(prev => ({ ...prev, isOpen: false }));
+    
     window.addEventListener('openSongMenu', handleOpenMenu);
     window.addEventListener('click', handleCloseMenu);
     window.addEventListener('scroll', handleCloseMenu, true);
+    
     return () => {
         window.removeEventListener('openSongMenu', handleOpenMenu);
         window.removeEventListener('click', handleCloseMenu);
@@ -425,15 +459,18 @@ export default function App() {
     window.dispatchEvent(new Event('likedSongsUpdated'));
   };
 
+  // 🔥 SISTEM INGATAN (CACHE) UNTUK RADIO MIX 🔥
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
     let cleanArtist = (baseSong.artist || 'Official').split('-')[0].trim();
     cleanArtist = cleanArtist.replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
     
+    // Cek di ingatan
     const cacheKey = `radiomix_${cleanArtist}`;
     const cachedMix = sessionStorage.getItem(cacheKey);
     
     if (cachedMix) {
+        console.log("⚡ Hemat Kuota! Mengambil mix dari ingatan.");
         usePlayerStore.setState(state => ({ queue: [baseSong, ...JSON.parse(cachedMix)] }));
         return;
     }
@@ -461,7 +498,7 @@ export default function App() {
 
         mix = mix.sort(() => Math.random() - 0.5).slice(0, 25);
         if (mix.length > 0) {
-            sessionStorage.setItem(cacheKey, JSON.stringify(mix)); 
+            sessionStorage.setItem(cacheKey, JSON.stringify(mix)); // Simpan ke ingatan
             usePlayerStore.setState(state => ({ queue: [baseSong, ...mix] }));
         }
     } catch (e) {}
@@ -491,12 +528,14 @@ export default function App() {
     if (q) setSearchQuery(q);
   }, [location.search]);
 
+  // 🔥 SISTEM INGATAN (CACHE) UNTUK PENCARIAN 🔥
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (searchQuery.trim().length > 2) {
         setIsFetchingSuggestions(true);
         const qLower = searchQuery.trim().toLowerCase();
         
+        // Cek di ingatan
         const cacheKey = `search_${qLower}`;
         const cachedSearch = sessionStorage.getItem(cacheKey);
 
@@ -529,6 +568,8 @@ export default function App() {
 
             setTextSuggestions(finalTexts);
             setLiveSuggestions(finalLives); 
+            
+            // Simpan ke ingatan
             sessionStorage.setItem(cacheKey, JSON.stringify({ texts: finalTexts, lives: finalLives }));
           }
         } catch (error) {} finally { setIsFetchingSuggestions(false); }
@@ -657,6 +698,7 @@ export default function App() {
     return () => window.removeEventListener('message', handleMessage);
   }, [isDragging, mediaMode]);
 
+  // 🔥 SISTEM INGATAN (CACHE) UNTUK ARTIS TERKAIT 🔥
   useEffect(() => {
       if (activeTab === 'artist' && displayArtist && displayArtist !== "Artis") {
           const cacheKey = `related_${displayArtist}`;
@@ -679,7 +721,7 @@ export default function App() {
                           return { id: vid, title: cleanT.trim(), artist: displayArtist, image: t.thumbnail, url: `https://www.youtube.com/watch?v=${vid}` };
                       }).filter(t => t.id);
                       setRelatedSongs(tracks);
-                      sessionStorage.setItem(cacheKey, JSON.stringify(tracks)); 
+                      sessionStorage.setItem(cacheKey, JSON.stringify(tracks)); // Simpan ke ingatan
                   }
               })
               .catch(err => console.error(err))
@@ -713,7 +755,8 @@ export default function App() {
         const likedSongs = JSON.parse(localStorage.getItem('ytm_liked_songs') || '[]');
         setIsLiked(likedSongs.some(song => song.id === currentSong.id));
         
-        if (audioRef.current) {
+        // Murni fallback kalau status lagu berubah dari tempat lain
+        if (audioRef.current && audioRef.current.src !== expectedUrl) {
             audioRef.current.src = expectedUrl;
             audioRef.current.load();
             setIsBuffering(true);
@@ -855,6 +898,7 @@ export default function App() {
                    audioRef.current.currentTime = 0;
                    audioRef.current.play();
                } else {
+                   // Eksekusi jalan tol ganti lagu langsung
                    handleNextLocal(null); 
                }
            }
