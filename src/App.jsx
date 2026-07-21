@@ -190,43 +190,76 @@ export default function App() {
     }
   }, [adzanMode]);
 
+  // 🔥 ======================================================= 🔥
+  // 🔥 TEKNIK PEKERJA SILUMAN (WEB WORKER) + KUDA TROYA AUDIO 🔥
+  // 🔥 ======================================================= 🔥
   useEffect(() => {
     if (!adzanMode || prayerTimes.length === 0) return;
-    const interval = setInterval(() => {
-        const now = new Date();
-        const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-        if (prayerTimes.includes(timeStr) && lastAdzanTriggered.current !== timeStr) {
-            lastAdzanTriggered.current = timeStr;
-            
-            wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
-            setIsAdzanPlaying(true);
-            
-            if (wasPlayingBeforeAdzan.current) {
-                usePlayerStore.setState({ isPlaying: false });
-                if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
-                audioRef.current?.pause();
-            }
 
-            showToast('🕌 Waktu Adzan tiba! Mendengarkan panggilan...');
-            
-            if (adzanAudioRef.current) {
-                adzanAudioRef.current.play().catch(e => {
-                    console.log("Auto-play Adzan diblokir browser, pindah ke mode Timer", e);
-                    setTimeout(() => {
-                        setIsAdzanPlaying(false);
-                        if (wasPlayingBeforeAdzan.current) {
-                            usePlayerStore.setState({ isPlaying: true });
-                            if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
-                            audioRef.current?.play().catch(()=>{});
-                            showToast('▶️ Adzan selesai. Melanjutkan musik...');
-                        }
-                    }, 240000); 
-                });
-            }
+    // Bikin thread di luar jangkauan pembekuan OS HP
+    const workerCode = `
+      let timer;
+      self.onmessage = function(e) {
+        if (e.data === 'start') {
+          timer = setInterval(() => {
+            const now = new Date();
+            const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            postMessage(timeStr);
+          }, 10000);
+        } else if (e.data === 'stop') {
+          clearInterval(timer);
         }
-    }, 10000); 
-    return () => clearInterval(interval);
+      };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const worker = new Worker(URL.createObjectURL(blob));
+
+    worker.onmessage = (e) => {
+      const timeStr = e.data;
+      if (prayerTimes.includes(timeStr) && lastAdzanTriggered.current !== timeStr) {
+          lastAdzanTriggered.current = timeStr;
+          
+          wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
+          setIsAdzanPlaying(true);
+          
+          if (wasPlayingBeforeAdzan.current) {
+              usePlayerStore.setState({ isPlaying: false });
+              if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
+              
+              if (audioRef.current) {
+                  audioRef.current.pause(); // Stop musik utama
+                  showToast('🕌 Adzan Tiba! Membajak jalur background...');
+                  
+                  // Panggil audio adzan yg udah pre-load
+                  adzanAudioRef.current.play().catch(err => {
+                      console.log("Kuda troya diblokir, masuk mode timer", err);
+                      // Mode Timer Darurat (kalau OS tetep ngeyel)
+                      setTimeout(() => {
+                          setIsAdzanPlaying(false);
+                          if (wasPlayingBeforeAdzan.current) {
+                              usePlayerStore.setState({ isPlaying: true });
+                              if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+                              audioRef.current?.play().catch(()=>{});
+                              showToast('▶️ Adzan selesai. Melanjutkan...');
+                          }
+                      }, 240000); 
+                  });
+              }
+          } else {
+              showToast('🕌 Waktu Adzan tiba!');
+              adzanAudioRef.current.play().catch(()=>{});
+          }
+      }
+    };
+
+    worker.postMessage('start');
+    
+    return () => {
+      worker.postMessage('stop');
+      worker.terminate();
+    };
   }, [adzanMode, prayerTimes, mediaMode]);
+  // 🔥 ======================================================= 🔥
 
   useEffect(() => {
     const handleOpenMenu = (e) => {
