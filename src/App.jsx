@@ -27,6 +27,8 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
 
 // MP3 Kosong (Silent) buat nipu OS HP pas lagi buffering
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+// 🔥 URL ADZAN 🔥
+const ADZAN_URL = "https://raw.githubusercontent.com/islamic-network/cdn/master/audio/adhan/makkah.mp3";
 
 export default function App() {
   const { currentSong, isPlaying, togglePlay, playNext, playPrev, playSong, queue, currentIndex } = usePlayerStore();
@@ -96,6 +98,7 @@ export default function App() {
   const [adzanMode, setAdzanMode] = useState(() => JSON.parse(localStorage.getItem('ytm_adzan_mode') || 'false'));
   const [isAdzanPlaying, setIsAdzanPlaying] = useState(false);
   const [prayerTimes, setPrayerTimes] = useState([]);
+  const [adzanBlocked, setAdzanBlocked] = useState(false); // 🔥 STATE BLOKIR ADZAN
   
   const lastAdzanTriggered = useRef("");
   const wasPlayingBeforeAdzan = useRef(false);
@@ -116,7 +119,7 @@ export default function App() {
   };
 
   // =========================================================================
-  // 🔥 FUNGSI ADZAN 🔥
+  // 🔥 FUNGSI ADZAN & HIJACK AUDIO 🔥
   // =========================================================================
   useEffect(() => {
       isAdzanPlayingRef.current = isAdzanPlaying;
@@ -127,6 +130,7 @@ export default function App() {
           if (!isAdzanPlayingRef.current) return;
           isAdzanPlayingRef.current = false;
           setIsAdzanPlaying(false);
+          setAdzanBlocked(false);
           
           if (adzanAudioRef.current) {
               adzanAudioRef.current.pause();
@@ -134,9 +138,27 @@ export default function App() {
           }
           
           if (wasPlayingBeforeAdzan.current) {
+              const active = getActiveAudio();
+              // KEMBALIKAN KASET MUSIK JIKA TADI DI-HIJACK
+              if (active && active.dataset.isAdzan === "true") {
+                  active.dataset.isAdzan = "false";
+                  const song = usePlayerStore.getState().currentSong;
+                  if (song) {
+                      active.src = `${API_BASE}/api/audio?id=${song.id}`;
+                      active.load();
+                      active.currentTime = currentTimeRef.current; // Lanjut di detik yg sama
+                  }
+                  if (mediaModeRef.current === 'video') {
+                      active.muted = true;
+                  }
+              }
+
               usePlayerStore.setState({ isPlaying: true });
-              if (mediaModeRef.current === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
-              getActiveAudio()?.play().catch(()=>{});
+              if (mediaModeRef.current === 'video') {
+                  iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+              } else {
+                  getActiveAudio()?.play().catch(()=>{});
+              }
               showToast('▶️ Adzan selesai. Melanjutkan musik...');
           } else {
               showToast('▶️ Adzan selesai.');
@@ -144,15 +166,49 @@ export default function App() {
       };
   }, []);
 
+  const fireAdzan = (isTest = false) => {
+      wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
+      isAdzanPlayingRef.current = true;
+      setIsAdzanPlaying(true);
+
+      if (wasPlayingBeforeAdzan.current) {
+          // HIJACK AUDIO
+          usePlayerStore.setState({ isPlaying: false });
+          if (mediaModeRef.current === 'video') {
+              iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
+          }
+
+          const active = getActiveAudio();
+          if (active) {
+              active.muted = false; 
+              active.dataset.isAdzan = "true";
+              active.src = ADZAN_URL;
+              active.play().catch((err) => {
+                  console.error("Hijack gagal:", err);
+                  setAdzanBlocked(true);
+              });
+          }
+          showToast(isTest ? '🔊 Test Adzan! Mengambil alih audio...' : '🕌 Adzan Tiba! Mengambil alih audio...');
+      } else {
+          showToast(isTest ? '🔊 Test Adzan dimulai!' : '🕌 Waktu Adzan tiba!');
+          if (adzanAudioRef.current) {
+              adzanAudioRef.current.currentTime = 0;
+              adzanAudioRef.current.volume = 1;
+              adzanAudioRef.current.play().catch((err) => {
+                  setAdzanBlocked(true);
+              });
+          }
+      }
+
+      setTimeout(() => {
+          forceFinishAdzanRef.current && forceFinishAdzanRef.current();
+      }, 240000); // 4 menit
+  };
+
   const dismissAdzanIfActive = () => {
       if (isAdzanPlayingRef.current) {
-          isAdzanPlayingRef.current = false;
-          setIsAdzanPlaying(false);
-          if (adzanAudioRef.current) {
-              adzanAudioRef.current.pause();
-              adzanAudioRef.current.currentTime = 0;
-          }
-          showToast('Adzan dihentikan manual.');
+          forceFinishAdzanRef.current && forceFinishAdzanRef.current();
+          showToast('Adzan dilewati.');
           return true;
       }
       return false;
@@ -160,38 +216,7 @@ export default function App() {
 
   const triggerTestAdzan = () => {
       if (isAdzanPlayingRef.current) return;
-      
-      wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
-      isAdzanPlayingRef.current = true;
-      setIsAdzanPlaying(true);
-      
-      if (wasPlayingBeforeAdzan.current) {
-          usePlayerStore.setState({ isPlaying: false });
-          if (mediaModeRef.current === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
-          
-          const active = getActiveAudio();
-          if (active) active.pause(); 
-          
-          showToast('🔊 Test Adzan! Menghentikan musik...');
-      } else {
-          showToast('🔊 Test Adzan dimulai!');
-      }
-
-      if (adzanAudioRef.current) {
-          adzanAudioRef.current.currentTime = 0;
-          adzanAudioRef.current.volume = 1;
-          const playPromise = adzanAudioRef.current.play();
-          if (playPromise !== undefined) {
-              playPromise.catch((err) => {
-                  console.error("Adzan diblokir browser:", err);
-                  showToast("⚠️ Browser memblokir Adzan! Sentuh layar.");
-              });
-          }
-      }
-
-      setTimeout(() => {
-          forceFinishAdzanRef.current && forceFinishAdzanRef.current();
-      }, 240000);
+      fireAdzan(true);
   };
 
   useEffect(() => {
@@ -249,38 +274,7 @@ export default function App() {
           const timeStr = data.time;
           if (prayerTimes.includes(timeStr) && lastAdzanTriggered.current !== timeStr) {
               lastAdzanTriggered.current = timeStr;
-              
-              wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
-              isAdzanPlayingRef.current = true;
-              setIsAdzanPlaying(true);
-              
-              if (wasPlayingBeforeAdzan.current) {
-                  usePlayerStore.setState({ isPlaying: false });
-                  if (mediaModeRef.current === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
-                  
-                  const active = activeEngine.current === 1 ? audio1Ref.current : audio2Ref.current;
-                  if (active) active.pause(); 
-                  
-                  showToast('🕌 Adzan Tiba! Mengambil alih audio...');
-              } else {
-                  showToast('🕌 Waktu Adzan tiba!');
-              }
-
-              if (adzanAudioRef.current) {
-                  adzanAudioRef.current.currentTime = 0;
-                  adzanAudioRef.current.volume = 1;
-                  const playPromise = adzanAudioRef.current.play();
-                  if (playPromise !== undefined) {
-                      playPromise.catch((err) => {
-                          console.error("Adzan diblokir browser:", err);
-                          showToast("⚠️ Browser memblokir Adzan! Sentuh layar untuk memutar.");
-                      });
-                  }
-              }
-
-              setTimeout(() => {
-                  forceFinishAdzanRef.current && forceFinishAdzanRef.current();
-              }, 240000); // 4 menit adzan
+              fireAdzan(false);
           }
       }
     };
@@ -298,7 +292,7 @@ export default function App() {
   // =========================================================================
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
-      dismissAdzanIfActive(); 
+      if (dismissAdzanIfActive()) return; 
       if (e && keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       
       if (e) {
@@ -319,7 +313,7 @@ export default function App() {
 
   const handlePrevLocal = (e) => {
       if (e) e.stopPropagation();
-      dismissAdzanIfActive(); 
+      if (dismissAdzanIfActive()) return; 
 
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
@@ -332,7 +326,6 @@ export default function App() {
 
   const handleTogglePlayLocal = (e) => {
       if (e) e.stopPropagation();
-      
       if (dismissAdzanIfActive()) return; 
 
       if (isPlaying) {
@@ -957,6 +950,8 @@ export default function App() {
 
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
+      if (e.target.dataset.isAdzan === "true") return; // Abaikan update UI saat kaset adzan diputar
+      
       if (!isDragging && mediaMode === 'audio') {
           setCurrentTime(e.target.currentTime);
           currentTimeRef.current = e.target.currentTime;
@@ -964,6 +959,8 @@ export default function App() {
   };
   const handleLoadedMetadata = (e) => {
       if (e.target !== getActiveAudio()) return;
+      if (e.target.dataset.isAdzan === "true") return; 
+      
       if (mediaMode === 'audio') setDuration(e.target.duration);
   };
   const handleCanPlay = (e) => {
@@ -973,7 +970,7 @@ export default function App() {
   };
   const handleError = (e) => {
       if (e.target !== getActiveAudio()) return;
-      if (mediaMode === 'audio' && currentSong?.id && e.target.src) {
+      if (mediaMode === 'audio' && currentSong?.id && e.target.src && e.target.dataset.isAdzan !== "true") {
           setIsBuffering(false);
           usePlayerStore.setState({ isPlaying: false });
           showToast("❌ Audio diproteksi/gagal dimuat. Melompat ke lagu berikutnya...");
@@ -991,6 +988,13 @@ export default function App() {
   };
   
   const handleAudioEnded = (e) => {
+      // JIKA YANG BERAKHIR ADALAH KASET ADZAN
+      if (e.target.dataset.isAdzan === "true") {
+          e.target.dataset.isAdzan = "false";
+          forceFinishAdzanRef.current && forceFinishAdzanRef.current();
+          return;
+      }
+
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
 
@@ -1034,11 +1038,46 @@ export default function App() {
       {/* 🔥 AUDIO KHUSUS ADZAN MAKKAH 🔥 */}
       <audio
         ref={adzanAudioRef}
-        src="https://raw.githubusercontent.com/islamic-network/cdn/master/audio/adhan/makkah.mp3"
+        src={ADZAN_URL}
         preload="auto"
         onEnded={() => { forceFinishAdzanRef.current && forceFinishAdzanRef.current(); }}
         className="hidden"
       />
+
+      {/* 🔥 OVERLAY BLOKIR ADZAN (MUNCUL KALAU HP NGEBLOKIR AUTOPLAY) 🔥 */}
+      {adzanBlocked && (
+        <div 
+          className="fixed inset-0 bg-black/95 backdrop-blur-xl z-[999999] flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300"
+          onClick={() => {
+             if (adzanAudioRef.current) {
+                 adzanAudioRef.current.play().catch(()=>{});
+             }
+             setAdzanBlocked(false);
+          }}
+        >
+          <div className="w-24 h-24 bg-[#3ea6ff]/20 rounded-full flex items-center justify-center mb-6 animate-pulse border border-[#3ea6ff]/30">
+            <MosqueIcon size={48} className="text-[#3ea6ff]" />
+          </div>
+          <h2 className="text-3xl font-black text-white mb-4">Waktu Adzan Tiba</h2>
+          <p className="text-zinc-400 text-base md:text-lg mb-8 max-w-sm leading-relaxed">
+            Browser memblokir pemutaran otomatis. Sentuh layar atau klik tombol di bawah untuk mengumandangkan Adzan.
+          </p>
+          <button className="bg-[#3ea6ff] text-black font-bold px-10 py-4 rounded-full text-lg shadow-[0_0_20px_rgba(62,166,255,0.4)] hover:scale-105 transition-transform">
+            Putar Adzan
+          </button>
+          
+          <button 
+             onClick={(e) => {
+                 e.stopPropagation();
+                 setAdzanBlocked(false);
+                 forceFinishAdzanRef.current && forceFinishAdzanRef.current();
+             }}
+             className="mt-10 text-zinc-500 hover:text-white transition-colors border-b border-zinc-700 hover:border-white pb-1 text-sm font-medium"
+          >
+             Lewati Adzan
+          </button>
+        </div>
+      )}
 
       {toastMsg && (
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-6 py-3 rounded-full text-sm font-semibold shadow-2xl z-[99999] animate-in slide-in-from-bottom-5 whitespace-nowrap">
@@ -1090,7 +1129,6 @@ export default function App() {
       <div className="hidden md:flex fixed top-0 left-0 right-0 h-[72px] bg-[#050505]/60 backdrop-blur-xl z-[45] items-center justify-between px-6 border-b border-white/5">
         <div className="flex items-center">
           
-          {/* 🔥 LOGO & NAMA DIUBAH DI SINI 🔥 */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
             <img src="/rnctech.jpg" alt="RnCmusic logo" className="w-10 h-10 rounded-full object-cover shadow-[0_0_10px_rgba(62,166,255,0.3)]" />
             <span className="text-2xl font-black tracking-tighter">RnCmusic</span>
