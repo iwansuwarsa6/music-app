@@ -27,6 +27,9 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
   </svg>
 );
 
+// MP3 Kosong (Silent) buat nipu OS HP pas lagi buffering
+const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+
 export default function App() {
   const { currentSong, isPlaying, togglePlay, playNext, playPrev, playSong, queue, currentIndex } = usePlayerStore();
   const location = useLocation();
@@ -52,6 +55,7 @@ export default function App() {
   const audioRef = useRef(null);
   const ghostAudioRef = useRef(null); 
   const adzanAudioRef = useRef(null); 
+  const keepAliveAudioRef = useRef(null); // 🔥 PENAHAN NYAWA (JEMBATAN BISU) 🔥
   
   // 🔥 URL SUDAH DIGANTI KE RAILWAY 🔥
   const API_BASE = "https://music-app-production-278c.up.railway.app";
@@ -130,27 +134,39 @@ export default function App() {
   // 🔥 PENGHANCUR BUG NYANGKUT (Ultimate Override) 🔥
   const dismissAdzanIfActive = () => {
       if (isAdzanPlayingRef.current) {
-          forceFinishAdzanRef.current && forceFinishAdzanRef.current();
-          return true;
+          // Kalau statusnya Adzan tapi HP ngebunuh/ngepause audionya
+          if (adzanAudioRef.current && adzanAudioRef.current.paused) {
+              console.log("Bug HP terdeteksi: Membuka paksa blokiran adzan!");
+              forceFinishAdzanRef.current && forceFinishAdzanRef.current();
+              return false; // Udah gak adzan lagi, bebas jalan!
+          }
+          showToast("🕌 Sedang Adzan, harap tunggu sebentar...");
+          return true; // Beneran lagi adzan
       }
       return false;
   };
 
   // =========================================================================
-  // 🔥 BYPASS SINKRON ANTI-MATI SAAT LAYAR HP SLEEP 🔥
+  // 🔥 JEMBATAN BISU: ANTI-MATI SAAT LAYAR HP SLEEP & NUNGGU LOADING 🔥
   // =========================================================================
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       dismissAdzanIfActive(); 
       
-      // 1. Eksekusi logika ganti lagu di memori utama Store
+      // 1. Nyalakan penipu OS HP (Suara Kosong) biar background nggak mati
+      if (keepAliveAudioRef.current) {
+          keepAliveAudioRef.current.play().catch(err => console.log("KeepAlive Error:", err));
+      }
+      
+      // 2. Eksekusi logika ganti lagu
       usePlayerStore.getState().playNext(isShuffle);
       
-      // 2. SUNTIK LANGSUNG ke Audio Engine tanpa nunggu React loading!
+      // 3. Suntik langsung
       const newSong = usePlayerStore.getState().currentSong;
       if (newSong && newSong.id && audioRef.current) {
           audioRef.current.src = `${API_BASE}/api/audio?id=${newSong.id}`;
-          audioRef.current.play().catch(err => console.log("Background muter diblokir:", err));
+          audioRef.current.load(); // Paksa browser mikir
+          audioRef.current.play().catch(()=>{});
       }
   };
 
@@ -161,10 +177,12 @@ export default function App() {
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
       } else {
+          if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
           usePlayerStore.getState().playPrev();
           const newSong = usePlayerStore.getState().currentSong;
           if (newSong && newSong.id && audioRef.current) {
               audioRef.current.src = `${API_BASE}/api/audio?id=${newSong.id}`;
+              audioRef.current.load();
               audioRef.current.play().catch(()=>{});
           }
       }
@@ -195,8 +213,11 @@ export default function App() {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
       
+      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
+      
       if (audioRef.current) {
           audioRef.current.src = `${API_BASE}/api/audio?id=${song.id}`;
+          audioRef.current.load();
           audioRef.current.play().catch(()=>{});
       }
       playSong(song, list, idx); 
@@ -227,18 +248,16 @@ export default function App() {
     }
   }, [queue, currentIndex, API_BASE]);
 
-  // 🔥 LAPIS 2: FULL UNLOCK AUDIO CONTEXT 🔥
+  // 🔥 UNLOCK SEMUA AUDIO CONTEXT 🔥
   useEffect(() => {
     const unlockAudioContext = () => {
-      // Unlock Musik Utama
       if (audioRef.current && audioRef.current.paused && !currentSong?.id) {
-         audioRef.current.src = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+         audioRef.current.src = SILENT_MP3;
          audioRef.current.play().then(() => {
              audioRef.current.pause();
              audioRef.current.src = '';
          }).catch(() => {});
       }
-      
       // Unlock Adzan (Mute 1ms lalu Pause biar dapet izin HP)
       if (adzanAudioRef.current && adzanAudioRef.current.paused && adzanAudioRef.current.currentTime === 0) {
           adzanAudioRef.current.volume = 0; 
@@ -246,6 +265,9 @@ export default function App() {
               adzanAudioRef.current.pause();
               adzanAudioRef.current.volume = 1; 
           }).catch(() => {});
+      }
+      if (keepAliveAudioRef.current && keepAliveAudioRef.current.paused) {
+          keepAliveAudioRef.current.play().then(() => keepAliveAudioRef.current.pause()).catch(()=>{});
       }
       
       document.removeEventListener('click', unlockAudioContext);
@@ -339,7 +361,7 @@ export default function App() {
                       
                       // Panggil audio adzan yg udah pre-load
                       adzanAudioRef.current.play().catch(err => {
-                          console.log("OS Memblokir Adzan, nunggu user nekat nge-play!", err);
+                          console.log("OS Memblokir Adzan!", err);
                       });
                   }
               } else {
@@ -874,6 +896,9 @@ export default function App() {
   return (
     <div className="h-screen bg-gradient-to-br from-[#13151f] via-[#0f0f0f] to-[#000000] text-white flex flex-col font-sans overflow-hidden relative">
       
+      {/* 🔥 PENAHAN NYAWA BACKGROUND (JEMBATAN BISU) 🔥 */}
+      <audio ref={keepAliveAudioRef} src={SILENT_MP3} loop playsInline className="hidden" />
+
       {/* 🔥 AUDIO NATIVE MURNI 🔥 */}
       <audio
         ref={audioRef}
@@ -892,13 +917,19 @@ export default function App() {
            setIsBuffering(false);
            if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) audioRef.current.play().catch(() => console.log("Menunggu interaksi pengguna"));
         }}
+        onPlaying={() => {
+           setIsBuffering(false);
+           // Matikan jembatan bisu begitu lagu asli udah mulai bunyi!
+           if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause(); 
+        }}
         onEnded={() => { 
            if (mediaMode === 'audio') {
                if (usePlayerStore.getState().repeatMode === 'one') {
                    audioRef.current.currentTime = 0;
                    audioRef.current.play();
                } else {
-                   // Eksekusi jalan tol ganti lagu langsung
+                   // Nyalakan jembatan bisu buat nepis OS pas layar mati
+                   if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
                    handleNextLocal(null); 
                }
            }
@@ -916,7 +947,6 @@ export default function App() {
            }
         }}
         onWaiting={() => setIsBuffering(true)}
-        onPlaying={() => setIsBuffering(false)}
         className="hidden"
       />
 
