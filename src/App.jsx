@@ -740,7 +740,12 @@ export default function App() {
                console.log("Audio Error API 5000:", e);
                setIsBuffering(false);
                usePlayerStore.setState({ isPlaying: false });
-               showToast("❌ File audio gagal dimuat. Pastikan backend 5000 merespon dan yt-dlp berjalan.");
+               
+               // 🔥 FITUR AUTO-SKIP ANTI STUCK 🔥
+               showToast("❌ Audio diproteksi/gagal dimuat. Melompat ke lagu berikutnya...");
+               setTimeout(() => {
+                   handleNextLocal(null);
+               }, 2500);
            }
         }}
         onWaiting={() => setIsBuffering(true)}
