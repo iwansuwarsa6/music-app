@@ -661,21 +661,52 @@ export default function App() {
   // =========================================================================
   // 🔥 FUNGSI MEDIA & LYRICS 🔥
   // =========================================================================
+
+  // 1. Dapatkan nama artis dari API (Channel YouTube-nya) biar gak ketuker sama judul
+  const displayArtist = useMemo(() => {
+    if (!currentSong) return "Artis";
+    
+    // Ambil dari nama channel bawaan YouTube (paling akurat)
+    let a = currentSong.artist || "";
+    
+    // Bersihin nama channel dari embel-embel Vevo, Topic, dll biar bersih
+    a = a.replace(/vevo|official|topic|music|channel/gi, '').replace(/-/g, '').trim();
+    
+    // Kalau dari sananya gak ada nama channel, baru terpaksa tebak dari potong judul
+    if (!a || a.toLowerCase() === 'youtube') {
+       if (currentSong.title && currentSong.title.includes('-')) {
+           a = currentSong.title.split('-')[0].replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
+       }
+    }
+    return a.trim() || "Artis";
+  }, [currentSong]);
+
+  // 2. Tentukan judul dengan membandingkannya dengan nama artis di atas
   const displayTitle = useMemo(() => {
     if (!currentSong?.title) return "Pilih Lagu";
+    
+    // Bersihin tanda kurung dll
     let t = currentSong.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
-    if (t.includes('-')) t = t.split('-')[1]; 
-    return t.trim();
-  }, [currentSong?.title]);
-
-  const displayArtist = useMemo(() => {
-    if (!currentSong?.title) return "Artis";
-    if (currentSong.title.includes('-')) {
-      let a = currentSong.title.split('-')[0].replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
-      return a.trim();
+    
+    if (t.includes('-')) {
+       let parts = t.split('-');
+       let artistName = displayArtist.toLowerCase();
+       
+       // Kalau bagian depan itu nama artis, berarti sisanya adalah judul
+       if (parts[0].toLowerCase().includes(artistName)) {
+           t = parts.slice(1).join('-'); 
+       } 
+       // Kalau bagian belakang itu nama artis, berarti bagian depan adalah judul
+       else if (parts[1] && parts[1].toLowerCase().includes(artistName)) {
+           t = parts[0];
+       } 
+       // Default tebakan YouTube: Artist - Title
+       else {
+           t = parts.slice(1).join('-');
+       }
     }
-    return currentSong.artist || "Artis";
-  }, [currentSong]);
+    return t.trim() || currentSong.title;
+  }, [currentSong, displayArtist]);
 
   const handleIframeLoad = () => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
@@ -753,6 +784,7 @@ export default function App() {
       }
   }, [activeTab, displayArtist]);
 
+  // 🔥 UPDATE: BYPASS CORS LYRIST PAKAI CORSPROXY.IO 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
