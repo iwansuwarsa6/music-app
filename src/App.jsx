@@ -1129,8 +1129,8 @@ export default function App() {
                      }).catch(() => {});
                  }
              }}
-             onContextMenu={(e) => {
-                 // FITUR RAHASIA: Tahan/Klik Kanan icon masjid buat ngetes Adzan
+             onDoubleClick={(e) => {
+                 // FITUR RAHASIA: Klik Kiri 2x Cepat buat ngetes Adzan
                  e.preventDefault();
                  showToast("🔊 Test Audio Adzan...");
                  if(adzanAudioRef.current) {
@@ -1139,7 +1139,7 @@ export default function App() {
                  }
              }}
              className={`transition-all duration-300 ${adzanMode ? 'text-[#3ea6ff] drop-shadow-[0_0_8px_rgba(62,166,255,0.4)]' : 'text-zinc-500 hover:text-zinc-300'}`} 
-             title="Mode Adzan (Tahan/Klik Kanan untuk Test)"
+             title="Mode Adzan (Klik Kiri 2x Cepat untuk Test)"
           >
             <MosqueIcon size={24} />
           </button>
@@ -1295,7 +1295,7 @@ export default function App() {
                        }).catch(() => {});
                    }
                }}
-               onContextMenu={(e) => {
+               onDoubleClick={(e) => {
                    e.preventDefault();
                    showToast("🔊 Test Audio Adzan...");
                    if(adzanAudioRef.current) {
@@ -1304,7 +1304,7 @@ export default function App() {
                    }
                }}
                className={`p-2 rounded-full hover:bg-white/10 transition-all duration-300 ${adzanMode ? 'text-[#3ea6ff] drop-shadow-[0_0_8px_rgba(62,166,255,0.4)]' : 'text-zinc-500 hover:text-white'}`} 
-               title="Mode Adzan (Tahan/Klik Kanan untuk Test)"
+               title="Mode Adzan (Klik Kiri 2x Cepat untuk Test)"
             >
                <MosqueIcon size={24} />
             </button>
