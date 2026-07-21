@@ -694,7 +694,6 @@ export default function App() {
       const syncMedia = () => {
           if (!iframeRef.current?.contentWindow) return;
           
-          // KALAU ADZAN NYALA, STOP PAKSA VIDEO DAN STOP SYNC
           if (isAdzanPlayingRef.current) {
               iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
               return; 
@@ -754,7 +753,7 @@ export default function App() {
       }
   }, [activeTab, displayArtist]);
 
-  // 🔥 UPDATE: BYPASS CORS LYRIST PAKAI ALLORIGINS 🔥
+  // 🔥 UPDATE: BYPASS CORS LYRIST PAKAI CORSPROXY.IO 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -833,9 +832,9 @@ export default function App() {
           if (!trackFound) {
               console.log(`⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik untuk: ${searchQueryAPI}`);
               try {
-                  // 🔥 PAKAI PROXY ALLORIGINS BIAR GAK KENA BLOKIR CORS 🔥
+                  // 🔥 PAKAI CORSPROXY.IO BIAR GAK ERROR 520 🔥
                   const targetUrl = `https://lyrist.vercel.app/api/${encodeURIComponent(searchQueryAPI)}`;
-                  const fallbackRes = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
+                  const fallbackRes = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
                   const fallbackData = await fallbackRes.json();
                   
                   if (fallbackData && fallbackData.lyrics) {
@@ -843,7 +842,7 @@ export default function App() {
                       if (parsed.length > 0) { 
                           setLyrics(parsed); 
                           setLyricsMode('full');
-                          console.log("✅ Lirik Jalur Darurat Berhasil Ditarik via Proxy!");
+                          console.log("✅ Lirik Jalur Darurat Berhasil Ditarik via corsproxy.io!");
                       }
                   }
               } catch(err) {
