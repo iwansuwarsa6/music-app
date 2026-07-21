@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/lyrics/:match*",
+      "destination": "https://lrclib.net/api/:match*"
+    }
+  ]
+}
