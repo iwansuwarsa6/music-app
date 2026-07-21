@@ -61,11 +61,6 @@ export default function App() {
   const getActiveAudio = () => activeAudioRef.current === 1 ? audio1Ref.current : audio2Ref.current;
   const getGhostAudio = () => activeAudioRef.current === 1 ? audio2Ref.current : audio1Ref.current;
 
-  // 🔥 ALIAS AJAIB BIAR KODINGAN LAMA NGGAK CRASH (Mencegah Layar Blank Putih) 🔥
-  const audioRef = useMemo(() => ({
-      get current() { return getActiveAudio(); }
-  }), []);
-
   const adzanAudioRef = useRef(null); 
   const keepAliveAudioRef = useRef(null); // Penahan Nyawa Background
   
@@ -694,9 +689,11 @@ export default function App() {
         
         if (activeAudio && activeAudio.src !== expectedUrl) {
             activeAudio.src = expectedUrl;
-            activeAudio.load();
-            setIsBuffering(true);
-            if (isPlaying && !isAdzanPlayingRef.current) activeAudio.play().catch(()=>{});
+            if (activeAudio === audio1Ref.current || activeAudio === audio2Ref.current) {
+               activeAudio.load();
+               setIsBuffering(true);
+               if (isPlaying && !isAdzanPlayingRef.current) activeAudio.play().catch(()=>{});
+            }
         }
     }
 
@@ -841,14 +838,9 @@ export default function App() {
           e.target.currentTime = 0;
           e.target.play();
       } else {
-          // NYALAKAN JEMBATAN BISU (Jaga OS biar gak merem)
           if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
-          
           const nextAudio = getGhostAudio();
-          // SWAP MESIN!
           activeAudioRef.current = activeAudioRef.current === 1 ? 2 : 1;
-          
-          // LANGSUNG PLAY MESIN BARU INSTAN! (Tanpa nunggu jaringan lagi)
           if (nextAudio && nextAudio.src) {
               nextAudio.play().catch(err => console.log("PingPong Play Blocked:", err));
           }
