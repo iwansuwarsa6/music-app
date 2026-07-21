@@ -691,6 +691,7 @@ export default function App() {
       }
   }, [activeTab, displayArtist]);
 
+  // 🔥 UPDATE: MESIN LIRIK KEMBAR (LRCLIB + GENIUS SCRAPER) 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -719,7 +720,6 @@ export default function App() {
         setIsLiked(likedSongs.some(song => song.id === currentSong.id));
         
         if (activeAudio && activeAudio.src !== expectedUrl) {
-            // Mencegah load ulang kalau src nya udah bener dari hasil pre-load
             if (!activeAudio.src.includes(currentSong.id)) {
                 activeAudio.src = expectedUrl;
                 activeAudio.load();
@@ -732,18 +732,22 @@ export default function App() {
     }
 
     if (currentSong?.title) {
-      setIsLoadingLyrics(true);
-      setLyrics([]);
+      setIsLoadingLyrics(true); 
+      setLyrics([]); 
       setActiveLyricIndex(-1);
+      
+      // MESIN 1: Cari Lirik Running Text (LRCLIB)
       fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(`${displayTitle} ${displayArtist}`.trim())}`)
         .then(res => res.json())
-        .then(data => {
+        .then(async data => {
+          let trackFound = false;
           if (Array.isArray(data) && data.length > 0) {
             const safeTitle = displayTitle.toLowerCase().trim();
             const exactMatches = data.filter(t => t.trackName?.toLowerCase().includes(safeTitle) || safeTitle.includes(t.trackName?.toLowerCase()));
             let track = exactMatches.length > 0 ? (exactMatches.find(t => t.syncedLyrics) || exactMatches.find(t => t.plainLyrics) || exactMatches[0]) : (data.find(t => t.syncedLyrics) || data.find(t => t.plainLyrics) || data[0]);
 
             if (track) {
+              trackFound = true;
               setLrclibDuration(track.duration || 0);
               if (track.syncedLyrics) {
                 const parsed = track.syncedLyrics.split('\n').map(line => {
@@ -755,10 +759,31 @@ export default function App() {
               }
               if (track.plainLyrics) {
                 const parsed = track.plainLyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
-                if (parsed.length > 0) { setLyrics(parsed); setLyricsMode('full'); }
+                if (parsed.length > 0) { setLyrics(parsed); setLyricsMode('full'); return; }
               }
             }
           }
+          
+          // 🔥 MESIN 2 (JALUR DARURAT): Kalau LRCLIB kosong, paksa tarik dari Scraper Genius 🔥
+          if (!trackFound) {
+              console.log("⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik...");
+              try {
+                  const fallbackRes = await fetch(`https://lyrist.vercel.app/api/${encodeURIComponent(displayTitle + ' ' + displayArtist)}`);
+                  const fallbackData = await fallbackRes.json();
+                  
+                  if (fallbackData && fallbackData.lyrics) {
+                      const parsed = fallbackData.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
+                      if (parsed.length > 0) { 
+                          setLyrics(parsed); 
+                          setLyricsMode('full'); // Set ke Full Text otomatis
+                          console.log("✅ Lirik Jalur Darurat Berhasil Ditarik!");
+                      }
+                  }
+              } catch(err) {
+                  console.log("❌ Lirik jalur darurat juga gagal:", err);
+              }
+          }
+          
         }).finally(() => setIsLoadingLyrics(false));
     }
   }, [currentSong?.id, displayTitle, displayArtist, API_BASE]);
