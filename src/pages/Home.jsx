@@ -56,7 +56,7 @@ export default function Home() {
       let userDNA = JSON.parse(localStorage.getItem('ytm_vibe_dna') || '[]');
       userDNA = userDNA.filter(name => name.length < 20 && !name.toLowerCase().includes('zaini') && !name.toLowerCase().includes('cover'));
 
-      const indoPop = ["Mahalini", "Bernadya", "Hindia", "Tiara Andini", "Sal Priadi", "Kunto Aji", "Nadin Amizah", "Pamungkas", "Yura Yunita", "Maliq & D'Essentials", "Feby Putri", "Juicy Luicy", "Rizky Febian", "Tulus", "Lyodra"];
+      const indoPop = ["Mahalini", "Bernadya", "Hindia", "Tiara Andini", "Sal Priadi", "Kunto Aji", "Nadin Amizah", "Pamungkas", "Yura Yunita", "Maliq & D'Essentials", "Feby Putri", "Juicy Luicy", "Rizky Febian", "Tulus", "Lyodra", "Ziva Magnolya", "Keisya Levronka"];
       const westPop = ["Taylor Swift", "The Weeknd", "Bruno Mars", "Ariana Grande", "Justin Bieber", "Post Malone", "Dua Lipa", "Coldplay", "Ed Sheeran", "Burna Boy", "Sabrina Carpenter", "Billie Eilish", "Shawn Mendes"];
 
       let targetArtists = [];
@@ -193,36 +193,71 @@ export default function Home() {
     };
   }, [activeCategory]); 
 
+  // 🔥 ALGORITMA INSTAN: KELOMPOKAN BANYAK LAGU SEFREKUENSI SECARA KILAT 🔥
   const handlePlay = (song, sectionTracks, index) => {
     if (currentSong?.id === song.id) {
       const audios = document.querySelectorAll('audio');
       audios.forEach(audio => {
         if (audio.src && audio.src.includes(song.id)) {
-          if (isPlaying) {
-            audio.pause();
-          } else {
-            audio.play().catch(()=>{});
-          }
+          if (isPlaying) audio.pause();
+          else audio.play().catch(()=>{});
         }
       });
 
       const iframe = document.querySelector('iframe');
       if (iframe && iframe.contentWindow) {
         iframe.contentWindow.postMessage(JSON.stringify({ 
-          event: 'command', 
-          func: isPlaying ? 'pauseVideo' : 'playVideo', 
-          args: [] 
+          event: 'command', func: isPlaying ? 'pauseVideo' : 'playVideo', args: [] 
         }), '*');
       }
-
       togglePlay();
       return;
     }
     
+    // 🧠 RADAR GENRE
+    const indoPop = /mahalini|bernadya|hindia|tiara|sal priadi|kunto|nadin|pamungkas|yura|maliq|feby|juicy|rizky|tulus|lyodra|ziva|keisya|andmesh|budi|vierratale|d'masiv|sheila|noah|ungu|geisha|armada|kangen/i;
+    const baratPop = /taylor|weeknd|bruno|ariana|bieber|post malone|dua lipa|coldplay|ed sheeran|sabrina|billie|shawn|olivia|maroon|charlie|katy|rihanna|beyonce/i;
+
+    let cleanArtist = (song.artist || '').toLowerCase();
+    let isIndo = indoPop.test(cleanArtist);
+    let isBarat = baratPop.test(cleanArtist);
+
+    // Kumpulin semua stok lagu yang udah dimuat di halaman Home (Ada sekitar 50+ lagu)
+    let allHomeTracks = [];
+    homeSections.forEach(sec => {
+        if (sec.tracks) allHomeTracks = [...allHomeTracks, ...sec.tracks];
+    });
+
+    // Saring cuma yang sefrekuensi (Ziva ketemu Mahalini dkk, Bruno ketemu Taylor dkk)
+    let relatedTracks = allHomeTracks.filter(t => {
+        if (t.id === song.id) return false; 
+        let tArtist = (t.artist || '').toLowerCase();
+        if (isIndo) return indoPop.test(tArtist);
+        if (isBarat) return baratPop.test(tArtist);
+        // Kalau lagu indie/gak masuk radar, cocokin artisnya aja
+        return tArtist.includes(cleanArtist) || cleanArtist.includes(tArtist);
+    });
+
+    // Buang duplikat lagu yang sama
+    let uniqueRelated = Array.from(new Map(relatedTracks.map(item => [item.id, item])).values());
+    
+    // Acak antreannya biar seger, ambil 20 lagu teratas
+    uniqueRelated = uniqueRelated.sort(() => 0.5 - Math.random()).slice(0, 20);
+
+    let newQueue = [song, ...uniqueRelated];
+
+    // Kalau ternyata hasil saringannya dikit (misal kurang dari 5 lagu), 
+    // kita campur sama sectionTracks aslinya sebagai cadangan biar antrean tetep panjang
+    if (newQueue.length < 5) {
+        const fallback = sectionTracks.filter(s => s.id !== song.id && !newQueue.some(q => q.id === s.id));
+        newQueue = [...newQueue, ...fallback].slice(0, 20);
+    }
+
+    // Eksekusi pemutaran langsung dengan Antrean Penuh Sefrekuensi
     playSong({
       ...song,
       url: `https://music-app-production-278c.up.railway.app/api/audio?id=${song.id}` 
-    }, sectionTracks, index);
+    }, newQueue, 0);
   };
 
   const handlePlayAll = (e, sectionTracks) => {
@@ -334,7 +369,6 @@ export default function Home() {
                           <button onClick={(e) => handleOpenMenu(e, song)} className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 text-white/80 hover:text-white transition-opacity">
                               <MoreVertical size={24} />
                           </button>
-                          {/* Logika Opacity HP: Selalu muncul kalau lagu lagi jalan */}
                           <button className={`w-12 h-12 bg-white text-black rounded-full flex items-center justify-center transition-all hover:scale-105 shadow-xl ${currentSong?.id === song.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                             {isPlaying && currentSong?.id === song.id ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
                           </button>
@@ -359,13 +393,11 @@ export default function Home() {
                     >
                       <div className="relative w-12 h-12 flex-shrink-0">
                         <img src={song.image} alt={song.title} className="w-full h-full object-cover rounded shadow-md" />
-                        {/* Logika Opacity HP: Selalu muncul gelap & tombol play kalau lagu lagi jalan */}
                         <div className={`absolute inset-0 rounded flex items-center justify-center transition-opacity ${currentSong?.id === song.id ? 'opacity-100 bg-black/50' : 'opacity-0 group-hover:opacity-100 bg-black/50'}`}>
                           {isPlaying && currentSong?.id === song.id ? <Pause fill="white" size={16} /> : <Play fill="white" size={16} className="ml-0.5" />}
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        {/* Bikin tulisan biru kalau lagi diputar */}
                         <div className={`text-sm font-bold truncate mb-0.5 group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
                         <div className="text-xs text-zinc-400 truncate">{song.artist}</div>
                       </div>

@@ -160,7 +160,6 @@ export default function App() {
           } else {
               const audioPlayer = getActiveAudio();
               if (audioPlayer) {
-                  // 🔥 JURUS MOTOR: Nyalain lagu utama dulu, baru matikan lagu senyap
                   audioPlayer.play().then(() => {
                       usePlayerStore.setState({ isPlaying: true });
                       showToast('▶️ Gas lagi! Waktu Adzan selesai.');
@@ -169,7 +168,6 @@ export default function App() {
                       usePlayerStore.setState({ isPlaying: false }); 
                       showToast('⚠️ HP memblokir. Ketuk Play manual.');
                   }).finally(() => {
-                      // Matikan lagu pancingan senyap
                       if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
                   });
               }
@@ -183,16 +181,13 @@ export default function App() {
   const fireAdzanPause = (prayerName, isTest = false) => {
       wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
       isAdzanPlayingRef.current = true;
-      setActivePrayerName(prayerName); // Munculin Overlay Pop Up
+      setActivePrayerName(prayerName);
 
       if (wasPlayingBeforeAdzan.current) {
-          // 🔥 JURUS MOTOR: Nyalain MP3 senyap SEBELUM lagu utama di-pause. 
-          // Biar OS HP nggak ketiduran pas layar mati!
           if (keepAliveAudioRef.current) {
               keepAliveAudioRef.current.play().catch(()=>{});
           }
 
-          // Baru Pause Musik Utama
           usePlayerStore.setState({ isPlaying: false });
           if (mediaModeRef.current === 'video') {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
@@ -203,7 +198,6 @@ export default function App() {
       
       showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba!` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 3 menit.`);
 
-      // Set Timer 3 Menit (180.000 ms) buat play lagi otomatis
       forceFinishAdzanRef.current = setTimeout(() => {
           dismissAdzanPause();
       }, 180000); 
@@ -356,13 +350,11 @@ export default function App() {
       }
   };
 
-  // 🔥 INI DIA FUNGSI YANG UDAH DIREVISI 🔥
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
       if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       
-      // FIX BUG: Cek apakah lagu yang diklik = lagu yang lagi jalan
       if (currentSong && currentSong.id === song.id) {
           handleTogglePlayLocal(null);
           return; 
@@ -389,7 +381,6 @@ export default function App() {
     }
   };
 
-  // 🔥 CURI START DOWNLOAD (PRELOAD) KE MESIN CADANGAN 🔥
   useEffect(() => {
     const nextSong = queue[currentIndex + 1];
     if (nextSong && nextSong.id) {
@@ -528,27 +519,54 @@ export default function App() {
     window.dispatchEvent(new Event('likedSongsUpdated'));
   };
 
-  // 🔥 UPDATE: RADIO MIX DENGAN FILTER ANTI-SAMPAH 🔥
+  // =========================================================================
+  // 🔥 ALGORITMA INFINITE AUTOPLAY (Muter Tanpa Batas) 🔥
+  // =========================================================================
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
     let cleanArtist = (baseSong.artist || 'Official').split('-')[0].trim();
     cleanArtist = cleanArtist.replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
     
-    const cacheKey = `radiomix_${cleanArtist}`;
+    const cacheKey = `algomix_infinite_${cleanArtist}`;
     const cachedMix = sessionStorage.getItem(cacheKey);
     
+    // Kalau lagu dari artis ini udah pernah dicari, tinggal masukin sisa daftarnya ke antrean
     if (cachedMix) {
-        usePlayerStore.setState(state => ({ queue: [baseSong, ...JSON.parse(cachedMix)] }));
+        const parsedMix = JSON.parse(cachedMix);
+        usePlayerStore.setState(state => {
+            // Saring biar nggak ada lagu kembar yang masuk lagi
+            const existingIds = new Set(state.queue.map(q => q.id));
+            const newUnique = parsedMix.filter(m => !existingIds.has(m.id));
+            if (newUnique.length === 0) return state; 
+            return { queue: [...state.queue, ...newUnique] }; // Tumpuk ke belakang antrean!
+        });
         return;
     }
 
-    let queryPool = [`${cleanArtist} official music video`, `${cleanArtist} pop hits official audio`];
+    const indoPop = /mahalini|bernadya|hindia|tiara andini|sal priadi|kunto aji|nadin|pamungkas|yura|maliq|feby|juicy|rizky febian|tulus|lyodra|ziva|keisya|andmesh|budi|vierratale|d'masiv/i;
+    const baratPop = /taylor swift|weeknd|bruno mars|ariana|bieber|post malone|dua lipa|coldplay|ed sheeran|sabrina|billie|shawn|olivia/i;
+
+    let queryPool = [`${cleanArtist} official audio`]; 
+
+    if (indoPop.test(cleanArtist)) {
+        queryPool.push(`lagu pop indonesia hits official audio`);
+    } else if (baratPop.test(cleanArtist)) {
+        queryPool.push(`top western pop hits official audio`);
+    } else {
+        queryPool.push(`${cleanArtist} similar artists official audio`);
+    }
 
     try {
         const responses = await Promise.all(queryPool.map(q => fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(q)}`)));
         const datasets = await Promise.all(responses.map(r => r.json()));
         let combined = [];
-        datasets.forEach(d => { if(d.status && d.data) combined = [...combined, ...d.data.sort(() => 0.5 - Math.random())]; });
+        
+        datasets.forEach(d => { 
+            if(d.status && d.data) {
+                combined = [...combined, ...d.data.sort(() => 0.5 - Math.random())]; 
+            }
+        });
+        
         let mix = [];
         let usedIds = new Set([baseSong.id]); 
 
@@ -563,31 +581,31 @@ export default function App() {
             usedIds.add(validId);
         });
 
-        mix = mix.sort(() => Math.random() - 0.5).slice(0, 25);
+        mix = mix.slice(0, 25);
         if (mix.length > 0) {
             sessionStorage.setItem(cacheKey, JSON.stringify(mix)); 
-            usePlayerStore.setState(state => ({ queue: [baseSong, ...mix] }));
+            usePlayerStore.setState(state => {
+                const existingIds = new Set(state.queue.map(q => q.id));
+                const newUnique = mix.filter(m => !existingIds.has(m.id));
+                // Jangan numpuk (replace) antrean! Tapi Tumpuk di belakangnya (append)
+                return { queue: [...state.queue, ...newUnique] }; 
+            });
         }
     } catch (e) {}
   };
 
+  // 🔥 OTAK BARU APP.JSX: CUMA KERJA KALAU ANTREAN UDAH MAU HABIS 🔥
   useEffect(() => {
     if (!currentSong || queue.length === 0) return;
-    let cleanArtist = (currentSong.artist || 'Official').split('-')[0].trim();
-    cleanArtist = cleanArtist.replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
 
-    let isMonotonous = false;
-    if (queue.length > 2) {
-        let pureTitle = currentSong.title.toLowerCase().replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').replace(/[^a-z0-9\s]/gi, ' ').trim();
-        const firstWord = pureTitle.split(' ').filter(w => w.length >= 4)[0];
-        if (firstWord && queue[1]?.title.toLowerCase().includes(firstWord)) isMonotonous = true;
-    }
+    // Hitung sisa lagu di panel "Berikutnya"
+    const remainingSongs = queue.length - 1 - currentIndex;
     
-    if (queue.length <= 1 || isMonotonous) {
-        usePlayerStore.setState({ queue: [currentSong] });
+    // Kalau sisa lagu tinggal 2 lagu lagi, diam-diam (di background) cari lagu sefrekuensi dan taruh di bawahnya!
+    if (remainingSongs <= 2) {
         generateRadioMix(currentSong);
     }
-  }, [currentSong?.id]);
+  }, [currentSong?.id, currentIndex, queue.length]);
 
   // =========================================================================
   // 🔥 FUNGSI SEARCH & SUGGESTIONS DENGAN FILTER ANTI-SAMPAH 🔥
@@ -889,7 +907,6 @@ export default function App() {
           if (!trackFound) {
               console.log(`⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik untuk: ${searchQueryAPI}`);
               try {
-                  // Fallback 1: ovh API 
                   const resOvh = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtistAPI)}/${encodeURIComponent(cleanTitleAPI)}`);
                   if (resOvh.ok) {
                       const dataOvh = await resOvh.json();
@@ -902,7 +919,6 @@ export default function App() {
                       }
                   }
                   
-                  // 🔥 Fallback 2: Lyrist via AllOrigins GET (Bebas CORS) 🔥
                   const targetUrl = `https://lyrist.vercel.app/api/${encodeURIComponent(searchQueryAPI)}`;
                   const fallbackRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
                   const fallbackDataWrapped = await fallbackRes.json();
@@ -1053,7 +1069,6 @@ export default function App() {
       }
   };
 
-  // 🔥 KABEL PENGHUBUNG BUAT SAKLAR BERANDA 🔥
   window.saklarPusat = handleTogglePlayLocal;
 
   return (
@@ -1112,6 +1127,7 @@ export default function App() {
            onClick={(e) => e.stopPropagation()}
         >
            <button onClick={(e) => { 
+               // Khusus Mix di Menu, biarin cuma 1 lagu biar API kerja nyari lagu acak yg bagus
                handlePlayClick(e, contextMenu.song, [contextMenu.song], 0);
                generateRadioMix(contextMenu.song); 
                showToast("Memulai Radio Mix...");
