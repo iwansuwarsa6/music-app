@@ -363,11 +363,12 @@ export default function App() {
           active.play().catch(()=>{});
       }
       
+      // HANYA UPDATE INDEX SAJA, JANGAN GANTI LIST QUEUE-NYA!
       usePlayerStore.getState().playSong(qSong, queue, idx);
       setIsExpanded(true); // 🔥 OTOMATIS BUKA FULLSCREEN
   };
 
-  // FUNGSI PLAY DARI MENU TERKAIT (DI DALAM PLAYER)
+  // FUNGSI PLAY DARI MENU TERKAIT ATAU BERANDA (DARI LUAR ANTREAN)
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
@@ -673,15 +674,21 @@ export default function App() {
     }
   }, [currentSong?.id, currentIndex, queue.length]);
 
+  // 🔥 DETEKSI LOKASI UNTUK RESET SEARCH BAR 🔥
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const q = params.get('q');
-    if (q) setSearchQuery(q);
-  }, [location.search]);
+    if (location.pathname !== '/search') {
+      setSearchQuery('');
+      setShowSearchHistory(false);
+    } else {
+      const params = new URLSearchParams(location.search);
+      const q = params.get('q');
+      if (q) setSearchQuery(q);
+    }
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
-      if (searchQuery.trim().length > 2) {
+      if (searchQuery.trim().length > 2 && location.pathname === '/search') {
         setIsFetchingSuggestions(true);
         const qLower = searchQuery.trim().toLowerCase();
         
@@ -725,7 +732,7 @@ export default function App() {
       } else { setLiveSuggestions([]); setTextSuggestions([]); }
     }, 500); 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]);
+  }, [searchQuery, location.pathname]);
 
   const executeSearch = (query) => {
     const q = query.trim();
@@ -1373,7 +1380,7 @@ export default function App() {
       </div>
 
       {/* 🔥 KONTEN UTAMA DENGAN PADDING DINAMIS 🔥 */}
-      <div className={`flex-1 overflow-y-auto pt-0 md:pt-[72px] z-10 transition-all duration-[600ms] ${currentSong?.id ? 'pb-36 md:pb-28' : 'pb-20 md:pb-8'}`}>
+      <div className={`flex-1 overflow-y-auto pt-0 md:pt-[72px] z-10 transition-all duration-[600ms] ${currentSong?.id ? 'pb-[140px] md:pb-[100px]' : 'pb-20 md:pb-8'}`}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
@@ -1384,18 +1391,18 @@ export default function App() {
       </div>
 
       {/* MOBILE BOTTOM NAV */}
-      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-[#0a0a0a]/90 backdrop-blur-2xl flex justify-around items-center text-[10px] z-40 pb-1 border-t border-white/5 transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isExpanded ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-[#0a0a0a]/90 backdrop-blur-2xl flex justify-around items-center text-[10px] z-40 pb-1 border-t border-white/5 transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
         <Link to="/" className={`flex flex-col items-center gap-1 ${location.pathname === '/' ? 'text-white' : 'text-zinc-400'}`}><HomeIcon size={24} /><span>Beranda</span></Link>
         <Link to="/search" className={`flex flex-col items-center gap-1 ${location.pathname === '/search' ? 'text-white' : 'text-zinc-400'}`}><SearchIcon size={24} /><span>Mencari</span></Link>
         <Link to="/library" className={`flex flex-col items-center gap-1 ${location.pathname === '/library' ? 'text-white' : 'text-zinc-400'}`}><Library size={24} /><span>Pustaka</span></Link>
         <Link to="/developer" className={`flex flex-col items-center gap-1 ${location.pathname === '/developer' ? 'text-white' : 'text-zinc-400'}`}><User size={24} /><span>Developer</span></Link>
       </div>
 
-      {/* 🔥 MINI PLAYER BAR (NGE-SLIDE DARI BAWAH PAS LAGU DIPUTAR) 🔥 */}
+      {/* 🔥 MINI PLAYER BAR (BENERAN NGUMPET SAMPAI KE BAWAH TANAH KALAU GAK ADA LAGU) 🔥 */}
       <div 
         className={`fixed left-0 right-0 h-[64px] md:h-[72px] bg-[#212121]/95 backdrop-blur-2xl border-t border-black flex flex-col justify-center px-4 md:px-6 z-[90] cursor-pointer hover:bg-[#2a2a2a]/95 transition-all duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
-        ${!currentSong?.id ? 'translate-y-[200%] opacity-0 pointer-events-none' 
-        : isExpanded ? 'translate-y-[150%] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto bottom-0' 
+        ${!currentSong?.id ? 'translate-y-[150vh] opacity-0 pointer-events-none' 
+        : isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto bottom-0' 
         : 'translate-y-0 opacity-100 bottom-[60px] md:bottom-0'}`}
         onClick={() => { if(!isExpanded && currentSong?.id) setIsExpanded(true); }}
       >
@@ -1492,10 +1499,10 @@ export default function App() {
         </div>
       </div>
 
-      {/* 🔥 FULLSCREEN PLAYER OVERLAY DENGAN ANIMASI SPRING BAWAAN APLIKASI 🔥 */}
+      {/* 🔥 FULLSCREEN PLAYER OVERLAY (BENERAN NGUMPET SAMPAI KE BAWAH TANAH KALAU GAK ADA LAGU) 🔥 */}
       <div 
         className={`fixed top-0 left-0 right-0 bottom-0 md:bottom-[72px] bg-gradient-to-b from-[#1a1c29] to-[#0f0f0f] z-[80] flex flex-col transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
-        ${isExpanded ? 'translate-y-0' : 'translate-y-full'}`}
+        ${!currentSong?.id || !isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100 pointer-events-auto'}`}
       >
         <div className="h-[80px] shrink-0 flex justify-between items-center px-4 md:px-8 border-b border-white/5">
           <button onClick={() => setIsExpanded(false)} className="text-white hover:text-zinc-300 p-2 rounded-full hover:bg-white/10 transition-colors">
