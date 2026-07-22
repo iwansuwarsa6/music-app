@@ -5,68 +5,59 @@ const axios = require('axios');
 const app = express();
 app.use(cors());
 
-app.get('/', (req, res) => res.send('🔥 Backend RnCmusic (Nyamar Chrome & Redirect) 🔥'));
+app.get('/', (req, res) => {
+    res.send('🔥 Backend RnCmusic (Jalur JioSaavn) - BEBAS BLOKIR 🔥');
+});
 
-app.get('/api/audio', async (req, res) => {
-    const videoId = req.query.id;
-    if (!videoId) return res.status(400).send('ID kosong!');
+// 1. Endpoint buat nyari lagu (Frontend lu nembak ke sini buat dapet ID lagu)
+app.get('/api/search', async (req, res) => {
+    const query = req.query.q;
+    if (!query) return res.status(400).send('Mau nyari lagu apa Bang?');
 
     try {
-        console.log(`[ ▶ ] MENCARI LINK BAWAH TANAH: ${videoId}`);
+        console.log(`[ 🔍 ] Nyari lagu: ${query}`);
+        // Nembak ke server komunitas JioSaavn (Gratis, gak perlu Key)
+        const response = await axios.get(`https://saavn.dev/api/search/songs?query=${query}`);
         
-        // 🔥 JURUS LICIK: Nyamar jadi Google Chrome versi terbaru biar lolos Cloudflare
-        const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'Accept': 'application/json',
-            'Accept-Language': 'id-ID,id;q=0.9,en-US;q=0.8'
-        };
-        
-        // Daftar server komunitas (kalau satu mati, otomatis nyoba yang lain)
-        const apis = [
-            `https://pipedapi.kavin.rocks/streams/${videoId}`,
-            `https://pipedapi.syncpundit.io/streams/${videoId}`,
-            `https://de.piped.api.nosebs.ru/streams/${videoId}`
-        ];
+        // Kirim data lagunya ke frontend lu
+        res.json(response.data);
+    } catch (err) {
+        console.error(`[ ❌ ] Gagal nyari:`, err.message);
+        res.status(500).send('Server pencarian lagi gangguan.');
+    }
+});
 
-        let data = null;
+// 2. Endpoint buat muter audio berdasarkan ID lagu
+app.get('/api/audio', async (req, res) => {
+    const songId = req.query.id;
+    if (!songId) return res.status(400).send('ID lagu kosong!');
+
+    try {
+        console.log(`[ ▶ ] Ngambil audio ID: ${songId}`);
         
-        for (let url of apis) {
-            try {
-                console.log(`Mencoba nembus: ${url}`);
-                const response = await axios.get(url, { headers });
-                if (response.data && response.data.audioStreams) {
-                    data = response.data;
-                    break; // Kalau tembus 1, langsung stop nyari
-                }
-            } catch (e) {
-                console.log(`[ ! ] Gagal nembus, lanjut cari jalan lain...`);
-            }
+        // Minta detail lagunya ke API
+        const response = await axios.get(`https://saavn.dev/api/songs/${songId}`);
+        const songData = response.data.data[0];
+
+        if (!songData || !songData.downloadUrl) {
+            return res.status(404).send('Audio gak ketemu Bang.');
         }
 
-        if (!data) {
-            return res.status(500).send('Semua jalur bawah tanah diblokir.');
-        }
-        
-        // Cari format audio yang support di web
-        const audio = data.audioStreams.find(s => 
-            s.mimeType.startsWith('audio/mp4') || s.mimeType.startsWith('audio/webm')
-        );
-        
-        if (!audio || !audio.url) {
-            return res.status(500).send('Audio tidak ditemukan.');
-        }
+        // Cari link audio kualitas paling bagus (320kbps) atau seadanya
+        const audioLink = songData.downloadUrl.find(q => q.quality === '320kbps')?.link || songData.downloadUrl[0].link;
 
-        console.log(`[ ✔ ] LINK DAPET! Mengalihkan player ke jalur langsung...`);
-
-        // 🔥 STRATEGI BARU: Jangan didownload sama server Railway!
-        // Langsung suruh web lu (Frontend) muter lagunya dari link aslinya.
-        res.redirect(audio.url);
+        console.log(`[ ✔ ] Audio dapet! Langsung disetelin...`);
+        
+        // Redirect langsung ke link MP4/M4A aslinya (Biar server lu gak capek nyedot)
+        res.redirect(audioLink);
 
     } catch (err) {
-        console.error(`[ ❌ ] ERROR FATAL:`, err.message);
-        res.status(500).send('Server error.');
+        console.error(`[ ❌ ] Gagal muter:`, err.message);
+        res.status(500).send('Gagal narik audio dari JioSaavn.');
     }
 });
 
 const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`🔥 SERVER REDIRECT JALAN DI PORT ${PORT} 🔥`));
+app.listen(PORT, () => {
+    console.log(`🔥 SERVER JIOSAAVN JALAN DI PORT ${PORT} 🔥`);
+});
