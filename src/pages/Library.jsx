@@ -90,11 +90,11 @@ export default function Library() {
   };
 
   // ===========================================================================
-  // 🔥 ALGORITMA SCRAPING LINK SPOTIFY & YOUTUBE (TANPA BACKEND) 🔥
+  // 🔥 ALGORITMA SCRAPING LINK SPOTIFY & YOUTUBE (VERSI TAHAN BANTING) 🔥
   // ===========================================================================
   const handleImportLink = async (e) => {
     e.preventDefault();
-    const url = importUrl.trim();
+    let url = importUrl.trim();
     if (!url) return;
 
     setIsImporting(true);
@@ -110,26 +110,39 @@ export default function Library() {
             return;
         }
 
-        setImportProgress("Menembus keamanan CORS...");
+        // 🔥 TRIK RAHASIA 1: Kalau link YouTube Music, paksa ganti jadi YouTube biasa biar gampang disedot HTML-nya!
+        if (isYouTube && url.includes('music.youtube.com')) {
+            url = url.replace('music.youtube.com', 'www.youtube.com');
+        }
+
+        setImportProgress("Menembus keamanan server...");
         
-        // 🔥 Kita pakai Proxy AllOrigins biar gak kena blokir browser!
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-        const response = await fetch(proxyUrl);
-        const data = await response.json();
-        
+        let html = "";
+        try {
+            // 🔥 TRIK RAHASIA 2: Double Proxy. Kalau Proxy 1 (AllOrigins) diblokir, tembak pakai Proxy 2 (CorsProxy)!
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+            const response = await fetch(proxyUrl);
+            const data = await response.json();
+            html = data.contents;
+        } catch (err1) {
+            try {
+                const response2 = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
+                html = await response2.text();
+            } catch (err2) {
+                throw new Error("Semua proxy diblokir server.");
+            }
+        }
+
+        if (!html) throw new Error("Data HTML Kosong");
+
         setImportProgress("Mengekstrak data lagu rahasia...");
-        const html = data.contents;
-        
         let extractedTitles = [];
 
         if (isSpotify) {
-            // Jurus 1: Nembus JSON Spotify di dalam HTML
             const titleMatches = html.match(/"name":"([^"]+)","type":"track"/g);
             if (titleMatches) {
                 extractedTitles = titleMatches.map(t => t.split('":"')[1].split('","')[0]);
             }
-            
-            // Jurus 2: Nembus lewat meta deskripsi (Buat backup)
             if (extractedTitles.length === 0) {
                 const match = html.match(/<meta property="og:description" content="([^"]+)"/);
                 if (match && match[1]) {
@@ -138,18 +151,20 @@ export default function Library() {
                 }
             }
         } else if (isYouTube) {
-            // Jurus 3: Ekstrak JSON dari YouTube Playlist
+            // Ekstrak JSON dari script YouTube
             const titleMatches = html.match(/{"title":{"runs":\[{"text":"([^"]+)"}\]/g);
             if (titleMatches) {
-                extractedTitles = titleMatches.map(t => t.match(/"text":"([^"]+)"/)[1]);
+                extractedTitles = titleMatches.map(t => {
+                    const m = t.match(/"text":"([^"]+)"/);
+                    return m ? m[1] : null;
+                }).filter(t => t && t !== "Hapus" && t !== "Simpan" && !t.includes("Playlist"));
             }
         }
 
-        // Hapus lagu kembar dan batasin 15 lagu (Biar API kita ga over-limit)
         extractedTitles = [...new Set(extractedTitles)].slice(0, 15);
 
         if (extractedTitles.length === 0) {
-            showToast("❌ Playlist terkunci (Private) atau link tidak valid.");
+            showToast("❌ Playlist terkunci (Private) atau struktur web diblokir.");
             setIsImporting(false);
             return;
         }
@@ -157,7 +172,6 @@ export default function Library() {
         let newTracks = [];
         let successCount = 0;
 
-        // Proses pencarian dan penyatuan ke database lagu kita
         for (let i = 0; i < extractedTitles.length; i++) {
             setImportProgress(`Meracik audio: ${i + 1}/${extractedTitles.length}...`);
             try {
@@ -185,7 +199,6 @@ export default function Library() {
             } catch (e) {
                 console.error("Gagal nyari lagu:", extractedTitles[i]);
             }
-            // Delay bentar biar API ga ngamuk dikira bot spam
             await new Promise(resolve => setTimeout(resolve, 600));
         }
 
@@ -200,7 +213,7 @@ export default function Library() {
         }
 
     } catch (error) {
-        showToast("❌ Terjadi kesalahan saat menembus link.");
+        showToast("❌ Terjadi kesalahan saat menembus link. (Server Diblokir)");
     } finally {
         setIsImporting(false);
     }
@@ -257,7 +270,7 @@ export default function Library() {
                   <p className="text-sm text-zinc-400 truncate mt-0.5">{song.artist}</p>
                 </div>
                 
-                <button onClick={(e) => openMenu(e, song)} className="text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity p-2">
+                <button onClick={(e) => openMenu(e, song)} className="text-zinc-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-2">
                     <MoreVertical size={20} />
                 </button>
               </div>
@@ -292,7 +305,6 @@ export default function Library() {
           Tanggal ditambahkan ↓
         </div>
         
-        {/* 🔥 TOMBOL IMPORT DITAMBAHKAN DI SINI 🔥 */}
         <button 
           onClick={() => setShowImportModal(true)}
           className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white px-4 py-1.5 rounded-full text-xs font-bold transition-colors border border-white/10"
@@ -346,7 +358,7 @@ export default function Library() {
                   <p className={`text-base font-bold line-clamp-1 ${isCurrent ? 'text-white' : 'text-zinc-200'}`}>{song.title}</p>
                   <p className="text-sm text-zinc-400 truncate mt-0.5">{song.artist}</p>
                 </div>
-                <button onClick={(e) => openMenu(e, song)} className="text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity p-2">
+                <button onClick={(e) => openMenu(e, song)} className="text-zinc-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-2">
                     <MoreVertical size={20} />
                 </button>
               </div>
