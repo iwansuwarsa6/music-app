@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, Pause, MoreVertical, Heart, Download, TrendingUp, ArrowLeft, Shuffle, Disc3, Mic2, Users, Import, X, Loader2, ListPlus, Search } from 'lucide-react';
+import { Play, Pause, MoreVertical, Heart, Download, TrendingUp, ArrowLeft, Shuffle, Disc3, Mic2, Users, Import, X, Loader2, ListPlus, Link as LinkIcon, Search } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 
 export default function Library() {
@@ -11,9 +11,9 @@ export default function Library() {
   const [likedSongs, setLikedSongs] = useState([]);
   const [historySongs, setHistorySongs] = useState([]);
 
-  // 🔥 STATE UNTUK FITUR IMPORT 🔥
+  // 🔥 STATE UNTUK FITUR IMPORT LINK 🔥
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importText, setImportText] = useState("");
+  const [importUrl, setImportUrl] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
   const [toastMsg, setToastMsg] = useState("");
@@ -70,17 +70,17 @@ export default function Library() {
   const handlePlayAll = (songs) => {
     if (songs.length === 0) return;
     playSong({ ...songs[0], url: `${API_BASE}/api/audio?id=${songs[0].id}` }, songs, 0);
-    window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 BUKA LAYAR PENUH
+    window.dispatchEvent(new CustomEvent('openFullScreenPlayer'));
   };
 
   const handlePlaySong = (song, list, index) => {
     if (currentSong?.id === song.id) {
       togglePlay();
-      window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 BUKA LAYAR PENUH
+      window.dispatchEvent(new CustomEvent('openFullScreenPlayer'));
       return;
     }
     playSong({ ...song, url: `${API_BASE}/api/audio?id=${song.id}` }, list, index);
-    window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 BUKA LAYAR PENUH
+    window.dispatchEvent(new CustomEvent('openFullScreenPlayer'));
   };
 
   const openMenu = (e, song) => {
@@ -89,69 +89,121 @@ export default function Library() {
     window.dispatchEvent(new CustomEvent('openSongMenu', { detail: { event: e, song: song } }));
   };
 
-  // 🔥 FUNGSI SMART BULK IMPORT 🔥
-  const handleImport = async () => {
-    if (!importText.trim()) return;
-    
-    if (importText.includes('spotify.com/') || importText.includes('youtube.com/playlist')) {
-        showToast("❌ Jangan pakai Link Bang! Langsung Copy-Paste TEKS judul lagunya aja ke sini.");
-        return;
-    }
+  // ===========================================================================
+  // 🔥 ALGORITMA SCRAPING LINK SPOTIFY & YOUTUBE (TANPA BACKEND) 🔥
+  // ===========================================================================
+  const handleImportLink = async (e) => {
+    e.preventDefault();
+    const url = importUrl.trim();
+    if (!url) return;
 
     setIsImporting(true);
-    const lines = importText.split('\n').map(l => l.trim()).filter(l => l.length > 2);
-    
-    if (lines.length === 0) {
-        showToast("Teks tidak valid atau kosong!");
-        setIsImporting(false);
-        return;
-    }
+    setImportProgress("Menganalisa link...");
 
-    let newTracks = [];
-    let successCount = 0;
+    try {
+        const isSpotify = url.includes('spotify.com');
+        const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
 
-    for (let i = 0; i < lines.length; i++) {
-        setImportProgress(`Menarik lagu ${i + 1} dari ${lines.length}...`);
-        try {
-            const res = await fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(lines[i] + ' official audio')}`);
-            const data = await res.json();
+        if (!isSpotify && !isYouTube) {
+            showToast("❌ Web ini hanya mendukung link Playlist Spotify & YouTube!");
+            setIsImporting(false);
+            return;
+        }
+
+        setImportProgress("Menembus keamanan CORS...");
+        
+        // 🔥 Kita pakai Proxy AllOrigins biar gak kena blokir browser!
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+        const response = await fetch(proxyUrl);
+        const data = await response.json();
+        
+        setImportProgress("Mengekstrak data lagu rahasia...");
+        const html = data.contents;
+        
+        let extractedTitles = [];
+
+        if (isSpotify) {
+            // Jurus 1: Nembus JSON Spotify di dalam HTML
+            const titleMatches = html.match(/"name":"([^"]+)","type":"track"/g);
+            if (titleMatches) {
+                extractedTitles = titleMatches.map(t => t.split('":"')[1].split('","')[0]);
+            }
             
-            if (data?.status && data?.data) {
-                const track = data.data.find(t => t.type === 'video');
-                if (track) {
-                    const validId = track.id || track.videoId || (track.url ? track.url.split('v=')[1] : null);
-                    if (validId) {
-                        let cleanT = track.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
-                        if (cleanT.includes('-')) cleanT = cleanT.split('-')[1];
-                        
-                        newTracks.push({
-                            id: validId,
-                            title: cleanT.trim(),
-                            artist: track.author?.name || 'YouTube',
-                            image: track.thumbnail
-                        });
-                        successCount++;
-                    }
+            // Jurus 2: Nembus lewat meta deskripsi (Buat backup)
+            if (extractedTitles.length === 0) {
+                const match = html.match(/<meta property="og:description" content="([^"]+)"/);
+                if (match && match[1]) {
+                    const desc = match[1].replace(/·/g, '').replace(/Playlist/gi, '').replace(/[0-9]+ songs/gi, '');
+                    extractedTitles = desc.split(',').map(s => s.trim()).filter(s => s.length > 3);
                 }
             }
-        } catch (e) {
-            console.error("Gagal menarik lagu:", lines[i]);
+        } else if (isYouTube) {
+            // Jurus 3: Ekstrak JSON dari YouTube Playlist
+            const titleMatches = html.match(/{"title":{"runs":\[{"text":"([^"]+)"}\]/g);
+            if (titleMatches) {
+                extractedTitles = titleMatches.map(t => t.match(/"text":"([^"]+)"/)[1]);
+            }
         }
-        await new Promise(resolve => setTimeout(resolve, 600));
-    }
 
-    if (newTracks.length > 0) {
-        const currentQueue = usePlayerStore.getState().queue || [];
-        usePlayerStore.setState({ queue: [...currentQueue, ...newTracks] });
-        
-        showToast(`✅ Sukses! ${successCount} lagu ditambahkan ke Antrean.`);
-        setShowImportModal(false);
-        setImportText("");
-    } else {
-        showToast("❌ Gagal menemukan lagu. Pastikan format teks benar.");
+        // Hapus lagu kembar dan batasin 15 lagu (Biar API kita ga over-limit)
+        extractedTitles = [...new Set(extractedTitles)].slice(0, 15);
+
+        if (extractedTitles.length === 0) {
+            showToast("❌ Playlist terkunci (Private) atau link tidak valid.");
+            setIsImporting(false);
+            return;
+        }
+
+        let newTracks = [];
+        let successCount = 0;
+
+        // Proses pencarian dan penyatuan ke database lagu kita
+        for (let i = 0; i < extractedTitles.length; i++) {
+            setImportProgress(`Meracik audio: ${i + 1}/${extractedTitles.length}...`);
+            try {
+                const res = await fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(extractedTitles[i] + ' official audio')}`);
+                const searchData = await res.json();
+                
+                if (searchData?.status && searchData?.data) {
+                    const track = searchData.data.find(t => t.type === 'video');
+                    if (track) {
+                        const validId = track.id || track.videoId || (track.url ? track.url.split('v=')[1] : null);
+                        if (validId) {
+                            let cleanT = track.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
+                            if (cleanT.includes('-')) cleanT = cleanT.split('-')[1];
+                            
+                            newTracks.push({
+                                id: validId,
+                                title: cleanT.trim(),
+                                artist: track.author?.name || 'YouTube',
+                                image: track.thumbnail
+                            });
+                            successCount++;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Gagal nyari lagu:", extractedTitles[i]);
+            }
+            // Delay bentar biar API ga ngamuk dikira bot spam
+            await new Promise(resolve => setTimeout(resolve, 600));
+        }
+
+        if (newTracks.length > 0) {
+            const currentQueue = usePlayerStore.getState().queue || [];
+            usePlayerStore.setState({ queue: [...currentQueue, ...newTracks] });
+            showToast(`✅ Berhasil menarik ${successCount} lagu dari Link!`);
+            setShowImportModal(false);
+            setImportUrl("");
+        } else {
+            showToast("❌ Gagal meracik audio dari playlist tersebut.");
+        }
+
+    } catch (error) {
+        showToast("❌ Terjadi kesalahan saat menembus link.");
+    } finally {
+        setIsImporting(false);
     }
-    
-    setIsImporting(false);
   };
 
   if (selectedPlaylist) {
@@ -218,6 +270,7 @@ export default function Library() {
     )
   }
 
+  // 🔥 TAMPILAN AWAL PUSTAKA 🔥
   return (
     <div className="pt-4 pb-20 px-4 md:px-8 animate-in fade-in duration-300 max-w-5xl mx-auto relative">
       
@@ -239,13 +292,16 @@ export default function Library() {
           Tanggal ditambahkan ↓
         </div>
         
+        {/* 🔥 TOMBOL IMPORT DITAMBAHKAN DI SINI 🔥 */}
         <button 
           onClick={() => setShowImportModal(true)}
           className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white px-4 py-1.5 rounded-full text-xs font-bold transition-colors border border-white/10"
         >
-          <Import size={14} /> Import Teks
+          <Import size={14} /> Import Link
         </button>
       </div>
+
+      {/* 🔥 KONTEN DINAMIS BERDASARKAN TAB YANG DIPILIH 🔥 */}
       
       {activeTab === 'Daftar putar' && (
         <div className="flex flex-col gap-2 animate-in fade-in duration-300">
@@ -316,15 +372,15 @@ export default function Library() {
         </div>
       )}
       
-      {/* 🔥 MODAL IMPORT PLAYLIST 🔥 */}
+      {/* 🔥 MODAL IMPORT PLAYLIST MENGGUNAKAN LINK 🔥 */}
       {showImportModal && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center px-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-[#181818] w-full max-w-lg rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
             
             <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/5">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <ListPlus className="text-[#3ea6ff]" />
-                Import Teks Playlist
+                <LinkIcon className="text-[#3ea6ff]" />
+                Tarik Playlist via Link
               </h2>
               <button onClick={() => !isImporting && setShowImportModal(false)} className="text-zinc-400 hover:text-white transition-colors bg-black/20 p-2 rounded-full">
                 <X size={20} />
@@ -332,32 +388,40 @@ export default function Library() {
             </div>
 
             <div className="p-6">
-              <p className="text-sm text-zinc-300 mb-4 leading-relaxed">
-                Copy (salin) semua teks daftar lagu dari Spotify, Notes, atau YouTube, lalu paste ke kotak di bawah ini. Pastikan satu judul per baris.
+              <p className="text-sm text-zinc-300 mb-6 leading-relaxed">
+                Nggak usah repot ngetik! Cukup *Paste* link (URL) dari Playlist <b>Spotify</b> atau <b>YouTube</b> favorit lu ke sini. Sisanya biar sistem yang kerja narik lagu-lagunya buat lu!
               </p>
 
-              <textarea 
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                disabled={isImporting}
-                placeholder="Contoh:&#10;Maher Zain - Rahmatun Lil'Alameen&#10;Opick - Tombo Ati&#10;Nissa Sabyan - Deen Assalam"
-                className="w-full h-48 bg-black/50 border border-white/10 rounded-xl p-4 text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-[#3ea6ff]/50 transition-colors resize-none mb-2"
-              ></textarea>
-
-              {isImporting ? (
-                <div className="flex flex-col items-center justify-center p-4 mt-2 bg-[#3ea6ff]/10 rounded-xl border border-[#3ea6ff]/20">
-                  <Loader2 className="animate-spin text-[#3ea6ff] mb-2" size={32} />
-                  <p className="text-sm font-bold text-white">{importProgress}</p>
-                  <p className="text-xs text-zinc-400 mt-1">Sistem sedang meracik antrean...</p>
+              <form onSubmit={handleImportLink} className="relative mb-6">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                  <Search size={20} className="text-zinc-500" />
                 </div>
-              ) : (
-                <button 
-                  onClick={handleImport}
-                  disabled={!importText.trim()}
-                  className="w-full flex items-center justify-center gap-2 bg-white hover:bg-zinc-200 disabled:opacity-50 disabled:cursor-not-allowed text-black py-3.5 rounded-xl font-bold transition-colors mt-2"
-                >
-                  <Search size={18} /> Eksekusi & Masukkan Antrean
-                </button>
+                <input 
+                  type="url" 
+                  value={importUrl}
+                  onChange={(e) => setImportUrl(e.target.value)}
+                  disabled={isImporting}
+                  placeholder="https://open.spotify.com/playlist/..." 
+                  className="w-full bg-black/50 border border-white/10 rounded-xl py-4 pl-12 pr-32 text-white text-sm placeholder:text-zinc-600 focus:outline-none focus:border-[#3ea6ff] focus:ring-1 focus:ring-[#3ea6ff] transition-all shadow-inner"
+                  required
+                />
+                {!isImporting && (
+                  <button 
+                    type="submit"
+                    disabled={!importUrl.trim()}
+                    className="absolute inset-y-2 right-2 bg-[#3ea6ff] hover:bg-blue-500 text-black font-bold px-6 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
+                  >
+                    Tarik!
+                  </button>
+                )}
+              </form>
+
+              {isImporting && (
+                <div className="flex flex-col items-center justify-center p-4 bg-[#3ea6ff]/10 rounded-xl border border-[#3ea6ff]/20">
+                  <Loader2 className="animate-spin text-[#3ea6ff] mb-2" size={32} />
+                  <p className="text-sm font-bold text-white text-center">{importProgress}</p>
+                  <p className="text-xs text-zinc-400 mt-1 text-center">Jangan tutup jendela ini ya Bang...</p>
+                </div>
               )}
             </div>
             
