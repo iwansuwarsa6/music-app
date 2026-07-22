@@ -13,24 +13,24 @@ Innertube.create({ cache: new UniversalCache(false) }).then((instance) => {
 }).catch(console.error);
 
 app.get('/', (req, res) => {
-    res.send('🔥 Backend RnCmusic Aktif (Murni JS by youtubei.js) 🔥');
+    res.send('🔥 Backend RnCmusic Aktif (Nyamar jadi Android) 🔥');
 });
 
 app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID kosong Bang!');
     
-    // Kalau mesin belum kelar loading, suruh tunggu
     if (!yt) return res.status(503).send('Mesin lagi dipanasin, coba refresh bentar lagi.');
 
     try {
-        console.log(`[ ▶ ] SEDOT LAGU (YOUTUBEI): ${videoId}`);
+        console.log(`[ ▶ ] SEDOT LAGU: ${videoId}`);
         
-        // Sedot stream pakai youtubei
+        // 🔥 JURUS NYAMAR JADI HP ANDROID 🔥
         const stream = await yt.download(videoId, {
-            type: 'audio', // Cuma ambil suaranya aja
+            type: 'audio',
             quality: 'best', 
-            format: 'mp4'  // Format paling aman buat web
+            format: 'mp4',
+            client: 'ANDROID' // <--- INI KUNCI BUKA GEMBOKNYA
         });
 
         res.setHeader('Content-Type', 'audio/mp4');
