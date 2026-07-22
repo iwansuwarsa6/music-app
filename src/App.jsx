@@ -28,7 +28,7 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
 const ADZAN_URL = "https://raw.githubusercontent.com/islamic-network/cdn/master/audio/adhan/makkah.mp3";
 
-// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE (Di-upgrade biar buang lagu 8D & Sped Up) 🔥
+// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE (Buang lagu 8D, Sped Up, & Slowed) 🔥
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
@@ -337,9 +337,7 @@ export default function App() {
       }
   };
 
-  // =========================================================================
   // 🔥 PENJAGA GERBANG MUTLAK: SIKAT SEMUA LAGU KEMBAR DARI MANA AJA 🔥
-  // =========================================================================
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
@@ -357,40 +355,38 @@ export default function App() {
           active.play().catch(()=>{});
       }
 
-      // 🧹 FILTER SUPER BERSIH: Buang lagu yang judulnya mirip dari daftar list yang dilempar
       let cleanQueue = [];
       let usedTitles = new Set();
       
-      // Catat judul lagu utama biar jadi patokan anti-kembar
       let baseTitle = (song.title || '').toLowerCase()
           .replace(/[^a-z0-9\s]/gi, '')
           .replace(/(official|lyric|lyrics|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '')
           .trim();
       usedTitles.add(baseTitle);
       
-      cleanQueue.push(song); // Masukin lagu utama ke urutan pertama
+      cleanQueue.push(song); 
 
-      list.forEach(t => {
-          if (t.id === song.id) return; // Lewati lagu utama
+      if (Array.isArray(list)) {
+        list.forEach(t => {
+            if (t.id === song.id) return; 
 
-          let tTitle = (t.title || '').toLowerCase()
-              .replace(/[^a-z0-9\s]/gi, '')
-              .replace(/(official|lyric|lyrics|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '')
-              .trim();
+            let tTitle = (t.title || '').toLowerCase()
+                .replace(/[^a-z0-9\s]/gi, '')
+                .replace(/(official|lyric|lyrics|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '')
+                .trim();
 
-          let isDup = false;
-          if (tTitle.length > 3) {
-              isDup = Array.from(usedTitles).some(seen => seen.includes(tTitle) || tTitle.includes(seen));
-          }
+            let isDup = false;
+            if (tTitle.length > 3) {
+                isDup = Array.from(usedTitles).some(seen => seen.includes(tTitle) || tTitle.includes(seen));
+            }
 
-          if (!isDup) {
-              cleanQueue.push(t);
-              if (tTitle.length > 3) usedTitles.add(tTitle);
-          }
-      });
+            if (!isDup) {
+                cleanQueue.push(t);
+                if (tTitle.length > 3) usedTitles.add(tTitle);
+            }
+        });
+      }
 
-      // Kalau hasil filter sisa lagunya dikit (misal hasil pencarian isinya cuma kembaran semua),
-      // Langsung panggil algoritma Radio Mix buat nyari lagu sefrekuensi dari artis lain!
       if (cleanQueue.length <= 3) {
           usePlayerStore.getState().playSong(song, cleanQueue, 0);
           generateRadioMix(song);
@@ -640,9 +636,6 @@ export default function App() {
     }
   }, [currentSong?.id, currentIndex, queue.length]);
 
-  // =========================================================================
-  // 🔥 FUNGSI SEARCH & SUGGESTIONS DENGAN FILTER ANTI-SAMPAH 🔥
-  // =========================================================================
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const q = params.get('q');
@@ -1338,7 +1331,8 @@ export default function App() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-36 md:pb-28 pt-0 md:pt-[72px] z-10">
+      {/* 🔥 KONTEN UTAMA DENGAN PADDING DINAMIS 🔥 */}
+      <div className={`flex-1 overflow-y-auto pt-0 md:pt-[72px] z-10 transition-all duration-[600ms] ${currentSong?.id ? 'pb-36 md:pb-28' : 'pb-20 md:pb-8'}`}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
@@ -1349,17 +1343,19 @@ export default function App() {
       </div>
 
       {/* MOBILE BOTTOM NAV */}
-      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-[#0a0a0a]/90 backdrop-blur-2xl flex justify-around items-center text-[10px] z-40 pb-1 border-t border-white/5 transition-transform duration-500 ${isExpanded ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-[#0a0a0a]/90 backdrop-blur-2xl flex justify-around items-center text-[10px] z-40 pb-1 border-t border-white/5 transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isExpanded ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
         <Link to="/" className={`flex flex-col items-center gap-1 ${location.pathname === '/' ? 'text-white' : 'text-zinc-400'}`}><HomeIcon size={24} /><span>Beranda</span></Link>
         <Link to="/search" className={`flex flex-col items-center gap-1 ${location.pathname === '/search' ? 'text-white' : 'text-zinc-400'}`}><SearchIcon size={24} /><span>Mencari</span></Link>
         <Link to="/library" className={`flex flex-col items-center gap-1 ${location.pathname === '/library' ? 'text-white' : 'text-zinc-400'}`}><Library size={24} /><span>Pustaka</span></Link>
         <Link to="/developer" className={`flex flex-col items-center gap-1 ${location.pathname === '/developer' ? 'text-white' : 'text-zinc-400'}`}><User size={24} /><span>Developer</span></Link>
       </div>
 
-      {/* MINI PLAYER BAR */}
+      {/* 🔥 MINI PLAYER BAR (NGE-SLIDE DARI BAWAH PAS LAGU DIPUTAR) 🔥 */}
       <div 
-        className={`fixed left-0 right-0 h-[64px] md:h-[72px] bg-[#212121]/95 backdrop-blur-2xl border-t border-black flex flex-col justify-center px-4 md:px-6 z-[90] cursor-pointer hover:bg-[#2a2a2a]/95 transition-all duration-500 
-        ${isExpanded ? 'translate-y-[150%] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto bottom-0' : 'translate-y-0 opacity-100 bottom-[60px] md:bottom-0'}`}
+        className={`fixed left-0 right-0 h-[64px] md:h-[72px] bg-[#212121]/95 backdrop-blur-2xl border-t border-black flex flex-col justify-center px-4 md:px-6 z-[90] cursor-pointer hover:bg-[#2a2a2a]/95 transition-all duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
+        ${!currentSong?.id ? 'translate-y-[200%] opacity-0 pointer-events-none' 
+        : isExpanded ? 'translate-y-[150%] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto bottom-0' 
+        : 'translate-y-0 opacity-100 bottom-[60px] md:bottom-0'}`}
         onClick={() => { if(!isExpanded && currentSong?.id) setIsExpanded(true); }}
       >
         <div className="absolute top-[-5px] left-0 right-0 h-[10px] group/timeline items-center cursor-pointer z-50 md:flex hidden">
@@ -1455,9 +1451,9 @@ export default function App() {
         </div>
       </div>
 
-      {/* FULLSCREEN PLAYER OVERLAY */}
+      {/* 🔥 FULLSCREEN PLAYER OVERLAY DENGAN ANIMASI SPRING 🔥 */}
       <div 
-        className={`fixed top-0 left-0 right-0 bottom-0 md:bottom-[72px] bg-gradient-to-b from-[#1a1c29] to-[#0f0f0f] z-[80] flex flex-col transition-transform duration-500 ease-in-out 
+        className={`fixed top-0 left-0 right-0 bottom-0 md:bottom-[72px] bg-gradient-to-b from-[#1a1c29] to-[#0f0f0f] z-[80] flex flex-col transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
         ${isExpanded ? 'translate-y-0' : 'translate-y-full'}`}
       >
         <div className="h-[80px] shrink-0 flex justify-between items-center px-4 md:px-8 border-b border-white/5">
