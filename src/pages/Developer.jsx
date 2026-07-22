@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, CheckCircle2, Coffee, Download, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Coffee, Download, X, Copy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // 🔥 IMPORT GAMBAR SESUAI NAMA FILE LU 🔥
@@ -17,9 +17,10 @@ export default function Developer() {
 
   // 🔥 STATE MODAL DONASI 🔥
   const [showDonateModal, setShowDonateModal] = useState(false);
-  const [nominal, setNominal] = useState(10000);
+  const [nominal, setNominal] = useState(5000); // Default ke 5k
   const [nama, setNama] = useState('');
   const [pesan, setPesan] = useState('');
+  const [copied, setCopied] = useState(false);
 
   // 🔥 TARUH LINK DANA PERMANEN LU DI SINI BANG 🔥
   const DANA_LINK = "https://link.dana.id/minta/ganti_pakai_link_permanen_lu"; 
@@ -29,27 +30,29 @@ export default function Developer() {
     setShowDonateModal(false);
   };
 
+  const handleCopyDana = () => {
+    navigator.clipboard.writeText("085716827409");
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const presetNominals = [
-    { label: '1k', value: 1000, color: 'bg-[#95D5D1]' },
-    { label: '3k', value: 3000, color: 'bg-[#198BF6]' },
-    { label: '5k', value: 5000, color: 'bg-[#F9A825]' },
-    { label: '10k', value: 10000, color: 'bg-[#A27BCA]' },
+    { label: '5k', value: 5000, color: 'bg-[#95D5D1]' },
+    { label: '10k', value: 10000, color: 'bg-[#198BF6]' },
+    { label: '15k', value: 15000, color: 'bg-[#F9A825]' },
+    { label: '20k', value: 20000, color: 'bg-[#A27BCA]' },
   ];
 
   // 🔥 LOGIK PENANGKAP INSTALLER 🔥
   useEffect(() => {
-    // 1. Nangkep Izin Install buat Android
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // 2. Deteksi apakah HP-nya iPhone/iPad
     const userAgent = window.navigator.userAgent.toLowerCase();
     const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
-    
-    // Cek apakah udah diinstal (standalone)
     const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
     
     if (isIosDevice && !isStandalone) {
@@ -59,7 +62,6 @@ export default function Developer() {
     return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
-  // 🔥 FUNGSI KLIK TOMBOL DOWNLOAD 🔥
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -136,7 +138,6 @@ export default function Developer() {
                     <CheckCircle2 size={22} className="text-[#3ea6ff] fill-white bg-black rounded-full" />
                 </div>
 
-                {/* Sosial Media Rizal */}
                 <div className="flex justify-center gap-3 w-full">
                     <a href="https://www.tiktok.com/@rizalagst" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-[#282828] hover:bg-[#333] px-4 py-3 rounded-xl transition-colors group/soc flex-1">
                         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400 group-hover/soc:text-white transition-colors">
@@ -177,7 +178,6 @@ export default function Developer() {
                     <CheckCircle2 size={22} className="text-[#3ea6ff] fill-white bg-black rounded-full" />
                 </div>
 
-                {/* Sosial Media Sevi */}
                 <div className="flex justify-center gap-3 w-full">
                     <a href="https://www.tiktok.com/@sevi.sevvv" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 bg-[#282828] hover:bg-[#333] px-4 py-3 rounded-xl transition-colors group/soc flex-1">
                         <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-400 group-hover/soc:text-white transition-colors">
@@ -271,7 +271,7 @@ export default function Developer() {
                 </div>
               </div>
 
-              {/* Preset Buttons */}
+              {/* Preset Buttons - UPDATE KE 5K, 10K, 15K, 20K */}
               <div className="grid grid-cols-4 gap-2 mb-6">
                 {presetNominals.map((preset) => (
                   <button
@@ -307,9 +307,22 @@ export default function Developer() {
                 ></textarea>
               </div>
 
-              {/* Notice DANA */}
+              {/* 🔥 NOTICE DANA BARU (MUNCULIN NOMER JELAS) 🔥 */}
               <div className="bg-yellow-100 border-l-4 border-yellow-500 p-3 mb-6 text-sm font-medium">
-                Penting: Transfer manual via DANA. Pastikan lu ngetik nominal <b>Rp {nominal.toLocaleString('id-ID')}</b> di aplikasi DANA lu.
+                <p className="mb-2 text-yellow-900">Kirim dukungan via DANA ke nomor ini:</p>
+                <div className="flex items-center justify-between bg-white border-2 border-black p-2 rounded mb-2">
+                  <span className="text-xl font-black tracking-widest text-black">085716827409</span>
+                  <button 
+                    onClick={handleCopyDana} 
+                    className="flex items-center gap-1 bg-[#118EEA] text-white px-3 py-1.5 rounded font-bold text-xs border-2 border-black shadow-[2px_2px_0_0_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
+                  >
+                    {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                    {copied ? 'Tersalin!' : 'Salin'}
+                  </button>
+                </div>
+                <p className="text-xs text-yellow-800">
+                  *Klik tombol di bawah untuk otomatis buka aplikasi DANA, atau transfer manual dengan nominal <b>Rp {nominal.toLocaleString('id-ID')}</b>.
+                </p>
               </div>
 
               {/* Action Button */}
@@ -317,7 +330,7 @@ export default function Developer() {
                 onClick={handleDonateDana}
                 className="w-full bg-[#118EEA] border-2 border-black shadow-[4px_4px_0_0_#000] active:shadow-[0_0_0_0_#000] active:translate-x-[4px] active:translate-y-[4px] py-4 text-white font-black text-lg flex items-center justify-center gap-2 transition-all rounded-lg uppercase tracking-wider"
               >
-                Bayar Pakai DANA
+                Buka Aplikasi DANA
               </button>
 
             </div>
