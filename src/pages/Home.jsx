@@ -193,14 +193,15 @@ export default function Home() {
     };
   }, [activeCategory]); 
 
-  // 🔥 INI DIA REVISI BUG FIX: JURUS NINJA DOM 🔥
+  // 🔥 INI DIA BUG FIX 1000%: JURUS PENEMBAK JITU ID LAGU 🔥
   const handlePlay = (song, sectionTracks, index) => {
     if (currentSong?.id === song.id) {
-      // 1. Cari semua audio di browser (App.jsx) dan paksa matiin/nyalain
+      
+      // 1. TEMBAK AUDIO-NYA (Cari tag audio yang URL-nya mengandung ID lagu ini)
       const audios = document.querySelectorAll('audio');
       audios.forEach(audio => {
-        // Abaikan audio pancingan adzan / kosong
-        if (audio.src && !audio.src.includes('data:audio')) {
+        // PERHATIKAN BARIS INI: Kita cek pakai song.id, bukan 'data:audio' lagi!
+        if (audio.src && audio.src.includes(song.id)) {
           if (isPlaying) {
             audio.pause();
           } else {
@@ -209,7 +210,7 @@ export default function Home() {
         }
       });
 
-      // 2. Kalau lagi mode Video, paksa iframe YouTube matiin/nyalain
+      // 2. TEMBAK VIDEO-NYA (Kalau lagi di mode video)
       const iframe = document.querySelector('iframe');
       if (iframe && iframe.contentWindow) {
         iframe.contentWindow.postMessage(JSON.stringify({ 
@@ -219,7 +220,7 @@ export default function Home() {
         }), '*');
       }
 
-      // 3. Baru update tampilan tombolnya
+      // 3. BARU UBAH GAMBAR IKON-NYA
       togglePlay();
       return;
     }
