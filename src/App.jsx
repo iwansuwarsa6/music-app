@@ -120,6 +120,7 @@ export default function App() {
 
   // 🔥 STATE ADZAN BARU (PAUSE & RESUME 3 MENIT) 🔥
   const [adzanMode, setAdzanMode] = useState(() => JSON.parse(localStorage.getItem('ytm_adzan_mode') || 'false'));
+  const [isAdzanPlaying, setIsAdzanPlaying] = useState(false);
   const [prayerTimes, setPrayerTimes] = useState([]); 
   const [activePrayerName, setActivePrayerName] = useState(null); 
   
@@ -749,6 +750,7 @@ export default function App() {
       }
   }, [activeTab, displayArtist]);
 
+  // 🔥 LOGIKA LIRIK SUPER PINTAR & BERSIH 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -793,10 +795,25 @@ export default function App() {
       setLyrics([]); 
       setActiveLyricIndex(-1);
 
-      let cleanTitleAPI = displayTitle.split(/\||\(|\[|"/)[0].replace(/(hq|audio|official|music video|lyric video|lyrics|hd|mv|video|4k|8k)/gi, '').trim();
-      let cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,|\|/i)[0].trim(); 
-      const searchQueryAPI = `${cleanTitleAPI} ${cleanArtistAPI}`.trim();
+      // 🔥 MESIN PEMBERSIH JUDUL SUPER EKSTREM 🔥
+      let rawTitle = currentSong.title;
       
+      if (rawTitle.includes('-')) {
+          let parts = rawTitle.split('-');
+          if (parts[0].toLowerCase().includes(displayArtist.toLowerCase().split(' ')[0])) {
+              rawTitle = parts.slice(1).join('-');
+          } else {
+              rawTitle = parts[0]; 
+          }
+      }
+
+      let cleanTitleAPI = rawTitle.split(/\||\(|\[|"/)[0].replace(/(official|music|video|lyric|lyrics|audio|indonesian|clip|records|hq|hd|4k|8k|live|cover)/gi, '').trim();
+      
+      let cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/(official|vevo|channel|music|records)/gi, '').trim(); 
+      
+      const searchQueryAPI = `${cleanTitleAPI} ${cleanArtistAPI}`.trim();
+      console.log(`🔍 Nyari lirik bersih: "${searchQueryAPI}"`);
+
       fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(searchQueryAPI)}`)
         .then(res => res.json())
         .then(async data => {
@@ -844,20 +861,24 @@ export default function App() {
           if (!trackFound) {
               console.log(`⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik untuk: ${searchQueryAPI}`);
               try {
+                  // Fallback 1: ovh API 
                   const resOvh = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtistAPI)}/${encodeURIComponent(cleanTitleAPI)}`);
-                  const dataOvh = await resOvh.json();
-                  
-                  if (dataOvh && dataOvh.lyrics) {
-                      const parsed = dataOvh.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
-                      if (parsed.length > 0) { 
-                          setLyrics(parsed); setLyricsMode('full'); 
-                          return; 
+                  if (resOvh.ok) {
+                      const dataOvh = await resOvh.json();
+                      if (dataOvh && dataOvh.lyrics) {
+                          const parsed = dataOvh.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
+                          if (parsed.length > 0) { 
+                              setLyrics(parsed); setLyricsMode('full'); 
+                              return; 
+                          }
                       }
                   }
                   
+                  // 🔥 Fallback 2: Lyrist via AllOrigins GET (Bebas CORS) 🔥
                   const targetUrl = `https://lyrist.vercel.app/api/${encodeURIComponent(searchQueryAPI)}`;
-                  const fallbackRes = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`);
-                  const fallbackData = await fallbackRes.json();
+                  const fallbackRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+                  const fallbackDataWrapped = await fallbackRes.json();
+                  const fallbackData = JSON.parse(fallbackDataWrapped.contents);
                   
                   if (fallbackData && fallbackData.lyrics) {
                       const parsed = fallbackData.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
@@ -867,7 +888,7 @@ export default function App() {
                       }
                   }
               } catch(err) {
-                  console.log("❌ Lirik jalur darurat gagal total");
+                  console.log("❌ Lirik jalur darurat gagal total", err);
               }
           }
           
