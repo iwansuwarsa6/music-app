@@ -28,6 +28,7 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
 const ADZAN_URL = "https://raw.githubusercontent.com/islamic-network/cdn/master/audio/adhan/makkah.mp3";
 
+// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE (Di-upgrade biar buang lagu 8D & Sped Up) 🔥
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
@@ -46,7 +47,7 @@ const isBadMix = (title) => {
   const badMixWords = [
       'full album', 'kompilasi', 'compilation', '1 jam', '2 jam', ' hours', ' hour',
       'karaoke', 'instrumental', 'tanpa vokal', 'live at', 'live in', 
-      'konser', 'short', 'shorts'
+      'konser', 'short', 'shorts', '8d', '8 d', 'sped up', 'slowed', 'reverb'
   ];
   return badMixWords.some(w => t.includes(w));
 };
@@ -336,6 +337,9 @@ export default function App() {
       }
   };
 
+  // =========================================================================
+  // 🔥 PENJAGA GERBANG MUTLAK: SIKAT SEMUA LAGU KEMBAR DARI MANA AJA 🔥
+  // =========================================================================
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
@@ -352,7 +356,47 @@ export default function App() {
           active.load();
           active.play().catch(()=>{});
       }
-      playSong(song, list, idx); 
+
+      // 🧹 FILTER SUPER BERSIH: Buang lagu yang judulnya mirip dari daftar list yang dilempar
+      let cleanQueue = [];
+      let usedTitles = new Set();
+      
+      // Catat judul lagu utama biar jadi patokan anti-kembar
+      let baseTitle = (song.title || '').toLowerCase()
+          .replace(/[^a-z0-9\s]/gi, '')
+          .replace(/(official|lyric|lyrics|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '')
+          .trim();
+      usedTitles.add(baseTitle);
+      
+      cleanQueue.push(song); // Masukin lagu utama ke urutan pertama
+
+      list.forEach(t => {
+          if (t.id === song.id) return; // Lewati lagu utama
+
+          let tTitle = (t.title || '').toLowerCase()
+              .replace(/[^a-z0-9\s]/gi, '')
+              .replace(/(official|lyric|lyrics|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '')
+              .trim();
+
+          let isDup = false;
+          if (tTitle.length > 3) {
+              isDup = Array.from(usedTitles).some(seen => seen.includes(tTitle) || tTitle.includes(seen));
+          }
+
+          if (!isDup) {
+              cleanQueue.push(t);
+              if (tTitle.length > 3) usedTitles.add(tTitle);
+          }
+      });
+
+      // Kalau hasil filter sisa lagunya dikit (misal hasil pencarian isinya cuma kembaran semua),
+      // Langsung panggil algoritma Radio Mix buat nyari lagu sefrekuensi dari artis lain!
+      if (cleanQueue.length <= 3) {
+          usePlayerStore.getState().playSong(song, cleanQueue, 0);
+          generateRadioMix(song);
+      } else {
+          usePlayerStore.getState().playSong(song, cleanQueue, 0);
+      }
   };
 
   const handleSeek = (e) => {
@@ -551,8 +595,7 @@ export default function App() {
         let mix = [];
         let usedIds = new Set([baseSong.id]); 
         
-        // Memori untuk nyatet judul lagu yang udah masuk, biar nggak dobel
-        let baseTitleCheck = baseSong.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
+        let baseTitleCheck = baseSong.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '').trim();
         let usedTitles = new Set([baseTitleCheck]);
 
         combined.filter(t => t.type === 'video' && !isBadMix(t.title)).forEach(t => {
@@ -563,8 +606,7 @@ export default function App() {
             if (cleanTitle.includes('-')) cleanTitle = cleanTitle.split('-')[1];
             cleanTitle = cleanTitle.trim();
 
-            // 🔥 Filter Anti-Lagu Kembar (Nyaring judul lirik, cover, dll) 🔥
-            let titleCheck = cleanTitle.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
+            let titleCheck = cleanTitle.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '').trim();
             if (titleCheck.length > 3) {
                 let isDup = Array.from(usedTitles).some(seen => seen.includes(titleCheck) || titleCheck.includes(seen));
                 if (isDup) return; 
@@ -589,7 +631,6 @@ export default function App() {
     } catch (e) {}
   };
 
-  // Trigger otomatis nyari lagu pas antrean mau habis (sisa 2)
   useEffect(() => {
     if (!currentSong || queue.length === 0) return;
     const remainingSongs = queue.length - 1 - currentIndex;
