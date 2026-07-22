@@ -3,6 +3,30 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Search as SearchIcon, Play, Pause, Music, History, Trash2, X, Loader2, MoreVertical } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 
+// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE 🔥
+const isNonMusic = (title) => {
+  if (!title) return false;
+  const t = title.toLowerCase();
+  const badWords = [
+      'podcast', 'vlog', 'tutorial', 'review', 'unboxing', 'reaction',
+      'trailer', 'movie', 'episode', 'berita', 'gameplay', 'how to', 'cara ',
+      'ceramah', 'pengajian', 'talkshow', 'interview', 'parody', 'parodi'
+  ];
+  return badWords.some(w => t.includes(w));
+};
+
+const isBadMix = (title) => {
+  if (!title) return false;
+  if (isNonMusic(title)) return true;
+  const t = title.toLowerCase();
+  const badMixWords = [
+      'full album', 'kompilasi', 'compilation', '1 jam', '2 jam', ' hours', ' hour',
+      'karaoke', 'instrumental', 'tanpa vokal', 'live at', 'live in', 
+      'konser', 'short', 'shorts'
+  ];
+  return badMixWords.some(w => t.includes(w));
+};
+
 export default function Search() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -23,7 +47,6 @@ export default function Search() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  // 🔥 URL SUDAH DIGANTI KE RAILWAY 🔥
   const API_BASE = "https://music-app-production-278c.up.railway.app";
 
   const jalankanPencarian = async (kataKunci) => {
@@ -37,7 +60,7 @@ export default function Search() {
       
       if (resData.status && resData.data) {
         let formattedResults = resData.data
-          .filter(item => item.type === 'video')
+          .filter(item => item.type === 'video' && !isNonMusic(item.title)) // 🔥 FILTER SAMPAH PODCAST/VLOG
           .map(track => {
             const validId = track.id || track.videoId || (track.url ? track.url.split('v=')[1] : null);
             return {
@@ -56,8 +79,10 @@ export default function Search() {
             let skor = 0;
             if (judul.includes('audio')) skor += 3;
             if (judul.includes('lyric') || judul.includes('lirik')) skor += 2;
-            if (judul.includes('official video') || judul.includes('music video') || judul.includes('mv')) skor -= 3;
+            if (judul.includes('official video') || judul.includes('music video') || judul.includes('mv')) skor -= 1;
             if (judul.includes('live') || judul.includes('performance')) skor -= 2;
+            // 🔥 PENALTI BERAT BUAT KOMPILASI/ALBUM BIAR TURUN KE BAWAH 🔥
+            if (isBadMix(judul)) skor -= 5; 
             return skor;
           };
           return hitungSkor(judulB) - hitungSkor(judulA);
@@ -75,7 +100,7 @@ export default function Search() {
     }
   };
 
-  // 🔥 EFEK NGETIK LIVE SUGGESTION (KAYAK DI APP.JSX) 🔥
+  // 🔥 EFEK NGETIK LIVE SUGGESTION 🔥
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (query.trim().length > 2) {
@@ -86,7 +111,7 @@ export default function Search() {
           const resData = await response.json();
           if (resData.status && resData.data) {
             let formattedResults = resData.data
-              .filter(item => item.type === 'video')
+              .filter(item => item.type === 'video' && !isBadMix(item.title)) // 🔥 FILTER SUPER KETAT BUAT SUGGESTION
               .map(track => {
                 const validId = track.id || track.videoId || (track.url ? track.url.split('v=')[1] : null);
                 return { id: validId, title: track.title, artist: track.author?.name || 'YouTube', image: track.thumbnail };

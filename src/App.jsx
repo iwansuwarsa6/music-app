@@ -27,6 +27,32 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
 
 // MP3 Kosong (Silent) buat nipu OS HP pas lagi buffering
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+// 🔥 URL ADZAN 🔥
+const ADZAN_URL = "https://raw.githubusercontent.com/islamic-network/cdn/master/audio/adhan/makkah.mp3";
+
+// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE 🔥
+const isNonMusic = (title) => {
+  if (!title) return false;
+  const t = title.toLowerCase();
+  const badWords = [
+      'podcast', 'vlog', 'tutorial', 'review', 'unboxing', 'reaction',
+      'trailer', 'movie', 'episode', 'berita', 'gameplay', 'how to', 'cara ',
+      'ceramah', 'pengajian', 'talkshow', 'interview', 'parody', 'parodi'
+  ];
+  return badWords.some(w => t.includes(w));
+};
+
+const isBadMix = (title) => {
+  if (!title) return false;
+  if (isNonMusic(title)) return true;
+  const t = title.toLowerCase();
+  const badMixWords = [
+      'full album', 'kompilasi', 'compilation', '1 jam', '2 jam', ' hours', ' hour',
+      'karaoke', 'instrumental', 'tanpa vokal', 'live at', 'live in', 
+      'konser', 'short', 'shorts'
+  ];
+  return badMixWords.some(w => t.includes(w));
+};
 
 export default function App() {
   const { currentSong, isPlaying, togglePlay, playNext, playPrev, playSong, queue, currentIndex } = usePlayerStore();
@@ -60,6 +86,7 @@ export default function App() {
   const getActiveAudio = () => activeEngine.current === 1 ? audio1Ref.current : audio2Ref.current;
   const getGhostAudio = () => activeEngine.current === 1 ? audio2Ref.current : audio1Ref.current;
 
+  const adzanAudioRef = useRef(null); 
   const keepAliveAudioRef = useRef(null); 
   
   const API_BASE = "https://music-app-production-278c.up.railway.app";
@@ -472,6 +499,7 @@ export default function App() {
     window.dispatchEvent(new Event('likedSongsUpdated'));
   };
 
+  // 🔥 UPDATE: RADIO MIX DENGAN FILTER ANTI-SAMPAH 🔥
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
     let cleanArtist = (baseSong.artist || 'Official').split('-')[0].trim();
@@ -495,7 +523,7 @@ export default function App() {
         let mix = [];
         let usedIds = new Set([baseSong.id]); 
 
-        combined.filter(t => t.type === 'video').forEach(t => {
+        combined.filter(t => t.type === 'video' && !isBadMix(t.title)).forEach(t => {
             const validId = t.id || t.videoId || (t.url ? t.url.split('v=')[1] : null);
             if (!validId || usedIds.has(validId)) return;
             let cleanTitle = t.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
@@ -533,7 +561,7 @@ export default function App() {
   }, [currentSong?.id]);
 
   // =========================================================================
-  // 🔥 FUNGSI SEARCH & SUGGESTIONS 🔥
+  // 🔥 FUNGSI SEARCH & SUGGESTIONS DENGAN FILTER ANTI-SAMPAH 🔥
   // =========================================================================
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -563,7 +591,9 @@ export default function App() {
           const response = await fetch(`https://api.siputzx.my.id/api/s/youtube?query=${queryPintar}`);
           const resData = await response.json();
           if (resData.status && resData.data) {
-            let formattedResults = resData.data.filter(item => item.type === 'video').map(track => {
+            let formattedResults = resData.data
+              .filter(item => item.type === 'video' && !isNonMusic(item.title))
+              .map(track => {
                 const validId = track.id || track.videoId || (track.url ? track.url.split('v=')[1] : null);
                 return { id: validId, title: track.title, artist: track.author?.name || 'YouTube', image: track.thumbnail };
               }).filter(track => track.id != null);
@@ -704,7 +734,7 @@ export default function App() {
               .then(res => res.json())
               .then(data => {
                   if (data?.data) {
-                      const tracks = data.data.filter(t => t.type === 'video').slice(0, 15).map(t => {
+                      const tracks = data.data.filter(t => t.type === 'video' && !isBadMix(t.title)).slice(0, 15).map(t => {
                           const vid = t.id || t.videoId || (t.url ? t.url.split('v=')[1] : null);
                           let cleanT = t.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
                           if (cleanT.includes('-')) cleanT = cleanT.split('-')[1];
