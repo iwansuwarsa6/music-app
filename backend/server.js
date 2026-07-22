@@ -24,11 +24,12 @@ app.get('/api/audio', async (req, res) => {
     try {
         console.log(`[ ▶ ] SEDOT LAGU: ${videoId}`);
         
-        // Panggil versi standar tanpa manipulasi client
+        // Panggil versi YTMUSIC
         const stream = await yt.download(videoId, {
             type: 'audio',
             quality: 'best', 
-            format: 'mp4'
+            format: 'mp4',
+            client: 'YTMUSIC' 
         });
 
         res.setHeader('Content-Type', 'audio/mp4');
