@@ -28,7 +28,7 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
 const ADZAN_URL = "https://raw.githubusercontent.com/islamic-network/cdn/master/audio/adhan/makkah.mp3";
 
-// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE (Buang lagu 8D, Sped Up, & Slowed) 🔥
+// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE (Di-upgrade biar buang KUMPULAN & TERBAIK) 🔥
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
@@ -47,7 +47,8 @@ const isBadMix = (title) => {
   const badMixWords = [
       'full album', 'kompilasi', 'compilation', '1 jam', '2 jam', ' hours', ' hour',
       'karaoke', 'instrumental', 'tanpa vokal', 'live at', 'live in', 
-      'konser', 'short', 'shorts', '8d', '8 d', 'sped up', 'slowed', 'reverb'
+      'konser', 'short', 'shorts', '8d', '8 d', 'sped up', 'slowed', 'reverb',
+      'kumpulan', 'terbaik', 'pilihan', 'nonstop', 'non stop', '2023', '2024', '2025', '2026', '2027', 'hits tiktok', 'viral'
   ];
   return badMixWords.some(w => t.includes(w));
 };
@@ -155,7 +156,6 @@ export default function App() {
                       usePlayerStore.setState({ isPlaying: true });
                       showToast('▶️ Gas lagi! Waktu Adzan selesai.');
                   }).catch((err) => {
-                      console.log("Ditolak sistem HP:", err);
                       usePlayerStore.setState({ isPlaying: false }); 
                       showToast('⚠️ HP memblokir. Ketuk Play manual.');
                   }).finally(() => {
@@ -337,7 +337,29 @@ export default function App() {
       }
   };
 
-  // 🔥 PENJAGA GERBANG MUTLAK: SIKAT SEMUA LAGU KEMBAR DARI MANA AJA 🔥
+  // 🔥 FUNGSI KHUSUS KLIK DARI ANTREAN "BERIKUTNYA" (ANTI NGULANG/NGE-RESET LIST) 🔥
+  const handleQueuePlay = (e, qSong, idx) => {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      dismissAdzanIfActive(); 
+      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
+      
+      if (currentSong && currentSong.id === qSong.id) {
+          handleTogglePlayLocal(null);
+          return; 
+      }
+      
+      const active = getActiveAudio();
+      if (active) {
+          active.src = `${API_BASE}/api/audio?id=${qSong.id}`;
+          active.load();
+          active.play().catch(()=>{});
+      }
+      
+      // HANYA UPDATE INDEX SAJA, JANGAN GANTI LIST QUEUE-NYA!
+      usePlayerStore.getState().playSong(qSong, queue, idx);
+  };
+
+  // FUNGSI PLAY DARI BERANDA/PENCARIAN
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
@@ -543,14 +565,14 @@ export default function App() {
   };
 
   // =========================================================================
-  // 🔥 ALGORITMA INFINITE AUTOPLAY & RADAR ANTI-KEMBAR 🔥
+  // 🔥 ALGORITMA INFINITE AUTOPLAY (DENGAN PENCARIAN RANDOM ARTIST SEFREKUENSI) 🔥
   // =========================================================================
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
     let cleanArtist = (baseSong.artist || 'Official').split('-')[0].trim();
     cleanArtist = cleanArtist.replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
     
-    const cacheKey = `algomix_infinite_${cleanArtist}`;
+    const cacheKey = `algomix_infinite_v2_${cleanArtist}`;
     const cachedMix = sessionStorage.getItem(cacheKey);
     
     if (cachedMix) {
@@ -564,15 +586,23 @@ export default function App() {
         return;
     }
 
-    const indoPop = /mahalini|bernadya|hindia|tiara andini|sal priadi|kunto aji|nadin|pamungkas|yura|maliq|feby|juicy|rizky febian|tulus|lyodra|ziva|keisya|andmesh|budi|vierratale|d'masiv/i;
-    const baratPop = /taylor swift|weeknd|bruno mars|ariana|bieber|post malone|dua lipa|coldplay|ed sheeran|sabrina|billie|shawn|olivia/i;
+    const indoPopArr = ["Mahalini", "Bernadya", "Hindia", "Tiara Andini", "Sal Priadi", "Kunto Aji", "Nadin Amizah", "Pamungkas", "Yura Yunita", "Maliq & D'Essentials", "Feby Putri", "Juicy Luicy", "Rizky Febian", "Tulus", "Lyodra", "Ziva Magnolya", "Keisya Levronka"];
+    const baratPopArr = ["Taylor Swift", "The Weeknd", "Bruno Mars", "Ariana Grande", "Justin Bieber", "Post Malone", "Dua Lipa", "Coldplay", "Ed Sheeran", "Sabrina Carpenter", "Billie Eilish", "Shawn Mendes", "Olivia Rodrigo"];
+
+    const isIndo = /mahalini|bernadya|hindia|tiara|sal|kunto|nadin|pamungkas|yura|maliq|feby|juicy|rizky|tulus|lyodra|ziva|keisya|andmesh|budi|vierratale|d'masiv/i.test(cleanArtist);
+    const isBarat = /taylor|weeknd|bruno|ariana|bieber|post malone|dua lipa|coldplay|ed sheeran|sabrina|billie|shawn|olivia/i.test(cleanArtist);
 
     let queryPool = [`${cleanArtist} official audio`]; 
 
-    if (indoPop.test(cleanArtist)) {
-        queryPool.push(`lagu pop indonesia hits official audio`);
-    } else if (baratPop.test(cleanArtist)) {
-        queryPool.push(`top western pop hits official audio`);
+    // 🔥 KUNCI ANTI KOMPILASI: Cari nama artisnya langsung, jangan cari kata "Hits"!
+    if (isIndo) {
+        const randomArtists = indoPopArr.sort(() => 0.5 - Math.random()).slice(0, 2);
+        queryPool.push(`${randomArtists[0]} official audio`);
+        queryPool.push(`${randomArtists[1]} official audio`);
+    } else if (isBarat) {
+        const randomArtists = baratPopArr.sort(() => 0.5 - Math.random()).slice(0, 2);
+        queryPool.push(`${randomArtists[0]} official audio`);
+        queryPool.push(`${randomArtists[1]} official audio`);
     } else {
         queryPool.push(`${cleanArtist} similar artists official audio`);
     }
@@ -1684,7 +1714,7 @@ export default function App() {
                           key={idx} 
                           ref={isCurrent ? activeQueueRef : null} 
                           className={`flex items-center gap-4 py-2 px-3 -mx-3 rounded-lg cursor-pointer group transition-colors ${isCurrent ? 'bg-white/10' : 'hover:bg-white/5'}`} 
-                          onClick={(e) => !isCurrent && handlePlayClick(e, qSong, queue, idx)}
+                          onClick={(e) => !isCurrent && handleQueuePlay(e, qSong, idx)}
                         >
                           <div className="relative w-12 h-12 md:w-14 md:h-14 flex-shrink-0">
                             <img src={qSong.image} className={`w-full h-full rounded object-cover ${isCurrent ? '' : 'opacity-70 group-hover:opacity-100'}`} alt="thumb" />
