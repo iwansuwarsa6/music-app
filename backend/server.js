@@ -1,41 +1,55 @@
 const express = require('express');
 const cors = require('cors');
-// Kita panggil yt-dlp dari dalam node_modules lu sendiri!
-const ytDlp = require('yt-dlp-exec');
+const { Innertube, UniversalCache } = require('youtubei.js');
 
 const app = express();
 app.use(cors());
 
+// Panasin mesin youtubei.js
+let yt;
+Innertube.create({ cache: new UniversalCache(false) }).then((instance) => {
+    yt = instance;
+    console.log("🔥 MESIN YOUTUBEI.JS SIAP TEMPUR! 🔥");
+}).catch(console.error);
+
 app.get('/', (req, res) => {
-    res.send('🔥 Backend RnCmusic Aktif (Pakai yt-dlp-exec) 🔥');
+    res.send('🔥 Backend RnCmusic Aktif (Murni JS by youtubei.js) 🔥');
 });
 
-app.get('/api/audio', (req, res) => {
+app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
-    if (!videoId) return res.status(400).send('ID lagu kosong Bang!');
+    if (!videoId) return res.status(400).send('ID kosong Bang!');
+    
+    // Kalau mesin belum kelar loading, suruh tunggu
+    if (!yt) return res.status(503).send('Mesin lagi dipanasin, coba refresh bentar lagi.');
 
-    console.log(`[ ▶ ] PROSES SEDOT: ${videoId}`);
-    const url = `https://www.youtube.com/watch?v=${videoId}`;
+    try {
+        console.log(`[ ▶ ] SEDOT LAGU (YOUTUBEI): ${videoId}`);
+        
+        // Sedot stream pakai youtubei
+        const stream = await yt.download(videoId, {
+            type: 'audio', // Cuma ambil suaranya aja
+            quality: 'best', 
+            format: 'mp4'  // Format paling aman buat web
+        });
 
-    // Kasih tau browser ini stream media
-    res.setHeader('Content-Type', 'audio/webm');
-    res.setHeader('Transfer-Encoding', 'chunked');
+        res.setHeader('Content-Type', 'audio/mp4');
+        res.setHeader('Transfer-Encoding', 'chunked');
 
-    // Eksekusi yt-dlp bawaan node_modules
-    const stream = ytDlp.exec(url, {
-        format: 'bestaudio', // Ambil audio terbaik
-        output: '-'          // Lempar langsung outputnya
-    });
+        // Alirkan data sepotong-sepotong ke frontend lu
+        for await (const chunk of stream) {
+            res.write(chunk);
+        }
+        res.end();
+        console.log(`[ ✔ ] BERHASIL MUTAR: ${videoId}`);
 
-    // Alirkan datanya ke frontend
-    stream.stdout.pipe(res);
-
-    stream.on('error', (err) => {
+    } catch (err) {
         console.error(`[ ❌ ] GAGAL: ${err.message}`);
-    });
+        res.status(500).send('Gagal disedot youtubei');
+    }
 });
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-    console.log(`🔥 SERVER YT-DLP-EXEC JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER YOUTUBEI JALAN DI PORT ${PORT} 🔥`);
 });
