@@ -63,6 +63,13 @@ export default function App() {
   const [mediaMode, setMediaMode] = useState('audio'); 
   const [lyricsMode, setLyricsMode] = useState('synced'); 
 
+  // 🔥 LISTENER KHUSUS BUAT NERIMA SINYAL BUKA PLAYER DARI BERANDA & SEARCH 🔥
+  useEffect(() => {
+    const handleOpenPlayer = () => setIsExpanded(true);
+    window.addEventListener('openFullScreenPlayer', handleOpenPlayer);
+    return () => window.removeEventListener('openFullScreenPlayer', handleOpenPlayer);
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchHistory, setShowSearchHistory] = useState(false);
   const [liveSuggestions, setLiveSuggestions] = useState([]);
@@ -345,6 +352,7 @@ export default function App() {
       
       if (currentSong && currentSong.id === qSong.id) {
           handleTogglePlayLocal(null);
+          setIsExpanded(true); // 🔥 OTOMATIS BUKA FULLSCREEN
           return; 
       }
       
@@ -355,11 +363,11 @@ export default function App() {
           active.play().catch(()=>{});
       }
       
-      // HANYA UPDATE INDEX SAJA, JANGAN GANTI LIST QUEUE-NYA!
       usePlayerStore.getState().playSong(qSong, queue, idx);
+      setIsExpanded(true); // 🔥 OTOMATIS BUKA FULLSCREEN
   };
 
-  // FUNGSI PLAY DARI BERANDA/PENCARIAN
+  // FUNGSI PLAY DARI MENU TERKAIT (DI DALAM PLAYER)
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
@@ -367,6 +375,7 @@ export default function App() {
       
       if (currentSong && currentSong.id === song.id) {
           handleTogglePlayLocal(null);
+          setIsExpanded(true); // 🔥 OTOMATIS BUKA FULLSCREEN
           return; 
       }
       
@@ -415,6 +424,8 @@ export default function App() {
       } else {
           usePlayerStore.getState().playSong(song, cleanQueue, 0);
       }
+      
+      setIsExpanded(true); // 🔥 OTOMATIS BUKA FULLSCREEN
   };
 
   const handleSeek = (e) => {
@@ -564,9 +575,6 @@ export default function App() {
     window.dispatchEvent(new Event('likedSongsUpdated'));
   };
 
-  // =========================================================================
-  // 🔥 ALGORITMA INFINITE AUTOPLAY (DENGAN PENCARIAN RANDOM ARTIST SEFREKUENSI) 🔥
-  // =========================================================================
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
     let cleanArtist = (baseSong.artist || 'Official').split('-')[0].trim();
@@ -594,7 +602,6 @@ export default function App() {
 
     let queryPool = [`${cleanArtist} official audio`]; 
 
-    // 🔥 KUNCI ANTI KOMPILASI: Cari nama artisnya langsung, jangan cari kata "Hits"!
     if (isIndo) {
         const randomArtists = indoPopArr.sort(() => 0.5 - Math.random()).slice(0, 2);
         queryPool.push(`${randomArtists[0]} official audio`);
@@ -1311,7 +1318,11 @@ export default function App() {
                           onMouseDown={(e) => {
                             e.preventDefault();
                             setSearchQuery(song.title); 
+                            
+                            // 🔥 DISPATCH EVENT BIAR LAYAR NAIK PAS KLIK SUGGESTION 🔥
+                            window.dispatchEvent(new CustomEvent('openFullScreenPlayer'));
                             handlePlayClick(e, song, [song], 0);
+                            
                             setShowSearchHistory(false);
                           }}
                         >
@@ -1481,7 +1492,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* 🔥 FULLSCREEN PLAYER OVERLAY DENGAN ANIMASI SPRING 🔥 */}
+      {/* 🔥 FULLSCREEN PLAYER OVERLAY DENGAN ANIMASI SPRING BAWAAN APLIKASI 🔥 */}
       <div 
         className={`fixed top-0 left-0 right-0 bottom-0 md:bottom-[72px] bg-gradient-to-b from-[#1a1c29] to-[#0f0f0f] z-[80] flex flex-col transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
         ${isExpanded ? 'translate-y-0' : 'translate-y-full'}`}
