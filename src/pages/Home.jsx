@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Play, Pause, ChevronRight, MoreVertical, ArrowLeft } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
-import rndLogo from '../store/rndigital.jpg'; // 🔥 IMPORT LOGO NYA DI SINI
+import rndLogo from '../store/rndigital.jpg';
 
 export default function Home() {
   const { currentSong, isPlaying, playSong, togglePlay } = usePlayerStore();
@@ -193,12 +193,38 @@ export default function Home() {
     };
   }, [activeCategory]); 
 
-  // 🔥 URL SUDAH DIGANTI KE RAILWAY 🔥
+  // 🔥 INI DIA REVISI BUG FIX: JURUS NINJA DOM 🔥
   const handlePlay = (song, sectionTracks, index) => {
     if (currentSong?.id === song.id) {
+      // 1. Cari semua audio di browser (App.jsx) dan paksa matiin/nyalain
+      const audios = document.querySelectorAll('audio');
+      audios.forEach(audio => {
+        // Abaikan audio pancingan adzan / kosong
+        if (audio.src && !audio.src.includes('data:audio')) {
+          if (isPlaying) {
+            audio.pause();
+          } else {
+            audio.play().catch(()=>{});
+          }
+        }
+      });
+
+      // 2. Kalau lagi mode Video, paksa iframe YouTube matiin/nyalain
+      const iframe = document.querySelector('iframe');
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage(JSON.stringify({ 
+          event: 'command', 
+          func: isPlaying ? 'pauseVideo' : 'playVideo', 
+          args: [] 
+        }), '*');
+      }
+
+      // 3. Baru update tampilan tombolnya
       togglePlay();
       return;
     }
+    
+    // Kalau lagunya beda, mainkan dari awal kayak biasa
     playSong({
       ...song,
       url: `https://music-app-production-278c.up.railway.app/api/audio?id=${song.id}` 
