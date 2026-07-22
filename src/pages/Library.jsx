@@ -90,7 +90,7 @@ export default function Library() {
   };
 
   // ===========================================================================
-  // 🔥 ALGORITMA SCRAPING LINK SPOTIFY & YOUTUBE (VERSI PROXY HACKER) 🔥
+  // 🔥 ALGORITMA SCRAPING LINK SPOTIFY & YOUTUBE (PROXY ANTI-CORS V3) 🔥
   // ===========================================================================
   const handleImportLink = async (e) => {
     e.preventDefault();
@@ -110,7 +110,7 @@ export default function Library() {
             return;
         }
 
-        // 🔥 Paksa ganti link YT Music ke YT Biasa biar HTML-nya ga terlalu berat Javascript
+        // Paksa ganti link YT Music ke YT Biasa
         if (isYouTube && url.includes('music.youtube.com')) {
             url = url.replace('music.youtube.com', 'www.youtube.com');
         }
@@ -119,19 +119,20 @@ export default function Library() {
         
         let html = "";
         try {
-            // 🔥 PROXY 1: Codetabs (Lebih licin buat nembus Google)
-            const proxy1 = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
+            // 🔥 PROXY 1: AllOrigins mode JSON (Paling kuat nahan blokiran CORS Vercel)
+            const proxy1 = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
             const res1 = await fetch(proxy1);
-            html = await res1.text();
+            const data1 = await res1.json();
+            html = data1.contents;
             
-            // Kalau dikasih halaman consent/captcha, langsung lempar ke catch!
             if (!html || html.includes('consent.youtube.com') || html.includes('Our systems have detected unusual traffic')) {
-                throw new Error('Terdeteksi Google');
+                throw new Error('Terdeteksi Google/CORS block');
             }
         } catch (err1) {
+            console.warn("Proxy 1 gagal, mencoba Proxy 2...");
             try {
-                // 🔥 PROXY 2: AllOrigins versi RAW (Cadangan)
-                const proxy2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+                // 🔥 PROXY 2: CorsProxy.io (Alternatif)
+                const proxy2 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
                 const res2 = await fetch(proxy2);
                 html = await res2.text();
             } catch (err2) {
@@ -157,7 +158,6 @@ export default function Library() {
                 }
             }
         } else if (isYouTube) {
-            // Regex YouTube yang udah dilebarin jaringnya
             const titleMatches = html.match(/{"title":{"runs":\[{"text":"(.*?)"}\]/g);
             if (titleMatches) {
                 extractedTitles = titleMatches.map(t => {
@@ -166,7 +166,6 @@ export default function Library() {
                 }).filter(t => t && t !== "Hapus" && t !== "Simpan" && !t.includes("Playlist") && t !== "Private video" && t !== "Deleted video");
             }
             
-            // Regex lapis kedua kalau UI YouTube berubah
             if (extractedTitles.length === 0) {
                 const videoTitleMatches = html.match(/"title":"(.*?)"/g);
                 if (videoTitleMatches) {
@@ -175,7 +174,6 @@ export default function Library() {
             }
         }
 
-        // Hapus judul duplikat dan batasin biar API pencarian lagu kita ga limit
         extractedTitles = [...new Set(extractedTitles)].slice(0, 15);
 
         if (extractedTitles.length === 0) {
@@ -190,7 +188,6 @@ export default function Library() {
         for (let i = 0; i < extractedTitles.length; i++) {
             setImportProgress(`Meracik audio: ${i + 1}/${extractedTitles.length}...`);
             try {
-                // Di sini kita pakai API lu buat nyari lagunya berdasarkan judul yang baru dicuri
                 const res = await fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(extractedTitles[i] + ' official audio')}`);
                 const searchData = await res.json();
                 
@@ -215,7 +212,6 @@ export default function Library() {
             } catch (e) {
                 console.error("Gagal nyari lagu:", extractedTitles[i]);
             }
-            // Kasih jeda waktu biar nggak disangka bot DDOS sama API Siputzx lu
             await new Promise(resolve => setTimeout(resolve, 600));
         }
 
@@ -230,7 +226,7 @@ export default function Library() {
         }
 
     } catch (error) {
-        showToast("❌ Tembok keamanan Google terlalu tebal. Coba pakai Import Teks!");
+        showToast("❌ Proxy diblokir oleh CORS. Coba pakai fitur Import Teks!");
     } finally {
         setIsImporting(false);
     }
