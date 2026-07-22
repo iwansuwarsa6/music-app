@@ -335,10 +335,17 @@ export default function App() {
       }
   };
 
+  // 🔥 INI DIA FUNGSI YANG UDAH DIREVISI 🔥
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
       if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
+      
+      // FIX BUG: Cek apakah lagu yang diklik = lagu yang lagi jalan
+      if (currentSong && currentSong.id === song.id) {
+          handleTogglePlayLocal(null);
+          return; 
+      }
       
       const active = getActiveAudio();
       if (active) {
