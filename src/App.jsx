@@ -1701,7 +1701,7 @@ export default function App() {
                                <button onClick={(e) => {
                                   e.stopPropagation(); e.preventDefault();
                                   window.dispatchEvent(new CustomEvent('openSongMenu', { detail: { event: e, song: song } }));
-                               }} className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-white transition-opacity p-2">
+                               }} className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-zinc-400 hover:text-white transition-opacity p-2">
                                   <MoreVertical size={20} />
                                </button>
                             </div>
@@ -1766,7 +1766,7 @@ export default function App() {
                                   e.preventDefault();
                                   e.stopPropagation();
                                   window.dispatchEvent(new CustomEvent('openSongMenu', { detail: { event: e, song: qSong } }));
-                              }} className="opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-white transition-opacity p-2">
+                              }} className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-zinc-400 hover:text-white transition-opacity p-2">
                                   <MoreVertical size={20} />
                               </button>
                           </div>
