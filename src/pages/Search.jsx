@@ -88,7 +88,23 @@ export default function Search() {
           return hitungSkor(judulB) - hitungSkor(judulA);
         });
 
-        setResults(formattedResults.slice(0, 15));
+        // 🔥 TAMBAHAN DIKIT: Bersihin hasil pencarian biar nggak nampilin judul kembar dempetan 🔥
+        let cleanUnique = [];
+        let usedTitles = new Set();
+        formattedResults.forEach(item => {
+          let tCheck = item.title.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (tCheck.length > 3) {
+            let isDup = Array.from(usedTitles).some(seen => seen.includes(tCheck) || tCheck.includes(seen));
+            if (!isDup) {
+                usedTitles.add(tCheck);
+                cleanUnique.push(item);
+            }
+          } else {
+             cleanUnique.push(item);
+          }
+        });
+
+        setResults(cleanUnique.slice(0, 15));
       } else {
         setResults([]);
       }
@@ -170,16 +186,18 @@ export default function Search() {
     localStorage.setItem('ytm_search_history', JSON.stringify(newHistory));
   };
 
+  // 🔥 INI DIA KUNCI JAWABANNYA BANG 🔥
   const handlePlayClick = (song, index, fromSuggestion = false) => {
     if (currentSong?.id === song.id) {
       togglePlay();
       return;
     }
-    // Jika play dari live suggestion, kita buang dia jadi antrean tunggal dulu
+    // GAK PEDULI DARI SUGGESTION ATAU HASIL PENCARIAN,
+    // SELALU KIRIM 1 LAGU SAJA BIAR ALGORITMA APP.JSX YANG KERJA!
     playSong({
       ...song,
       url: `${API_BASE}/api/audio?id=${song.id}` 
-    }, fromSuggestion ? [song] : results, fromSuggestion ? 0 : index); 
+    }, [song], 0); 
   };
 
   return (
