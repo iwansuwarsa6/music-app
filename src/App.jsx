@@ -153,15 +153,30 @@ export default function App() {
       if (forceFinishAdzanRef.current) clearTimeout(forceFinishAdzanRef.current);
       
       if (wasPlayingBeforeAdzan.current) {
-          usePlayerStore.setState({ isPlaying: true });
           if (mediaModeRef.current === 'video') {
+              usePlayerStore.setState({ isPlaying: true });
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
+              showToast('▶️ Waktu Adzan selesai. Melanjutkan video...');
           } else {
-              getActiveAudio()?.play().catch(()=>{});
+              const audioPlayer = getActiveAudio();
+              if (audioPlayer) {
+                  // 🔥 JURUS MOTOR: Nyalain lagu utama dulu, baru matikan lagu senyap
+                  audioPlayer.play().then(() => {
+                      usePlayerStore.setState({ isPlaying: true });
+                      showToast('▶️ Gas lagi! Waktu Adzan selesai.');
+                  }).catch((err) => {
+                      console.log("Ditolak sistem HP:", err);
+                      usePlayerStore.setState({ isPlaying: false }); 
+                      showToast('⚠️ HP memblokir. Ketuk Play manual.');
+                  }).finally(() => {
+                      // Matikan lagu pancingan senyap
+                      if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
+                  });
+              }
           }
-          showToast('▶️ Waktu Adzan selesai. Melanjutkan musik...');
       } else {
           showToast('▶️ Waktu Adzan selesai.');
+          if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
       }
   };
 
@@ -171,7 +186,13 @@ export default function App() {
       setActivePrayerName(prayerName); // Munculin Overlay Pop Up
 
       if (wasPlayingBeforeAdzan.current) {
-          // Pause Musik
+          // 🔥 JURUS MOTOR: Nyalain MP3 senyap SEBELUM lagu utama di-pause. 
+          // Biar OS HP nggak ketiduran pas layar mati!
+          if (keepAliveAudioRef.current) {
+              keepAliveAudioRef.current.play().catch(()=>{});
+          }
+
+          // Baru Pause Musik Utama
           usePlayerStore.setState({ isPlaying: false });
           if (mediaModeRef.current === 'video') {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
@@ -1031,6 +1052,9 @@ export default function App() {
           usePlayerStore.getState().playNext(isShuffle);
       }
   };
+
+  // 🔥 KABEL PENGHUBUNG BUAT SAKLAR BERANDA 🔥
+  window.saklarPusat = handleTogglePlayLocal;
 
   return (
     <div className="h-screen bg-gradient-to-br from-[#13151f] via-[#0f0f0f] to-[#000000] text-white flex flex-col font-sans overflow-hidden relative">
