@@ -5,7 +5,6 @@ const { Innertube, UniversalCache } = require('youtubei.js');
 const app = express();
 app.use(cors());
 
-// Panasin mesin youtubei.js
 let yt;
 Innertube.create({ cache: new UniversalCache(false) }).then((instance) => {
     yt = instance;
@@ -13,30 +12,28 @@ Innertube.create({ cache: new UniversalCache(false) }).then((instance) => {
 }).catch(console.error);
 
 app.get('/', (req, res) => {
-    res.send('🔥 Backend RnCmusic Aktif (Nyamar jadi Android) 🔥');
+    res.send('🔥 Backend RnCmusic Aktif 🔥');
 });
 
 app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
-    if (!videoId) return res.status(400).send('ID kosong Bang!');
+    if (!videoId) return res.status(400).send('ID kosong!');
     
-    if (!yt) return res.status(503).send('Mesin lagi dipanasin, coba refresh bentar lagi.');
+    if (!yt) return res.status(503).send('Mesin belum siap.');
 
     try {
         console.log(`[ ▶ ] SEDOT LAGU: ${videoId}`);
         
-        // 🔥 JURUS NYAMAR JADI HP ANDROID 🔥
+        // Panggil versi standar tanpa manipulasi client
         const stream = await yt.download(videoId, {
             type: 'audio',
             quality: 'best', 
-            format: 'mp4',
-            client: 'ANDROID' // <--- INI KUNCI BUKA GEMBOKNYA
+            format: 'mp4'
         });
 
         res.setHeader('Content-Type', 'audio/mp4');
         res.setHeader('Transfer-Encoding', 'chunked');
 
-        // Alirkan data sepotong-sepotong ke frontend lu
         for await (const chunk of stream) {
             res.write(chunk);
         }
@@ -45,11 +42,11 @@ app.get('/api/audio', async (req, res) => {
 
     } catch (err) {
         console.error(`[ ❌ ] GAGAL: ${err.message}`);
-        res.status(500).send('Gagal disedot youtubei');
+        res.status(500).send('Gagal mecahin kode YouTube');
     }
 });
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-    console.log(`🔥 SERVER YOUTUBEI JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER JALAN DI PORT ${PORT} 🔥`);
 });
