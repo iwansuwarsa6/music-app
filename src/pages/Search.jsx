@@ -186,18 +186,22 @@ export default function Search() {
     localStorage.setItem('ytm_search_history', JSON.stringify(newHistory));
   };
 
-  // 🔥 INI DIA KUNCI JAWABANNYA BANG 🔥
+  // 🔥 KIRIM SINYAL FULLSCREEN PAS LAGU DIKLIK 🔥
   const handlePlayClick = (song, index, fromSuggestion = false) => {
     if (currentSong?.id === song.id) {
       togglePlay();
+      window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // Buka layar pas di-pause/play
       return;
     }
+    
     // GAK PEDULI DARI SUGGESTION ATAU HASIL PENCARIAN,
     // SELALU KIRIM 1 LAGU SAJA BIAR ALGORITMA APP.JSX YANG KERJA!
     playSong({
       ...song,
       url: `${API_BASE}/api/audio?id=${song.id}` 
     }, [song], 0); 
+    
+    window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // Langsung pop up layarnya
   };
 
   return (

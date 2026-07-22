@@ -220,6 +220,7 @@ export default function Home() {
         }), '*');
       }
       togglePlay();
+      window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 Buka pas dipause/play
       return;
     }
     
@@ -274,12 +275,15 @@ export default function Home() {
       ...song,
       url: `https://music-app-production-278c.up.railway.app/api/audio?id=${song.id}` 
     }, newQueue, 0);
+
+    window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 Otomatis Buka Player!
   };
 
   const handlePlayAll = (e, sectionTracks) => {
     e.stopPropagation();
     if (sectionTracks && sectionTracks.length > 0) {
       handlePlay(sectionTracks[0], sectionTracks, 0);
+      window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 Otomatis Buka Player!
     }
   };
 
