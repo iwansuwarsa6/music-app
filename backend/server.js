@@ -6,50 +6,60 @@ const app = express();
 app.use(cors());
 
 app.get('/', (req, res) => {
-    res.send('🔥 Backend RnCmusic (Cobalt API v10) 🔥');
+    res.send('🔥 Backend RnCmusic (Invidious API) 🔥');
 });
 
-// Endpoint buat muter audio dari YouTube
 app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
-    if (!videoId) return res.status(400).send('ID YouTube kosong Bang!');
+    if (!videoId) return res.status(400).send('ID YouTube kosong!');
 
     try {
-        console.log(`[ ▶ ] Nyuruh Cobalt v10 nembus YouTube ID: ${videoId}`);
+        console.log(`[ ▶ ] Nyari di server bayangan Invidious: ${videoId}`);
         
-        const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
-        
-        // 🔥 JURUS BARU: Format Cobalt API v10 🔥
-        const response = await axios.post('https://api.cobalt.tools/', {
-            url: youtubeUrl,
-            downloadMode: "audio", // Format baru buat minta audionya aja
-            audioFormat: "mp3",
-            filenameStyle: "basic"
-        }, {
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-        });
+        // Daftar server bayangan Invidious yang aktif
+        const instances = [
+            'https://invidious.jing.rocks',
+            'https://inv.tux.pizza',
+            'https://invidious.flokinet.to',
+            'https://vid.puffyan.us'
+        ];
 
-        if (response.data && response.data.url) {
-            console.log(`[ ✔ ] Sukses ditembus Cobalt v10! Ngarahin ke MP3...`);
-            // Langsung suruh HP/Laptop lu muter link dari Cobalt
-            res.redirect(response.data.url);
-        } else {
-            return res.status(500).send('Cobalt gagal ngasih link.');
+        let audioUrl = null;
+
+        for (const url of instances) {
+            try {
+                console.log(`Mencoba ngetuk: ${url}`);
+                const response = await axios.get(`${url}/api/v1/videos/${videoId}`, {
+                    timeout: 6000 // Jeda 6 detik, kalau ngelag langsung ganti server
+                });
+
+                // Nyari format audio kualitas bagus
+                const format = response.data.adaptiveFormats.find(f => f.type.includes('audio/mp4') || f.type.includes('audio/webm'));
+                
+                if (format && format.url) {
+                    audioUrl = format.url;
+                    console.log(`[ ✔ ] Berhasil dapet dari: ${url}`);
+                    break;
+                }
+            } catch (e) {
+                console.log(`[ ! ] Gagal/Server sibuk, pindah...`);
+            }
         }
 
+        if (!audioUrl) {
+            return res.status(500).send('Semua server bayangan lagi down.');
+        }
+
+        // Redirect ke link asli biar Railway lu gak kena beban
+        res.redirect(audioUrl);
+
     } catch (err) {
-        // Tangkap detail error dari Cobalt biar ketahuan kalau mereka rewel lagi
-        const errorMessage = err.response ? JSON.stringify(err.response.data) : err.message;
-        console.error(`[ ❌ ] Gagal muter: ${errorMessage}`);
-        res.status(500).send('Gagal ditarik dari Cobalt.');
+        console.error(`[ ❌ ] Error:`, err.message);
+        res.status(500).send('Gagal total.');
     }
 });
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-    console.log(`🔥 SERVER COBALT JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER INVIDIOUS JALAN DI PORT ${PORT} 🔥`);
 });
