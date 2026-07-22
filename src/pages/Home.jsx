@@ -193,14 +193,10 @@ export default function Home() {
     };
   }, [activeCategory]); 
 
-  // 🔥 INI DIA BUG FIX 1000%: JURUS PENEMBAK JITU ID LAGU 🔥
   const handlePlay = (song, sectionTracks, index) => {
     if (currentSong?.id === song.id) {
-      
-      // 1. TEMBAK AUDIO-NYA (Cari tag audio yang URL-nya mengandung ID lagu ini)
       const audios = document.querySelectorAll('audio');
       audios.forEach(audio => {
-        // PERHATIKAN BARIS INI: Kita cek pakai song.id, bukan 'data:audio' lagi!
         if (audio.src && audio.src.includes(song.id)) {
           if (isPlaying) {
             audio.pause();
@@ -210,7 +206,6 @@ export default function Home() {
         }
       });
 
-      // 2. TEMBAK VIDEO-NYA (Kalau lagi di mode video)
       const iframe = document.querySelector('iframe');
       if (iframe && iframe.contentWindow) {
         iframe.contentWindow.postMessage(JSON.stringify({ 
@@ -220,12 +215,10 @@ export default function Home() {
         }), '*');
       }
 
-      // 3. BARU UBAH GAMBAR IKON-NYA
       togglePlay();
       return;
     }
     
-    // Kalau lagunya beda, mainkan dari awal kayak biasa
     playSong({
       ...song,
       url: `https://music-app-production-278c.up.railway.app/api/audio?id=${song.id}` 
@@ -252,7 +245,6 @@ export default function Home() {
       <div className="flex items-center overflow-x-auto gap-3 pb-4 pr-4 hide-scrollbar sticky top-0 bg-[#0f0f0f] z-30 pt-2">
         {activeCategory ? (
           <>
-            {/* TOMBOL BACK SAAT MASUK KATEGORI */}
             <button 
               onClick={() => setActiveCategory(null)}
               className="flex items-center gap-1.5 px-4 py-1.5 bg-white text-black text-sm font-bold rounded-lg whitespace-nowrap hover:scale-105 transition-transform flex-shrink-0 shadow-md"
@@ -320,6 +312,7 @@ export default function Home() {
                 </div>
               )}
 
+              {/* 🔥 REVISI UI HERO SECTION 🔥 */}
               {section.type === 'hero' && (
                 <div className="flex overflow-x-auto gap-4 pb-4 hide-scrollbar snap-x">
                   {section.tracks.map((song, idx) => (
@@ -328,12 +321,12 @@ export default function Home() {
                       onClick={() => handlePlay(song, section.tracks, idx)}
                       className="w-[300px] md:w-[400px] flex-shrink-0 snap-start cursor-pointer group"
                     >
-                      <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden shadow-lg">
+                      <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden shadow-lg border border-transparent transition-colors">
                         <img src={song.image} alt={song.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/40"></div>
                         
                         <div className="absolute top-4 left-4 right-4">
-                          <h3 className="text-2xl md:text-3xl font-bold text-white mb-1 drop-shadow-md line-clamp-2">{song.title}</h3>
+                          <h3 className={`text-2xl md:text-3xl font-bold mb-1 drop-shadow-md line-clamp-2 ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</h3>
                           <p className="text-sm font-medium text-zinc-300 drop-shadow">{song.artist}</p>
                         </div>
                         
@@ -341,7 +334,8 @@ export default function Home() {
                           <button onClick={(e) => handleOpenMenu(e, song)} className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-2 text-white/80 hover:text-white transition-opacity">
                               <MoreVertical size={24} />
                           </button>
-                          <button className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:scale-105 shadow-xl">
+                          {/* Logika Opacity HP: Selalu muncul kalau lagu lagi jalan */}
+                          <button className={`w-12 h-12 bg-white text-black rounded-full flex items-center justify-center transition-all hover:scale-105 shadow-xl ${currentSong?.id === song.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                             {isPlaying && currentSong?.id === song.id ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
                           </button>
                         </div>
@@ -354,22 +348,25 @@ export default function Home() {
                 </div>
               )}
 
+              {/* 🔥 REVISI UI GRID SECTION (SPEED DIAL) 🔥 */}
               {section.type === 'grid' && (
                 <div className="grid grid-rows-4 grid-flow-col gap-x-4 gap-y-2 overflow-x-auto hide-scrollbar snap-x pb-4">
                   {section.tracks.map((song, idx) => (
                     <div 
                       key={song.id}
                       onClick={() => handlePlay(song, section.tracks, idx)}
-                      className="w-[280px] md:w-[340px] flex items-center gap-3 p-2 rounded-md hover:bg-zinc-800/60 cursor-pointer snap-start group transition-colors"
+                      className={`w-[280px] md:w-[340px] flex items-center gap-3 p-2 rounded-md cursor-pointer snap-start group transition-colors ${currentSong?.id === song.id ? 'bg-white/10' : 'hover:bg-zinc-800/60'}`}
                     >
                       <div className="relative w-12 h-12 flex-shrink-0">
                         <img src={song.image} alt={song.title} className="w-full h-full object-cover rounded shadow-md" />
-                        <div className="absolute inset-0 bg-black/50 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* Logika Opacity HP: Selalu muncul gelap & tombol play kalau lagu lagi jalan */}
+                        <div className={`absolute inset-0 rounded flex items-center justify-center transition-opacity ${currentSong?.id === song.id ? 'opacity-100 bg-black/50' : 'opacity-0 group-hover:opacity-100 bg-black/50'}`}>
                           {isPlaying && currentSong?.id === song.id ? <Pause fill="white" size={16} /> : <Play fill="white" size={16} className="ml-0.5" />}
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold truncate text-white mb-0.5 group-hover:underline">{song.title}</div>
+                        {/* Bikin tulisan biru kalau lagi diputar */}
+                        <div className={`text-sm font-bold truncate mb-0.5 group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
                         <div className="text-xs text-zinc-400 truncate">{song.artist}</div>
                       </div>
                       <button onClick={(e) => handleOpenMenu(e, song)} className="text-zinc-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1">
@@ -380,6 +377,7 @@ export default function Home() {
                 </div>
               )}
 
+              {/* 🔥 REVISI UI CIRCLE SECTION 🔥 */}
               {section.type === 'circle' && (
                 <div className="flex overflow-x-auto gap-6 pb-4 hide-scrollbar snap-x">
                   {section.tracks.map((song, idx) => (
@@ -388,14 +386,14 @@ export default function Home() {
                       onClick={() => handlePlay(song, section.tracks, idx)}
                       className="w-[100px] flex-shrink-0 flex flex-col items-center gap-3 cursor-pointer snap-start group relative"
                     >
-                      <div className="w-[100px] h-[100px] rounded-full overflow-hidden relative shadow-lg">
+                      <div className={`w-[100px] h-[100px] rounded-full overflow-hidden relative shadow-lg ${currentSong?.id === song.id ? 'ring-2 ring-[#3ea6ff]' : ''}`}>
                         <img src={song.image} alt={song.artist} className="w-full h-full object-cover group-hover:brightness-50 transition-all duration-300" />
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className={`absolute inset-0 flex items-center justify-center transition-opacity rounded-full ${currentSong?.id === song.id ? 'opacity-100 bg-black/40' : 'opacity-0 group-hover:opacity-100 bg-black/40'}`}>
                           {isPlaying && currentSong?.id === song.id ? <Pause fill="white" size={32} /> : <Play fill="white" size={32} className="ml-1" />}
                         </div>
                       </div>
                       <div className="w-full text-center">
-                        <div className="text-sm font-medium text-white truncate w-full group-hover:underline">{song.artist}</div>
+                        <div className={`text-sm font-medium truncate w-full group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.artist}</div>
                         <div className="text-[11px] text-zinc-500 mt-0.5">Artis</div>
                       </div>
                       
@@ -407,6 +405,7 @@ export default function Home() {
                 </div>
               )}
 
+              {/* 🔥 REVISI UI SQUARE SECTION 🔥 */}
               {section.type === 'square' && (
                 <div className="flex overflow-x-auto gap-4 pb-4 hide-scrollbar snap-x">
                   {section.tracks.map((song, idx) => (
@@ -417,13 +416,13 @@ export default function Home() {
                     >
                       <div className="relative w-full aspect-square mb-3 rounded-lg overflow-hidden shadow-lg">
                         <img src={song.image} alt={song.title} className="w-full h-full object-cover group-hover:brightness-50 transition-all duration-300" />
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className={`absolute inset-0 flex items-center justify-center transition-opacity ${currentSong?.id === song.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                           <button className="w-12 h-12 flex items-center justify-center bg-black/60 hover:bg-black/80 hover:scale-105 text-white rounded-full backdrop-blur-sm transition-all shadow-xl">
                             {isPlaying && currentSong?.id === song.id ? <Pause fill="white" size={24} /> : <Play fill="white" size={24} className="ml-1" />}
                           </button>
                         </div>
                       </div>
-                      <div className="text-sm font-bold truncate text-white mb-1 group-hover:underline pr-6">{song.title}</div>
+                      <div className={`text-sm font-bold truncate mb-1 group-hover:underline pr-6 ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
                       <div className="text-xs text-zinc-400 truncate whitespace-normal line-clamp-2 leading-tight pr-6">{song.artist}</div>
                       
                       <button onClick={(e) => handleOpenMenu(e, song)} className="absolute bottom-2 right-0 text-zinc-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1">
@@ -437,7 +436,7 @@ export default function Home() {
             </div>
           ))}
 
-          {/* 🔥 RIWAYAT LAGU 🔥 */}
+          {/* 🔥 REVISI UI RIWAYAT LAGU 🔥 */}
           {!activeCategory && playHistory.length > 0 && (
             <div className="mt-2">
               <div className="flex items-center justify-between mb-4 group">
@@ -458,16 +457,16 @@ export default function Home() {
                   <div 
                     key={song.id}
                     onClick={() => handlePlay(song, playHistory, idx)}
-                    className="w-[280px] md:w-[340px] flex items-center gap-3 p-2 rounded-md hover:bg-zinc-800/60 cursor-pointer snap-start group transition-colors"
+                    className={`w-[280px] md:w-[340px] flex items-center gap-3 p-2 rounded-md cursor-pointer snap-start group transition-colors ${currentSong?.id === song.id ? 'bg-white/10' : 'hover:bg-zinc-800/60'}`}
                   >
                     <div className="relative w-12 h-12 flex-shrink-0">
                       <img src={song.image} alt={song.title} className="w-full h-full object-cover rounded shadow-md" />
-                      <div className="absolute inset-0 bg-black/50 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className={`absolute inset-0 rounded flex items-center justify-center transition-opacity ${currentSong?.id === song.id ? 'opacity-100 bg-black/50' : 'opacity-0 group-hover:opacity-100 bg-black/50'}`}>
                         {isPlaying && currentSong?.id === song.id ? <Pause fill="white" size={16} /> : <Play fill="white" size={16} className="ml-0.5" />}
                       </div>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-bold truncate text-white mb-0.5 group-hover:underline">{song.title}</div>
+                      <div className={`text-sm font-bold truncate mb-0.5 group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
                       <div className="text-xs text-zinc-400 truncate">{song.artist}</div>
                     </div>
                     <button onClick={(e) => handleOpenMenu(e, song)} className="text-zinc-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1">
