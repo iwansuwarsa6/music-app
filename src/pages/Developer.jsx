@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, CheckCircle2, Coffee, Download, X, Copy } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ArrowLeft, CheckCircle2, Coffee, Download, X, Copy, Code, Github, Instagram, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // 🔥 IMPORT GAMBAR SESUAI NAMA FILE LU 🔥
@@ -206,7 +207,7 @@ export default function Developer() {
             </div>
             <div className="flex flex-col text-left">
               <span className="text-sm font-bold text-white group-hover:text-amber-500 transition-colors">Dukung RNC Tech</span>
-              <span className="text-xs text-zinc-400">Buy us a coffee</span>
+              <span className="text-xs text-zinc-400">Buat beli kopi brokk</span>
             </div>
           </button>
 
@@ -222,62 +223,62 @@ export default function Developer() {
       </div>
 
       {/* ===================================================================== */}
-      {/* 🔥 MODAL SAWERIA CLONE (NEO-BRUTALISM UI) 🔥 */}
+      {/* 🔥 MODAL SAWERIA CLONE (MENGGUNAKAN PORTAL AGAR SELALU DI DEPAN) 🔥 */}
       {/* ===================================================================== */}
-      {showDonateModal && (
-        <div className="fixed inset-0 z-[9999] flex items-start sm:items-center justify-center pt-10 sm:pt-0 px-4 bg-black/80 backdrop-blur-sm animate-in fade-in overflow-y-auto">
+      {showDonateModal && createPortal(
+        <div className="fixed inset-0 z-[99999] bg-black/80 backdrop-blur-sm overflow-y-auto flex py-10 px-4">
           
-          <div className="relative w-full max-w-lg bg-white rounded-lg shadow-[8px_8px_0_0_#000000] border-2 border-black animate-in zoom-in-95 duration-300 font-mono text-black my-8">
+          <div className="relative w-full max-w-lg bg-white rounded-xl shadow-[8px_8px_0_0_#000000] border-2 border-black animate-in zoom-in-95 duration-200 font-mono text-black m-auto">
             
             {/* Tombol Close */}
-            <button onClick={() => setShowDonateModal(false)} className="absolute top-4 right-4 text-black hover:bg-black/10 p-2 rounded-full transition-colors z-10">
+            <button onClick={() => setShowDonateModal(false)} className="absolute top-4 right-4 text-black hover:bg-black/10 p-2 rounded-full transition-colors z-20">
               <X size={24} strokeWidth={3} />
             </button>
 
             {/* Profile Section */}
-            <div className="flex flex-col items-center pt-8 pb-4 bg-white rounded-t-lg">
-              <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-black mb-4">
+            <div className="flex flex-col items-center pt-8 pb-4 bg-white rounded-t-xl relative z-10">
+              <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-black mb-3">
                 <img src={rnctechImg} alt="Profile" className="w-full h-full object-cover" />
               </div>
-              <h2 className="text-3xl font-black mb-1">RNC Tech</h2>
-              <p className="text-sm font-bold uppercase tracking-widest text-black/70">BUAT BELI KOPI BROKK</p>
+              <h2 className="text-2xl font-black mb-1">RNC Tech</h2>
+              <p className="text-[11px] font-bold uppercase tracking-widest text-black/70 mb-2">BUAT BELI KOPI BROKK</p>
             </div>
 
             {/* Tabs */}
-            <div className="px-6 flex gap-2 -mb-[2px] relative z-10">
-              <div className="bg-[#F9A825] border-2 border-black border-b-0 px-6 py-2 font-bold text-sm rounded-t-lg">
+            <div className="px-6 flex gap-2 relative z-10 -mb-[2px]">
+              <div className="bg-[#F9A825] border-2 border-black border-b-0 px-6 py-2.5 font-black text-sm rounded-t-lg">
                 Dukungan
               </div>
-              <div className="bg-white border-2 border-black border-b-0 px-6 py-2 font-bold text-sm rounded-t-lg text-black/50">
+              <div className="bg-white border-2 border-black border-b-0 px-6 py-2.5 font-bold text-sm rounded-t-lg text-black/40 cursor-not-allowed">
                 Top Up
               </div>
             </div>
 
             {/* Form Section */}
-            <div className="bg-[#F2F7F5] border-t-2 border-black p-6 rounded-b-lg">
+            <div className="bg-[#F2F7F5] border-t-2 border-black p-6 rounded-b-xl">
               
               {/* Input Nominal */}
               <div className="mb-6">
                 <label className="block text-sm font-bold mb-2">Nominal: <span className="text-red-500">*</span></label>
                 <div className="flex items-end gap-2 border-b-2 border-black/20 focus-within:border-black transition-colors pb-1">
-                  <span className="text-lg font-bold">Rp</span>
+                  <span className="text-xl font-black">Rp</span>
                   <input 
                     type="number" 
                     value={nominal}
                     onChange={(e) => setNominal(e.target.value)}
                     placeholder="Ketik jumlah dukungan"
-                    className="w-full bg-transparent border-none outline-none text-lg font-bold placeholder:text-black/30 placeholder:font-normal"
+                    className="w-full bg-transparent border-none outline-none text-xl font-black placeholder:text-black/30 placeholder:font-normal"
                   />
                 </div>
               </div>
 
               {/* Preset Buttons - UPDATE KE 5K, 10K, 15K, 20K */}
-              <div className="grid grid-cols-4 gap-2 mb-6">
+              <div className="grid grid-cols-4 gap-3 mb-8">
                 {presetNominals.map((preset) => (
                   <button
                     key={preset.label}
                     onClick={() => setNominal(preset.value)}
-                    className={`${preset.color} border-2 border-black shadow-[2px_2px_0_0_#000] active:shadow-[0_0_0_0_#000] active:translate-x-[2px] active:translate-y-[2px] py-2 font-bold transition-all rounded`}
+                    className={`${preset.color} border-2 border-black shadow-[3px_3px_0_0_#000] active:shadow-[0_0_0_0_#000] active:translate-x-[3px] active:translate-y-[3px] py-2.5 font-black text-sm transition-all rounded-lg`}
                   >
                     {preset.label}
                   </button>
@@ -303,25 +304,25 @@ export default function Developer() {
                   value={pesan}
                   onChange={(e) => setPesan(e.target.value)}
                   placeholder="Semangat bang ngerjain projectnya!"
-                  className="w-full bg-transparent border-b-2 border-black/20 focus:border-black outline-none pb-1 text-base font-bold placeholder:text-black/30 placeholder:font-normal transition-colors resize-none h-10"
+                  className="w-full bg-transparent border-b-2 border-black/20 focus:border-black outline-none pb-1 text-base font-bold placeholder:text-black/30 placeholder:font-normal transition-colors resize-none h-12"
                 ></textarea>
               </div>
 
               {/* 🔥 NOTICE DANA BARU (MUNCULIN NOMER JELAS) 🔥 */}
-              <div className="bg-yellow-100 border-l-4 border-yellow-500 p-3 mb-6 text-sm font-medium">
-                <p className="mb-2 text-yellow-900">Kirim dukungan via DANA ke nomor ini:</p>
-                <div className="flex items-center justify-between bg-white border-2 border-black p-2 rounded mb-2">
-                  <span className="text-xl font-black tracking-widest text-black">085716827409</span>
+              <div className="bg-[#FFF9C4] border-2 border-black p-4 mb-6 text-sm font-bold shadow-[4px_4px_0_0_#000] rounded-lg">
+                <p className="mb-3 text-black">Kirim dukungan via DANA ke nomor ini:</p>
+                <div className="flex items-center justify-between bg-white border-2 border-black p-2.5 rounded-lg mb-3">
+                  <span className="text-xl font-black tracking-widest text-black ml-2">085716827409</span>
                   <button 
                     onClick={handleCopyDana} 
-                    className="flex items-center gap-1 bg-[#118EEA] text-white px-3 py-1.5 rounded font-bold text-xs border-2 border-black shadow-[2px_2px_0_0_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
+                    className="flex items-center gap-1.5 bg-[#118EEA] text-white px-4 py-2 rounded-md font-black text-xs border-2 border-black shadow-[2px_2px_0_0_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-[0_0_0_0_#000] transition-all"
                   >
-                    {copied ? <CheckCircle2 size={14} /> : <Copy size={14} />}
+                    {copied ? <CheckCircle2 size={16} /> : <Copy size={16} />}
                     {copied ? 'Tersalin!' : 'Salin'}
                   </button>
                 </div>
-                <p className="text-xs text-yellow-800">
-                  *Klik tombol di bawah untuk otomatis buka aplikasi DANA, atau transfer manual dengan nominal <b>Rp {nominal.toLocaleString('id-ID')}</b>.
+                <p className="text-[11px] leading-relaxed text-black/70">
+                  *Klik tombol di bawah untuk otomatis buka DANA, atau transfer manual senilai <b className="text-black">Rp {nominal.toLocaleString('id-ID')}</b>.
                 </p>
               </div>
 
@@ -335,7 +336,8 @@ export default function Developer() {
 
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* 🔥 MODAL POP-UP KHUSUS IPHONE 🔥 */}
