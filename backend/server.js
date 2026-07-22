@@ -1,94 +1,71 @@
 const express = require('express');
 const cors = require('cors');
+const ytdl = require('ytdl-core');
 
 const app = express();
 app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
-// 🔥 INI DIA 5 NYAWA VIP LU SEKARANG 🔥
-const apiKeys = [
-    'f4e914fa55msh291e6fc92994ebep169f6djsn6468bdf8ea71', // Akun Baru 1 (Utama sekarang)
-    '7095d94fbamshbbec24ad251fd30p1f2b8fjsnb78470892218', // Akun Baru 2 (Cadangan Pertama)
-    '937d750ff1msh90d3afecabf1714p10cbe5jsna5bc5d8d048c', // Akun Lama 1 (Nunggu reset bulan depan)
-    'bcbaddf86bmshec9743f2eb27790p1cbf3ajsnfa15a73d34fb', // Akun Lama 2 (Nunggu reset bulan depan)
-    '53e8414702msh6aab12dd31d3234p149546jsna80ea3f770ec'  // Akun Lama 3 (Nunggu reset bulan depan)
-];
+app.get('/', (req, res) => {
+    res.send('🔥 Backend RnCmusic Aktif & Gratis Seumur Hidup (No RapidAPI)! 🔥');
+});
 
-// Memory untuk nginget sistem lagi pakai akun nomor berapa
-let currentKeyIndex = 0; 
-
+// ==========================================
+// 1. ENDPOINT STREAMING AUDIO (Buat Muter Lagu di App)
+// ==========================================
 app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID kosong');
 
-    console.log(`[▶️] OPERASI ROTASI VIP ID: ${videoId}`);
+    console.log(`[▶️] STREAMING GRATIS BYPASS YOUTUBE: ${videoId}`);
 
-    const rapidApiHost = 'youtube-mp36.p.rapidapi.com';
-    const rapidApiUrl = `https://${rapidApiHost}/dl?id=${videoId}`;
+    try {
+        const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        
+        // Ngatur Header biar frontend (React) ngebacanya sebagai MP3 murni
+        res.header('Content-Type', 'audio/mpeg');
+        
+        // Jurus nyedot audio tanpa perantara
+        ytdl(youtubeUrl, { 
+            filter: 'audioonly', 
+            quality: 'highestaudio' 
+        }).pipe(res);
 
-    let audioUrl = null;
-    let attempts = 0;
-
-    // Mesin bakal nyoba terus maksimal 5 kali (sesuai jumlah total akun lu)
-    while (attempts < apiKeys.length) {
-        const activeKey = apiKeys[currentKeyIndex];
-        console.log(`Mengetuk API menggunakan Akun ke-${currentKeyIndex + 1}...`);
-
-        try {
-            const response = await fetch(rapidApiUrl, {
-                method: 'GET',
-                headers: {
-                    'x-rapidapi-host': rapidApiHost,
-                    'x-rapidapi-key': activeKey
-                }
-            });
-
-            // SENSOR OTOMATIS: Kalau dapet error 429 (Kuota Habis)
-            if (response.status === 429) {
-                console.log(`⚠️ KUOTA AKUN KE-${currentKeyIndex + 1} HABIS! Otomatis geser ke akun cadangan...`);
-                // Oper gigi ke akun selanjutnya
-                currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-                attempts++;
-                continue; 
-            }
-
-            // Kalau error dari servernya mati atau down
-            if (!response.ok) {
-                console.log(`❌ Error Server (Status: ${response.status}), coba pakai kunci lain...`);
-                currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-                attempts++;
-                continue;
-            }
-
-            const data = await response.json();
-            
-            // Kalau berhasil dapet link MP3-nya
-            if (data && data.link) {
-                audioUrl = data.link;
-                break; // Lagu dapet! Hentikan perputaran
-            } else {
-                // Berjaga-jaga kalau respon API-nya berubah bentuk
-                console.log(`⚠️ Link nggak ketemu di akun ke-${currentKeyIndex + 1}, geser lagi...`);
-                currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-                attempts++;
-            }
-
-        } catch (err) {
-            console.log(`❌ Gagal koneksi di akun ke-${currentKeyIndex + 1}, lanjut geser...`);
-            currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
-            attempts++;
-        }
-    }
-
-    if (audioUrl) {
-        console.log('✅ LINK AUDIO ROTASI DAPAT! Mengalihkan ke Vercel...');
-        res.redirect(audioUrl);
-    } else {
-        res.status(500).send(`Gagal total! Semua kuota dari ${apiKeys.length} akun VIP lu udah habis bulan ini.`);
+    } catch (error) {
+        console.error('❌ Error nyedot audio:', error);
+        res.status(500).send('Gagal memutar audio');
     }
 });
 
+// ==========================================
+// 2. ENDPOINT DOWNLOAD MP3 (Buat Tombol Download)
+// ==========================================
+app.get('/api/download', async (req, res) => {
+    const videoId = req.query.id;
+    if (!videoId) return res.status(400).send('ID kosong');
+
+    console.log(`[⬇️] DOWNLOAD MP3 GRATIS: ${videoId}`);
+
+    try {
+        const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        
+        // Maksa browser HP/PC buat langsung ngebuka jendela Download
+        res.header('Content-Disposition', `attachment; filename="RnCmusic-${videoId}.mp3"`);
+        res.header('Content-Type', 'audio/mpeg');
+        
+        ytdl(youtubeUrl, { 
+            filter: 'audioonly', 
+            quality: 'highestaudio' 
+        }).pipe(res);
+
+    } catch (error) {
+        console.error('❌ Error download:', error);
+        res.status(500).send('Gagal download audio');
+    }
+});
+
+// Jalankan Server di Railway
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🔥 SERVER ${apiKeys.length} NYAWA ROTASI JALAN DI PORT ${PORT} 🔥`);
+    console.log(`🔥 SERVER YTDL GRATIS JALAN DI PORT ${PORT} 🔥`);
 });
