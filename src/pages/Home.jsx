@@ -99,6 +99,7 @@ export default function Home() {
 
         let cleanTracks = [];
         let usedIds = new Set();
+        let usedTitles = new Set(); // 🔥 RADAR ANTI-KEMBAR 🔥
 
         allRawTracks.forEach(t => {
             if (t.type !== 'video') return;
@@ -116,6 +117,14 @@ export default function Home() {
             let cleanTitle = t.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
             if (cleanTitle.includes('-')) cleanTitle = cleanTitle.split('-')[1];
             cleanTitle = cleanTitle.trim();
+
+            // Saringan Judul Kembar
+            let titleCheck = cleanTitle.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
+            if (titleCheck.length > 3) {
+                let isDup = Array.from(usedTitles).some(seen => seen.includes(titleCheck) || titleCheck.includes(seen));
+                if (isDup) return; // Buang kalau judulnya mirip!
+                usedTitles.add(titleCheck);
+            }
 
             let cleanDisplayArtist = t.requestedArtist || (t.title.includes('-') ? t.title.split('-')[0] : t.author?.name);
             cleanDisplayArtist = cleanDisplayArtist.replace(/vevo|official|topic|music|lyric|video/gi, '').replace(/\([^)]*\)/g, '').trim();
@@ -193,7 +202,7 @@ export default function Home() {
     };
   }, [activeCategory]); 
 
-  // 🔥 ALGORITMA INSTAN: KELOMPOKAN BANYAK LAGU SEFREKUENSI SECARA KILAT 🔥
+  // 🔥 ALGORITMA INSTAN DENGAN FILTER ANTI-KEMBAR 🔥
   const handlePlay = (song, sectionTracks, index) => {
     if (currentSong?.id === song.id) {
       const audios = document.querySelectorAll('audio');
@@ -214,7 +223,6 @@ export default function Home() {
       return;
     }
     
-    // 🧠 RADAR GENRE
     const indoPop = /mahalini|bernadya|hindia|tiara|sal priadi|kunto|nadin|pamungkas|yura|maliq|feby|juicy|rizky|tulus|lyodra|ziva|keisya|andmesh|budi|vierratale|d'masiv|sheila|noah|ungu|geisha|armada|kangen/i;
     const baratPop = /taylor|weeknd|bruno|ariana|bieber|post malone|dua lipa|coldplay|ed sheeran|sabrina|billie|shawn|olivia|maroon|charlie|katy|rihanna|beyonce/i;
 
@@ -222,38 +230,46 @@ export default function Home() {
     let isIndo = indoPop.test(cleanArtist);
     let isBarat = baratPop.test(cleanArtist);
 
-    // Kumpulin semua stok lagu yang udah dimuat di halaman Home (Ada sekitar 50+ lagu)
     let allHomeTracks = [];
     homeSections.forEach(sec => {
         if (sec.tracks) allHomeTracks = [...allHomeTracks, ...sec.tracks];
     });
 
-    // Saring cuma yang sefrekuensi (Ziva ketemu Mahalini dkk, Bruno ketemu Taylor dkk)
     let relatedTracks = allHomeTracks.filter(t => {
         if (t.id === song.id) return false; 
         let tArtist = (t.artist || '').toLowerCase();
         if (isIndo) return indoPop.test(tArtist);
         if (isBarat) return baratPop.test(tArtist);
-        // Kalau lagu indie/gak masuk radar, cocokin artisnya aja
         return tArtist.includes(cleanArtist) || cleanArtist.includes(tArtist);
     });
 
-    // Buang duplikat lagu yang sama
-    let uniqueRelated = Array.from(new Map(relatedTracks.map(item => [item.id, item])).values());
-    
-    // Acak antreannya biar seger, ambil 20 lagu teratas
-    uniqueRelated = uniqueRelated.sort(() => 0.5 - Math.random()).slice(0, 20);
+    let uniqueRelated = [];
+    let baseTitleCheck = song.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
+    let seenTitles = new Set([baseTitleCheck]);
 
+    // 🔥 Filter biar judul lagu nggak kembar di antrean 🔥
+    relatedTracks.forEach(t => {
+        let tTitle = t.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
+        let isDup = false;
+        
+        seenTitles.forEach(seen => {
+            if ((seen.includes(tTitle) || tTitle.includes(seen)) && tTitle.length > 3) isDup = true;
+        });
+        
+        if (!isDup && !uniqueRelated.some(u => u.id === t.id)) {
+            uniqueRelated.push(t);
+            seenTitles.add(tTitle);
+        }
+    });
+    
+    uniqueRelated = uniqueRelated.sort(() => 0.5 - Math.random()).slice(0, 20);
     let newQueue = [song, ...uniqueRelated];
 
-    // Kalau ternyata hasil saringannya dikit (misal kurang dari 5 lagu), 
-    // kita campur sama sectionTracks aslinya sebagai cadangan biar antrean tetep panjang
     if (newQueue.length < 5) {
         const fallback = sectionTracks.filter(s => s.id !== song.id && !newQueue.some(q => q.id === s.id));
         newQueue = [...newQueue, ...fallback].slice(0, 20);
     }
 
-    // Eksekusi pemutaran langsung dengan Antrean Penuh Sefrekuensi
     playSong({
       ...song,
       url: `https://music-app-production-278c.up.railway.app/api/audio?id=${song.id}` 
@@ -270,13 +286,11 @@ export default function Home() {
   return (
     <div className="pt-4 pb-10 pl-4 md:pl-8">
       
-      {/* 🔥 LOGO KHUSUS TAMPILAN HP 🔥 */}
       <div className="md:hidden flex items-center gap-2 mb-3 pr-4 pt-2">
         <img src={rndLogo} alt="rndmusic logo" className="w-8 h-8 rounded-full object-cover" />
         <span className="text-2xl font-bold tracking-tighter text-white">RnCmusic</span>
       </div>
 
-      {/* 🔥 KATEGORI & TOMBOL BACK 🔥 */}
       <div className="flex items-center overflow-x-auto gap-3 pb-4 pr-4 hide-scrollbar sticky top-0 bg-[#0f0f0f] z-30 pt-2">
         {activeCategory ? (
           <>
@@ -347,7 +361,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 🔥 REVISI UI HERO SECTION 🔥 */}
               {section.type === 'hero' && (
                 <div className="flex overflow-x-auto gap-4 pb-4 hide-scrollbar snap-x">
                   {section.tracks.map((song, idx) => (
@@ -382,7 +395,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 🔥 REVISI UI GRID SECTION (SPEED DIAL) 🔥 */}
               {section.type === 'grid' && (
                 <div className="grid grid-rows-4 grid-flow-col gap-x-4 gap-y-2 overflow-x-auto hide-scrollbar snap-x pb-4">
                   {section.tracks.map((song, idx) => (
@@ -409,7 +421,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 🔥 REVISI UI CIRCLE SECTION 🔥 */}
               {section.type === 'circle' && (
                 <div className="flex overflow-x-auto gap-6 pb-4 hide-scrollbar snap-x">
                   {section.tracks.map((song, idx) => (
@@ -437,7 +448,6 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 🔥 REVISI UI SQUARE SECTION 🔥 */}
               {section.type === 'square' && (
                 <div className="flex overflow-x-auto gap-4 pb-4 hide-scrollbar snap-x">
                   {section.tracks.map((song, idx) => (
@@ -468,7 +478,6 @@ export default function Home() {
             </div>
           ))}
 
-          {/* 🔥 REVISI UI RIWAYAT LAGU 🔥 */}
           {!activeCategory && playHistory.length > 0 && (
             <div className="mt-2">
               <div className="flex items-center justify-between mb-4 group">

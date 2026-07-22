@@ -25,12 +25,9 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
   </svg>
 );
 
-// MP3 Kosong (Silent) buat nipu OS HP pas lagi buffering
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
-// 🔥 URL ADZAN 🔥
 const ADZAN_URL = "https://raw.githubusercontent.com/islamic-network/cdn/master/audio/adhan/makkah.mp3";
 
-// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE 🔥
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
@@ -59,7 +56,6 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   
-  // STATE MANAGEMENT
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('upnext'); 
   const [mediaMode, setMediaMode] = useState('audio'); 
@@ -78,7 +74,6 @@ export default function App() {
 
   const iframeRef = useRef(null);
   
-  // 🔥 MESIN AUDIO KEMBAR PING PONG ANTI-MATI HP SLEEP 🔥
   const audio1Ref = useRef(null);
   const audio2Ref = useRef(null);
   const activeEngine = useRef(1);
@@ -100,7 +95,6 @@ export default function App() {
   const [preloadedNextUrl, setPreloadedNextUrl] = useState(null); 
   const [isBuffering, setIsBuffering] = useState(false);
 
-  // STATE LYRICS
   const [lyrics, setLyrics] = useState([]);
   const [activeLyricIndex, setActiveLyricIndex] = useState(-1);
   const [isLoadingLyrics, setIsLoadingLyrics] = useState(false);
@@ -118,7 +112,6 @@ export default function App() {
   const [toastMsg, setToastMsg] = useState("");
   const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, song: null });
 
-  // 🔥 STATE ADZAN BARU (PAUSE & RESUME 3 MENIT) 🔥
   const [adzanMode, setAdzanMode] = useState(() => JSON.parse(localStorage.getItem('ytm_adzan_mode') || 'false'));
   const [isAdzanPlaying, setIsAdzanPlaying] = useState(false);
   const [prayerTimes, setPrayerTimes] = useState([]); 
@@ -142,9 +135,6 @@ export default function App() {
       setTimeout(() => setToastMsg(""), 3500);
   };
 
-  // =========================================================================
-  // 🔥 FUNGSI ADZAN PAUSE 3 MENIT 🔥
-  // =========================================================================
   const dismissAdzanPause = () => {
       if (!isAdzanPlayingRef.current) return;
       
@@ -187,7 +177,6 @@ export default function App() {
           if (keepAliveAudioRef.current) {
               keepAliveAudioRef.current.play().catch(()=>{});
           }
-
           usePlayerStore.setState({ isPlaying: false });
           if (mediaModeRef.current === 'video') {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
@@ -298,9 +287,6 @@ export default function App() {
     };
   }, [adzanMode, prayerTimes]);
 
-  // =========================================================================
-  // 🔥 TOMBOL KONTROL & PING PONG MANUAL 🔥
-  // =========================================================================
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
@@ -418,9 +404,6 @@ export default function App() {
     };
   }, [currentSong]);
 
-  // =========================================================================
-  // 🔥 MENU & KONTEKS LIST 🔥
-  // =========================================================================
   useEffect(() => {
     const handleOpenMenu = (e) => {
         const { event, song } = e.detail;
@@ -520,7 +503,7 @@ export default function App() {
   };
 
   // =========================================================================
-  // 🔥 ALGORITMA INFINITE AUTOPLAY (Muter Tanpa Batas) 🔥
+  // 🔥 ALGORITMA INFINITE AUTOPLAY & RADAR ANTI-KEMBAR 🔥
   // =========================================================================
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
@@ -530,15 +513,13 @@ export default function App() {
     const cacheKey = `algomix_infinite_${cleanArtist}`;
     const cachedMix = sessionStorage.getItem(cacheKey);
     
-    // Kalau lagu dari artis ini udah pernah dicari, tinggal masukin sisa daftarnya ke antrean
     if (cachedMix) {
         const parsedMix = JSON.parse(cachedMix);
         usePlayerStore.setState(state => {
-            // Saring biar nggak ada lagu kembar yang masuk lagi
             const existingIds = new Set(state.queue.map(q => q.id));
             const newUnique = parsedMix.filter(m => !existingIds.has(m.id));
             if (newUnique.length === 0) return state; 
-            return { queue: [...state.queue, ...newUnique] }; // Tumpuk ke belakang antrean!
+            return { queue: [...state.queue, ...newUnique] }; 
         });
         return;
     }
@@ -569,14 +550,29 @@ export default function App() {
         
         let mix = [];
         let usedIds = new Set([baseSong.id]); 
+        
+        // Memori untuk nyatet judul lagu yang udah masuk, biar nggak dobel
+        let baseTitleCheck = baseSong.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
+        let usedTitles = new Set([baseTitleCheck]);
 
         combined.filter(t => t.type === 'video' && !isBadMix(t.title)).forEach(t => {
             const validId = t.id || t.videoId || (t.url ? t.url.split('v=')[1] : null);
             if (!validId || usedIds.has(validId)) return;
+            
             let cleanTitle = t.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
             if (cleanTitle.includes('-')) cleanTitle = cleanTitle.split('-')[1];
+            cleanTitle = cleanTitle.trim();
+
+            // 🔥 Filter Anti-Lagu Kembar (Nyaring judul lirik, cover, dll) 🔥
+            let titleCheck = cleanTitle.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
+            if (titleCheck.length > 3) {
+                let isDup = Array.from(usedTitles).some(seen => seen.includes(titleCheck) || titleCheck.includes(seen));
+                if (isDup) return; 
+                usedTitles.add(titleCheck);
+            }
+
             mix.push({
-                id: validId, title: cleanTitle.trim(), artist: t.author?.name || 'YouTube', image: t.thumbnail
+                id: validId, title: cleanTitle, artist: t.author?.name || 'YouTube', image: t.thumbnail
             });
             usedIds.add(validId);
         });
@@ -587,21 +583,17 @@ export default function App() {
             usePlayerStore.setState(state => {
                 const existingIds = new Set(state.queue.map(q => q.id));
                 const newUnique = mix.filter(m => !existingIds.has(m.id));
-                // Jangan numpuk (replace) antrean! Tapi Tumpuk di belakangnya (append)
                 return { queue: [...state.queue, ...newUnique] }; 
             });
         }
     } catch (e) {}
   };
 
-  // 🔥 OTAK BARU APP.JSX: CUMA KERJA KALAU ANTREAN UDAH MAU HABIS 🔥
+  // Trigger otomatis nyari lagu pas antrean mau habis (sisa 2)
   useEffect(() => {
     if (!currentSong || queue.length === 0) return;
-
-    // Hitung sisa lagu di panel "Berikutnya"
     const remainingSongs = queue.length - 1 - currentIndex;
     
-    // Kalau sisa lagu tinggal 2 lagu lagi, diam-diam (di background) cari lagu sefrekuensi dan taruh di bawahnya!
     if (remainingSongs <= 2) {
         generateRadioMix(currentSong);
     }
@@ -686,10 +678,6 @@ export default function App() {
     setSearchHistory(newHistory);
     localStorage.setItem('ytm_search_history', JSON.stringify(newHistory));
   };
-
-  // =========================================================================
-  // 🔥 FUNGSI MEDIA & LYRICS 🔥
-  // =========================================================================
 
   const displayArtist = useMemo(() => {
     if (!currentSong) return "Artis";
@@ -781,12 +769,19 @@ export default function App() {
               .then(res => res.json())
               .then(data => {
                   if (data?.data) {
+                      let usedRelatedTitles = new Set();
                       const tracks = data.data.filter(t => t.type === 'video' && !isBadMix(t.title)).slice(0, 15).map(t => {
                           const vid = t.id || t.videoId || (t.url ? t.url.split('v=')[1] : null);
                           let cleanT = t.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
                           if (cleanT.includes('-')) cleanT = cleanT.split('-')[1];
+                          
+                          let tCheck = cleanT.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
+                          let isDup = Array.from(usedRelatedTitles).some(seen => seen.includes(tCheck) || tCheck.includes(seen));
+                          if (isDup || tCheck.length <= 3) return null;
+                          usedRelatedTitles.add(tCheck);
+
                           return { id: vid, title: cleanT.trim(), artist: displayArtist, image: t.thumbnail, url: `https://www.youtube.com/watch?v=${vid}` };
-                      }).filter(t => t.id);
+                      }).filter(t => t !== null && t.id);
                       setRelatedSongs(tracks);
                       sessionStorage.setItem(cacheKey, JSON.stringify(tracks)); 
                   }
@@ -796,7 +791,6 @@ export default function App() {
       }
   }, [activeTab, displayArtist]);
 
-  // 🔥 LOGIKA LIRIK SUPER PINTAR & BERSIH 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -841,9 +835,7 @@ export default function App() {
       setLyrics([]); 
       setActiveLyricIndex(-1);
 
-      // 🔥 MESIN PEMBERSIH JUDUL SUPER EKSTREM 🔥
       let rawTitle = currentSong.title;
-      
       if (rawTitle.includes('-')) {
           let parts = rawTitle.split('-');
           if (parts[0].toLowerCase().includes(displayArtist.toLowerCase().split(' ')[0])) {
@@ -854,11 +846,9 @@ export default function App() {
       }
 
       let cleanTitleAPI = rawTitle.split(/\||\(|\[|"/)[0].replace(/(official|music|video|lyric|lyrics|audio|indonesian|clip|records|hq|hd|4k|8k|live|cover)/gi, '').trim();
-      
       let cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/(official|vevo|channel|music|records)/gi, '').trim(); 
       
       const searchQueryAPI = `${cleanTitleAPI} ${cleanArtistAPI}`.trim();
-      console.log(`🔍 Nyari lirik bersih: "${searchQueryAPI}"`);
 
       fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(searchQueryAPI)}`)
         .then(res => res.json())
@@ -905,7 +895,6 @@ export default function App() {
           }
           
           if (!trackFound) {
-              console.log(`⚠️ LRCLIB Kosong, Beralih ke Jalur Darurat Lirik untuk: ${searchQueryAPI}`);
               try {
                   const resOvh = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtistAPI)}/${encodeURIComponent(cleanTitleAPI)}`);
                   if (resOvh.ok) {
@@ -931,9 +920,7 @@ export default function App() {
                           setLyricsMode('full');
                       }
                   }
-              } catch(err) {
-                  console.log("❌ Lirik jalur darurat gagal total", err);
-              }
+              } catch(err) {}
           }
           
         }).finally(() => setIsLoadingLyrics(false));
@@ -1127,7 +1114,6 @@ export default function App() {
            onClick={(e) => e.stopPropagation()}
         >
            <button onClick={(e) => { 
-               // Khusus Mix di Menu, biarin cuma 1 lagu biar API kerja nyari lagu acak yg bagus
                handlePlayClick(e, contextMenu.song, [contextMenu.song], 0);
                generateRadioMix(contextMenu.song); 
                showToast("Memulai Radio Mix...");
