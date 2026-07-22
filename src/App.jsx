@@ -65,8 +65,6 @@ export default function App() {
 
   // 🔥 CLEAR/PAUSE OTOMATIS SAAT REFRESH 🔥
   useEffect(() => {
-    // Memastikan saat web direfresh, lagu diubah ke posisi OFF (Pause).
-    // Jadi mini player tetep nongol ngasih liat riwayat lagu lu, tapi nggak bocor play sendiri.
     usePlayerStore.setState({ isPlaying: false });
     setIsExpanded(false);
   }, []);
@@ -303,24 +301,42 @@ export default function App() {
     };
   }, [adzanMode, prayerTimes]);
 
+  // =========================================================================
+  // 🔥 FIX MEDIA CONTROLS ANDROID BACKGROUND (NEXT & PREV) 🔥
+  // =========================================================================
+
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
-      if (e && keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       
-      if (e) {
-          const nextSong = queue[currentIndex + 1];
-          const ghost = getGhostAudio();
-          if (nextSong && ghost && ghost.src.includes(nextSong.id)) {
-              getActiveAudio()?.pause();
+      // Pancing terus biar audio context ga mati pas layar mati
+      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
+      
+      const nextSong = queue[currentIndex + 1];
+      const ghost = getGhostAudio();
+      const active = getActiveAudio();
+      
+      if (nextSong) {
+          if (ghost && ghost.src.includes(nextSong.id)) {
+              // Kalau lagu udah dipreload, swap aja langsung
+              active?.pause();
               activeEngine.current = activeEngine.current === 1 ? 2 : 1;
               const newActive = getActiveAudio();
               newActive.currentTime = 0;
               newActive.play().catch(()=>{});
           } else {
-              getActiveAudio()?.pause();
+              // Kalau blm dipreload, KITA PAKSA load & play secara sinkronus di background!
+              active?.pause();
+              if (active) {
+                  active.src = `${API_BASE}/api/audio?id=${nextSong.id}`;
+                  active.load();
+                  active.play().catch(()=>{});
+              }
           }
+      } else {
+          active?.pause();
       }
+      
       usePlayerStore.getState().playNext(isShuffle);
   };
 
@@ -331,16 +347,32 @@ export default function App() {
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
       } else {
+          // Pancing terus biar audio context ga mati pas layar mati
           if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
-          getActiveAudio()?.pause();
+          
+          const prevSong = queue[currentIndex - 1];
+          const active = getActiveAudio();
+          
+          // KITA PAKSA load & play secara sinkronus di background!
+          if (prevSong && active) {
+              active.pause();
+              active.src = `${API_BASE}/api/audio?id=${prevSong.id}`;
+              active.load();
+              active.play().catch(()=>{});
+          } else {
+              active?.pause();
+          }
+          
           usePlayerStore.getState().playPrev();
       }
   };
 
-  // 🔥 PERBAIKAN: PLAY OTOMATIS LOAD ULANG SAAT REFRESH 🔥
   const handleTogglePlayLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
+
+      // Pancing terus biar audio context ga mati pas layar mati
+      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
 
       if (isPlaying) {
           getActiveAudio()?.pause();
@@ -348,7 +380,6 @@ export default function App() {
           togglePlay();
       } else {
           const active = getActiveAudio();
-          // Kalau web abis direfresh, src-nya pasti kosong walau lagu muncul. Jadi kita suntik lagi URL-nya di sini!
           if (active && currentSong && !active.src.includes(currentSong.id)) {
               active.src = `${API_BASE}/api/audio?id=${currentSong.id}`;
               active.load();
@@ -367,7 +398,7 @@ export default function App() {
       
       if (currentSong && currentSong.id === qSong.id) {
           handleTogglePlayLocal(null);
-          setIsExpanded(true); // 🔥 OTOMATIS BUKA FULLSCREEN
+          setIsExpanded(true); 
           return; 
       }
       
@@ -378,9 +409,8 @@ export default function App() {
           active.play().catch(()=>{});
       }
       
-      // HANYA UPDATE INDEX SAJA, JANGAN GANTI LIST QUEUE-NYA!
       usePlayerStore.getState().playSong(qSong, queue, idx);
-      setIsExpanded(true); // 🔥 OTOMATIS BUKA FULLSCREEN
+      setIsExpanded(true); 
   };
 
   // FUNGSI PLAY DARI MENU TERKAIT ATAU BERANDA (DARI LUAR ANTREAN)
@@ -391,7 +421,7 @@ export default function App() {
       
       if (currentSong && currentSong.id === song.id) {
           handleTogglePlayLocal(null);
-          setIsExpanded(true); // 🔥 OTOMATIS BUKA FULLSCREEN
+          setIsExpanded(true); 
           return; 
       }
       
@@ -441,7 +471,7 @@ export default function App() {
           usePlayerStore.getState().playSong(song, cleanQueue, 0);
       }
       
-      setIsExpanded(true); // 🔥 OTOMATIS BUKA FULLSCREEN
+      setIsExpanded(true); 
   };
 
   const handleSeek = (e) => {
@@ -1295,7 +1325,7 @@ export default function App() {
                       e.stopPropagation(); 
                       removeSearchHistory(item); 
                     }}
-                    className="text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity p-1"
+                    className="text-zinc-500 hover:text-white opacity-0 md:group-hover:opacity-100 transition-opacity p-1"
                   >
                     <Trash2 size={18} />
                   </button>
@@ -1353,7 +1383,7 @@ export default function App() {
                           <button onClick={(e) => {
                              e.stopPropagation(); e.preventDefault();
                              window.dispatchEvent(new CustomEvent('openSongMenu', { detail: { event: e, song: song } }));
-                          }} className="p-2 text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                          }} className="p-2 text-zinc-400 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                              <MoreVertical size={20} />
                           </button>
                         </div>
