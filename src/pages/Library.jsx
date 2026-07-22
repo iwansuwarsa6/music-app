@@ -18,9 +18,7 @@ export default function Library() {
   const [importProgress, setImportProgress] = useState("");
   const [toastMsg, setToastMsg] = useState("");
 
-  // 🔥 URL SUDAH DIGANTI KE RAILWAY 🔥
   const API_BASE = "https://music-app-production-278c.up.railway.app";
-
   const tabs = ['Daftar putar', 'Lagu', 'Album', 'Artis', 'Podcasts'];
 
   const showToast = (msg) => {
@@ -72,14 +70,17 @@ export default function Library() {
   const handlePlayAll = (songs) => {
     if (songs.length === 0) return;
     playSong({ ...songs[0], url: `${API_BASE}/api/audio?id=${songs[0].id}` }, songs, 0);
+    window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 BUKA LAYAR PENUH
   };
 
   const handlePlaySong = (song, list, index) => {
     if (currentSong?.id === song.id) {
       togglePlay();
+      window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 BUKA LAYAR PENUH
       return;
     }
     playSong({ ...song, url: `${API_BASE}/api/audio?id=${song.id}` }, list, index);
+    window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 BUKA LAYAR PENUH
   };
 
   const openMenu = (e, song) => {
@@ -153,7 +154,6 @@ export default function Library() {
     setIsImporting(false);
   };
 
-  // 🔥 TAMPILAN JIKA PLAYLIST DIKLIK (DETAIL PLAYLIST) 🔥
   if (selectedPlaylist) {
     const pl = playlists.find(p => p.id === selectedPlaylist);
     return (
@@ -218,7 +218,6 @@ export default function Library() {
     )
   }
 
-  // 🔥 TAMPILAN AWAL PUSTAKA 🔥
   return (
     <div className="pt-4 pb-20 px-4 md:px-8 animate-in fade-in duration-300 max-w-5xl mx-auto relative">
       
@@ -240,7 +239,6 @@ export default function Library() {
           Tanggal ditambahkan ↓
         </div>
         
-        {/* 🔥 TOMBOL IMPORT DITAMBAHKAN DI SINI 🔥 */}
         <button 
           onClick={() => setShowImportModal(true)}
           className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white px-4 py-1.5 rounded-full text-xs font-bold transition-colors border border-white/10"
@@ -248,8 +246,6 @@ export default function Library() {
           <Import size={14} /> Import Teks
         </button>
       </div>
-
-      {/* 🔥 KONTEN DINAMIS BERDASARKAN TAB YANG DIPILIH 🔥 */}
       
       {activeTab === 'Daftar putar' && (
         <div className="flex flex-col gap-2 animate-in fade-in duration-300">

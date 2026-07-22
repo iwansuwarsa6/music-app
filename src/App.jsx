@@ -63,6 +63,14 @@ export default function App() {
   const [mediaMode, setMediaMode] = useState('audio'); 
   const [lyricsMode, setLyricsMode] = useState('synced'); 
 
+  // 🔥 CLEAR/PAUSE OTOMATIS SAAT REFRESH 🔥
+  useEffect(() => {
+    // Memastikan saat web direfresh, lagu diubah ke posisi OFF (Pause).
+    // Jadi mini player tetep nongol ngasih liat riwayat lagu lu, tapi nggak bocor play sendiri.
+    usePlayerStore.setState({ isPlaying: false });
+    setIsExpanded(false);
+  }, []);
+
   // 🔥 LISTENER KHUSUS BUAT NERIMA SINYAL BUKA PLAYER DARI BERANDA & SEARCH 🔥
   useEffect(() => {
     const handleOpenPlayer = () => setIsExpanded(true);
@@ -329,6 +337,7 @@ export default function App() {
       }
   };
 
+  // 🔥 PERBAIKAN: PLAY OTOMATIS LOAD ULANG SAAT REFRESH 🔥
   const handleTogglePlayLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
@@ -338,7 +347,13 @@ export default function App() {
           if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
           togglePlay();
       } else {
-          getActiveAudio()?.play().catch(()=>{});
+          const active = getActiveAudio();
+          // Kalau web abis direfresh, src-nya pasti kosong walau lagu muncul. Jadi kita suntik lagi URL-nya di sini!
+          if (active && currentSong && !active.src.includes(currentSong.id)) {
+              active.src = `${API_BASE}/api/audio?id=${currentSong.id}`;
+              active.load();
+          }
+          active?.play().catch(()=>{});
           if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
           togglePlay();
       }
@@ -674,17 +689,11 @@ export default function App() {
     }
   }, [currentSong?.id, currentIndex, queue.length]);
 
-  // 🔥 DETEKSI LOKASI UNTUK RESET SEARCH BAR 🔥
   useEffect(() => {
-    if (location.pathname !== '/search') {
-      setSearchQuery('');
-      setShowSearchHistory(false);
-    } else {
-      const params = new URLSearchParams(location.search);
-      const q = params.get('q');
-      if (q) setSearchQuery(q);
-    }
-  }, [location.pathname, location.search]);
+    const params = new URLSearchParams(location.search);
+    const q = params.get('q');
+    if (q) setSearchQuery(q);
+  }, [location.search]);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
