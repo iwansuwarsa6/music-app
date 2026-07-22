@@ -90,7 +90,7 @@ export default function Library() {
   };
 
   // ===========================================================================
-  // 🔥 ALGORITMA SCRAPING LINK SPOTIFY & YOUTUBE (PROXY ANTI-CORS V3) 🔥
+  // 🔥 ALGORITMA SCRAPING LINK SPOTIFY & YOUTUBE (JALUR API BAWAH TANAH) 🔥
   // ===========================================================================
   const handleImportLink = async (e) => {
     e.preventDefault();
@@ -98,86 +98,93 @@ export default function Library() {
     if (!url) return;
 
     setIsImporting(true);
-    setImportProgress("Menganalisa link...");
+    setImportProgress("Menganalisa link playlist...");
 
     try {
-        const isSpotify = url.includes('spotify.com');
-        const isYouTube = url.includes('youtube.com') || url.includes('youtu.be');
+        let extractedTitles = [];
 
-        if (!isSpotify && !isYouTube) {
-            showToast("❌ Web ini hanya mendukung link Playlist Spotify & YouTube!");
+        // 1. DETEKSI YOUTUBE PLAYLIST
+        const ytMatch = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+        if (ytMatch) {
+            const playlistId = ytMatch[1];
+            setImportProgress("Menembus API Alternatif YouTube...");
+            
+            // 🔥 TRIK DEWA: Pakai API Invidious (YouTube Open Source). 
+            // Bypass HTML Scraping, Bypass CORS, langsung dapet JSON bersih!
+            const invidiousInstances = [
+                `https://vid.puffyan.us/api/v1/playlists/${playlistId}`,
+                `https://invidious.jing.rocks/api/v1/playlists/${playlistId}`,
+                `https://inv.tux.pizza/api/v1/playlists/${playlistId}`
+            ];
+
+            let successApi = false;
+            for (let api of invidiousInstances) {
+                try {
+                    const res = await fetch(api);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data.videos && data.videos.length > 0) {
+                            extractedTitles = data.videos.map(v => v.title);
+                            successApi = true;
+                            break; // Langsung keluar loop kalau berhasil
+                        }
+                    }
+                } catch(e) { 
+                    console.warn("API Invidious gagal, coba server lain..."); 
+                }
+            }
+
+            if (!successApi) throw new Error("Semua server API YouTube sedang sibuk atau Playlist Private.");
+        } 
+        // 2. DETEKSI SPOTIFY PLAYLIST
+        else if (url.includes('spotify.com/playlist/')) {
+            setImportProgress("Membongkar brankas Spotify...");
+            const spotMatch = url.match(/playlist\/([a-zA-Z0-9]+)/);
+            if (!spotMatch) throw new Error("Link Spotify tidak valid");
+            
+            const spotId = spotMatch[1];
+            // 🔥 TRIK DEWA 2: Targetin halaman Embed (Widget) karena HTML-nya enteng banget
+            // Bebas dari 408 Request Timeout!
+            const embedUrl = `https://open.spotify.com/embed/playlist/${spotId}`;
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(embedUrl)}`;
+            
+            const res = await fetch(proxyUrl);
+            const data = await res.json();
+            const html = data.contents;
+            
+            if (!html) throw new Error("Gagal mengambil data Spotify");
+
+            // Jurus 1: Ekstrak dari <meta name="description">
+            const descMatch = html.match(/<meta name="description" content="([^"]+)"/);
+            if (descMatch && descMatch[1]) {
+                const rawDesc = descMatch[1].replace(/·/g, '').replace(/Playlist/gi, '').replace(/[0-9]+ songs/gi, '');
+                extractedTitles = rawDesc.split(',').map(s => s.trim()).filter(s => s.length > 3);
+            }
+            
+            // Jurus 2: Nembus script JSON rahasia __NEXT_DATA__
+            if (extractedTitles.length === 0) {
+               const jsonMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">({.*?})<\/script>/);
+               if (jsonMatch && jsonMatch[1]) {
+                   try {
+                       const spotData = JSON.parse(jsonMatch[1]);
+                       const tracks = spotData?.props?.pageProps?.state?.data?.entity?.trackList || [];
+                       extractedTitles = tracks.map(t => t.title || t.name).filter(Boolean);
+                   } catch(e) {}
+               }
+            }
+        } else {
+            showToast("❌ Hanya mendukung link YouTube Playlist (ada '?list=') dan Spotify Playlist!");
             setIsImporting(false);
             return;
         }
 
-        // Paksa ganti link YT Music ke YT Biasa
-        if (isYouTube && url.includes('music.youtube.com')) {
-            url = url.replace('music.youtube.com', 'www.youtube.com');
-        }
-
-        setImportProgress("Membongkar brankas server...");
-        
-        let html = "";
-        try {
-            // 🔥 PROXY 1: AllOrigins mode JSON (Paling kuat nahan blokiran CORS Vercel)
-            const proxy1 = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-            const res1 = await fetch(proxy1);
-            const data1 = await res1.json();
-            html = data1.contents;
-            
-            if (!html || html.includes('consent.youtube.com') || html.includes('Our systems have detected unusual traffic')) {
-                throw new Error('Terdeteksi Google/CORS block');
-            }
-        } catch (err1) {
-            console.warn("Proxy 1 gagal, mencoba Proxy 2...");
-            try {
-                // 🔥 PROXY 2: CorsProxy.io (Alternatif)
-                const proxy2 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-                const res2 = await fetch(proxy2);
-                html = await res2.text();
-            } catch (err2) {
-                throw new Error("Semua proxy diblokir server.");
-            }
-        }
-
-        if (!html || html.length < 500) throw new Error("Data HTML Kosong");
-
-        setImportProgress("Menyaring daftar lagu...");
-        let extractedTitles = [];
-
-        if (isSpotify) {
-            const titleMatches = html.match(/"name":"([^"]+)","type":"track"/g);
-            if (titleMatches) {
-                extractedTitles = titleMatches.map(t => t.split('":"')[1].split('","')[0]);
-            }
-            if (extractedTitles.length === 0) {
-                const match = html.match(/<meta property="og:description" content="([^"]+)"/) || html.match(/<meta name="description" content="([^"]+)"/);
-                if (match && match[1]) {
-                    const desc = match[1].replace(/·/g, '').replace(/Playlist/gi, '').replace(/[0-9]+ songs/gi, '');
-                    extractedTitles = desc.split(',').map(s => s.trim()).filter(s => s.length > 3);
-                }
-            }
-        } else if (isYouTube) {
-            const titleMatches = html.match(/{"title":{"runs":\[{"text":"(.*?)"}\]/g);
-            if (titleMatches) {
-                extractedTitles = titleMatches.map(t => {
-                    const m = t.match(/"text":"(.*?)"/);
-                    return m ? m[1] : null;
-                }).filter(t => t && t !== "Hapus" && t !== "Simpan" && !t.includes("Playlist") && t !== "Private video" && t !== "Deleted video");
-            }
-            
-            if (extractedTitles.length === 0) {
-                const videoTitleMatches = html.match(/"title":"(.*?)"/g);
-                if (videoTitleMatches) {
-                    extractedTitles = videoTitleMatches.map(t => t.replace(/"title":"/, '').replace(/"$/, '')).filter(t => t.length > 3 && !t.includes("YouTube"));
-                }
-            }
-        }
-
-        extractedTitles = [...new Set(extractedTitles)].slice(0, 15);
+        // Hapus judul sampah dan batasin 15 lagu biar API siputzx lu aman
+        extractedTitles = [...new Set(extractedTitles)]
+            .filter(t => t !== "Hapus" && t !== "Simpan" && t !== "Private video" && t !== "Deleted video")
+            .slice(0, 15);
 
         if (extractedTitles.length === 0) {
-            showToast("❌ Playlist Private, atau Google ngacak struktur webnya.");
+            showToast("❌ Playlist terkunci (Private), kosong, atau sistem diblokir.");
             setIsImporting(false);
             return;
         }
@@ -212,6 +219,7 @@ export default function Library() {
             } catch (e) {
                 console.error("Gagal nyari lagu:", extractedTitles[i]);
             }
+            // Tahan nafas bentar biar ga kena Limit API
             await new Promise(resolve => setTimeout(resolve, 600));
         }
 
@@ -226,7 +234,7 @@ export default function Library() {
         }
 
     } catch (error) {
-        showToast("❌ Proxy diblokir oleh CORS. Coba pakai fitur Import Teks!");
+        showToast("❌ Server sumber ngambek. Coba cek link, atau pakai Import Teks!");
     } finally {
         setIsImporting(false);
     }
