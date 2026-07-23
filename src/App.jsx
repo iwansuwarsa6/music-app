@@ -26,9 +26,7 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
 );
 
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
-const ADZAN_URL = "https://raw.githubusercontent.com/islamic-network/cdn/master/audio/adhan/makkah.mp3";
 
-// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE (Di-upgrade biar buang KUMPULAN & TERBAIK) 🔥
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
@@ -63,13 +61,11 @@ export default function App() {
   const [mediaMode, setMediaMode] = useState('audio'); 
   const [lyricsMode, setLyricsMode] = useState('synced'); 
 
-  // 🔥 CLEAR/PAUSE OTOMATIS SAAT REFRESH 🔥
   useEffect(() => {
     usePlayerStore.setState({ isPlaying: false });
     setIsExpanded(false);
   }, []);
 
-  // 🔥 LISTENER KHUSUS BUAT NERIMA SINYAL BUKA PLAYER DARI BERANDA & SEARCH 🔥
   useEffect(() => {
     const handleOpenPlayer = () => setIsExpanded(true);
     window.addEventListener('openFullScreenPlayer', handleOpenPlayer);
@@ -88,15 +84,14 @@ export default function App() {
   });
 
   const iframeRef = useRef(null);
-  
   const audio1Ref = useRef(null);
   const audio2Ref = useRef(null);
   const activeEngine = useRef(1);
+  const workerRef = useRef(null); // 🔥 REF UNTUK WORKER WAKTU ABSOLUT 🔥
   
   const getActiveAudio = () => activeEngine.current === 1 ? audio1Ref.current : audio2Ref.current;
   const getGhostAudio = () => activeEngine.current === 1 ? audio2Ref.current : audio1Ref.current;
 
-  const adzanAudioRef = useRef(null); 
   const keepAliveAudioRef = useRef(null); 
   
   const API_BASE = "https://music-app-production-278c.up.railway.app";
@@ -107,7 +102,6 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
   
   const [audioStreamUrl, setAudioStreamUrl] = useState(null);
-  const [preloadedNextUrl, setPreloadedNextUrl] = useState(null); 
   const [isBuffering, setIsBuffering] = useState(false);
 
   const [lyrics, setLyrics] = useState([]);
@@ -128,19 +122,15 @@ export default function App() {
   const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, song: null });
 
   const [adzanMode, setAdzanMode] = useState(() => JSON.parse(localStorage.getItem('ytm_adzan_mode') || 'false'));
-  const [isAdzanPlaying, setIsAdzanPlaying] = useState(false);
   const [prayerTimes, setPrayerTimes] = useState([]); 
   const [activePrayerName, setActivePrayerName] = useState(null); 
   
   const lastAdzanTriggered = useRef("");
   const wasPlayingBeforeAdzan = useRef(false);
   const isAdzanPlayingRef = useRef(false); 
-  const forceFinishAdzanRef = useRef(null); 
 
   const mediaModeRef = useRef(mediaMode);
-  useEffect(() => {
-      mediaModeRef.current = mediaMode;
-  }, [mediaMode]);
+  useEffect(() => { mediaModeRef.current = mediaMode; }, [mediaMode]);
 
   const [relatedSongs, setRelatedSongs] = useState([]);
   const [isLoadingRelated, setIsLoadingRelated] = useState(false);
@@ -150,18 +140,23 @@ export default function App() {
       setTimeout(() => setToastMsg(""), 3500);
   };
 
+  // =========================================================================
+  // 🔥 ALGORITMA ADZAN BACKGROUND (ANTI-SLEEP & AUDIO FOCUS TRANSFER) 🔥
+  // =========================================================================
+
   const dismissAdzanPause = () => {
       if (!isAdzanPlayingRef.current) return;
       
       isAdzanPlayingRef.current = false;
       setActivePrayerName(null);
-      if (forceFinishAdzanRef.current) clearTimeout(forceFinishAdzanRef.current);
+      if (workerRef.current) workerRef.current.postMessage({ cmd: 'stop_adzan' });
       
       if (wasPlayingBeforeAdzan.current) {
           if (mediaModeRef.current === 'video') {
               usePlayerStore.setState({ isPlaying: true });
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
               showToast('▶️ Waktu Adzan selesai. Melanjutkan video...');
+              if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
           } else {
               const audioPlayer = getActiveAudio();
               if (audioPlayer) {
@@ -182,29 +177,45 @@ export default function App() {
       }
   };
 
+  const dismissAdzanPauseRef = useRef(dismissAdzanPause);
+  useEffect(() => { dismissAdzanPauseRef.current = dismissAdzanPause; }, [dismissAdzanPause]);
+
   const fireAdzanPause = (prayerName, isTest = false) => {
       wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
       isAdzanPlayingRef.current = true;
       setActivePrayerName(prayerName);
 
       if (wasPlayingBeforeAdzan.current) {
-          if (keepAliveAudioRef.current) {
-              keepAliveAudioRef.current.play().catch(()=>{});
-          }
           usePlayerStore.setState({ isPlaying: false });
-          if (mediaModeRef.current === 'video') {
-              iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
-          } else {
-              getActiveAudio()?.pause();
+          
+          // 🔥 AUDIO FOCUS TRANSFER (Biar Android Gak Cabut Izin Audio)
+          if (keepAliveAudioRef.current) {
+              keepAliveAudioRef.current.play().then(() => {
+                  if (mediaModeRef.current === 'video') {
+                      iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
+                  } else {
+                      getActiveAudio()?.pause();
+                  }
+              }).catch(() => {
+                  if (mediaModeRef.current === 'video') {
+                      iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
+                  } else {
+                      getActiveAudio()?.pause();
+                  }
+              });
           }
       }
       
-      showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba!` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 3 menit.`);
+      showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 3 menit.`);
 
-      forceFinishAdzanRef.current = setTimeout(() => {
-          dismissAdzanPause();
-      }, 180000); 
+      // Minta worker untuk mulai ngitung mundur waktu absolut
+      if (workerRef.current) {
+          workerRef.current.postMessage({ cmd: isTest ? 'start_test_adzan' : 'start_adzan' });
+      }
   };
+
+  const fireAdzanPauseRef = useRef(fireAdzanPause);
+  useEffect(() => { fireAdzanPauseRef.current = fireAdzanPause; }, [fireAdzanPause]);
 
   const dismissAdzanIfActive = () => {
       if (isAdzanPlayingRef.current) {
@@ -261,25 +272,43 @@ export default function App() {
     }
   }, [adzanMode]);
 
+  // 🔥 WEB WORKER BARU (TIMER ANTI SLEEP / BACKGROUND) 🔥
   useEffect(() => {
     if (!adzanMode || prayerTimes.length === 0) return;
 
     const workerCode = `
       let timer;
+      let adzanEndTime = 0;
       self.onmessage = function(e) {
-        if (e.data === 'start') {
+        if (e.data.cmd === 'start') {
           timer = setInterval(() => {
             const now = new Date();
             const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+            
+            // Lapor jam tiap detik
             postMessage({ type: 'time_check', time: timeStr });
-          }, 10000);
-        } else if (e.data === 'stop') {
+            
+            // Cek timer Adzan menggunakan jam absolut (Ga bakal telat walau HP di-lock)
+            if (adzanEndTime > 0 && now.getTime() >= adzanEndTime) {
+               adzanEndTime = 0;
+               postMessage({ type: 'end_adzan' });
+            }
+          }, 1000);
+        } else if (e.data.cmd === 'stop') {
           clearInterval(timer);
+          adzanEndTime = 0;
+        } else if (e.data.cmd === 'start_adzan') {
+          adzanEndTime = new Date().getTime() + 180000; // 3 Menit Exact
+        } else if (e.data.cmd === 'start_test_adzan') {
+          adzanEndTime = new Date().getTime() + 10000; // 10 Detik Exact
+        } else if (e.data.cmd === 'stop_adzan') {
+          adzanEndTime = 0;
         }
       };
     `;
     const blob = new Blob([workerCode], { type: 'application/javascript' });
     const worker = new Worker(URL.createObjectURL(blob));
+    workerRef.current = worker;
 
     worker.onmessage = (e) => {
       const data = e.data;
@@ -288,55 +317,39 @@ export default function App() {
           const matchedPrayer = prayerTimes.find(p => p.time === timeStr);
           if (matchedPrayer && lastAdzanTriggered.current !== timeStr) {
               lastAdzanTriggered.current = timeStr;
-              fireAdzanPause(matchedPrayer.name, false);
+              fireAdzanPauseRef.current(matchedPrayer.name, false);
           }
+      } else if (data.type === 'end_adzan') {
+          dismissAdzanPauseRef.current();
       }
     };
 
-    worker.postMessage('start');
+    worker.postMessage({ cmd: 'start' });
     
     return () => {
-      worker.postMessage('stop');
+      worker.postMessage({ cmd: 'stop' });
       worker.terminate();
     };
   }, [adzanMode, prayerTimes]);
 
-  // =========================================================================
-  // 🔥 FIX MEDIA CONTROLS ANDROID BACKGROUND (NEXT & PREV) 🔥
-  // =========================================================================
-
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
+      if (e && keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       
-      // Pancing terus biar audio context ga mati pas layar mati
-      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
-      
-      const nextSong = queue[currentIndex + 1];
-      const ghost = getGhostAudio();
-      const active = getActiveAudio();
-      
-      if (nextSong) {
-          if (ghost && ghost.src.includes(nextSong.id)) {
-              // Kalau lagu udah dipreload, swap aja langsung
-              active?.pause();
+      if (e) {
+          const nextSong = queue[currentIndex + 1];
+          const ghost = getGhostAudio();
+          if (nextSong && ghost && ghost.src.includes(nextSong.id)) {
+              getActiveAudio()?.pause();
               activeEngine.current = activeEngine.current === 1 ? 2 : 1;
               const newActive = getActiveAudio();
               newActive.currentTime = 0;
               newActive.play().catch(()=>{});
           } else {
-              // Kalau blm dipreload, KITA PAKSA load & play secara sinkronus di background!
-              active?.pause();
-              if (active) {
-                  active.src = `${API_BASE}/api/audio?id=${nextSong.id}`;
-                  active.load();
-                  active.play().catch(()=>{});
-              }
+              getActiveAudio()?.pause();
           }
-      } else {
-          active?.pause();
       }
-      
       usePlayerStore.getState().playNext(isShuffle);
   };
 
@@ -347,22 +360,8 @@ export default function App() {
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
       } else {
-          // Pancing terus biar audio context ga mati pas layar mati
           if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
-          
-          const prevSong = queue[currentIndex - 1];
-          const active = getActiveAudio();
-          
-          // KITA PAKSA load & play secara sinkronus di background!
-          if (prevSong && active) {
-              active.pause();
-              active.src = `${API_BASE}/api/audio?id=${prevSong.id}`;
-              active.load();
-              active.play().catch(()=>{});
-          } else {
-              active?.pause();
-          }
-          
+          getActiveAudio()?.pause();
           usePlayerStore.getState().playPrev();
       }
   };
@@ -370,9 +369,6 @@ export default function App() {
   const handleTogglePlayLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
-
-      // Pancing terus biar audio context ga mati pas layar mati
-      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
 
       if (isPlaying) {
           getActiveAudio()?.pause();
@@ -390,7 +386,6 @@ export default function App() {
       }
   };
 
-  // 🔥 FUNGSI KHUSUS KLIK DARI ANTREAN "BERIKUTNYA" (ANTI NGULANG/NGE-RESET LIST) 🔥
   const handleQueuePlay = (e, qSong, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
@@ -413,7 +408,6 @@ export default function App() {
       setIsExpanded(true); 
   };
 
-  // FUNGSI PLAY DARI MENU TERKAIT ATAU BERANDA (DARI LUAR ANTREAN)
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
@@ -1383,7 +1377,7 @@ export default function App() {
                           <button onClick={(e) => {
                              e.stopPropagation(); e.preventDefault();
                              window.dispatchEvent(new CustomEvent('openSongMenu', { detail: { event: e, song: song } }));
-                          }} className="p-2 text-zinc-400 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          }} className="p-2 text-zinc-400 hover:text-white opacity-0 md:opacity-100 transition-opacity">
                              <MoreVertical size={20} />
                           </button>
                         </div>
