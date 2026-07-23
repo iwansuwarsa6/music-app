@@ -704,20 +704,26 @@ export default function App() {
     }
   }, [currentSong?.id, currentIndex, queue.length]);
 
+  // 🔥 JURUS AUTO-SAPU: BERSIHKAN TEKS JIKA PINDAH HALAMAN (KECUALI SEARCH) 🔥
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const q = params.get('q');
-    if (q) setSearchQuery(q);
-  }, [location.search]);
+    if (location.pathname !== '/search') {
+      setSearchQuery(''); // Langsung hapus teks kalau bukan di Search
+      setShowSearchHistory(false);
+    } else {
+      const params = new URLSearchParams(location.search);
+      const q = params.get('q');
+      if (q) setSearchQuery(q);
+    }
+  }, [location.pathname, location.search]);
 
-  // 🔥 UDAH DIPERBAIKI: HAPUS location.pathname DARI SYARAT BIAR MUNCUL DI SEMUA HALAMAN 🔥
+  // 🔥 JURUS SENSOR PINTAR: MEMBERSIHKAN JUDUL ALAY DARI HASIL PENCARIAN 🔥
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (searchQuery.trim().length > 2) {
         setIsFetchingSuggestions(true);
         const qLower = searchQuery.trim().toLowerCase();
         
-        const cacheKey = `search_${qLower}`;
+        const cacheKey = `search_smart_${qLower}`;
         const cachedSearch = sessionStorage.getItem(cacheKey);
 
         if (cachedSearch) {
@@ -737,13 +743,25 @@ export default function App() {
               .filter(item => item.type === 'video' && !isNonMusic(item.title))
               .map(track => {
                 const validId = track.id || track.videoId || (track.url ? track.url.split('v=')[1] : null);
-                return { id: validId, title: track.title, artist: track.author?.name || 'YouTube', image: track.thumbnail };
+                
+                // 🔥 PROSES CUKUR TEKS ALAY (Lyrics, HD, MV, dll) 🔥
+                let cleanT = track.title;
+                cleanT = cleanT.replace(/\([^)]*\)/g, ''); // Hapus semua teks dalam kurung biasa ()
+                cleanT = cleanT.replace(/\[[^\]]*\]/g, ''); // Hapus semua teks dalam kurung siku []
+                cleanT = cleanT.replace(/(official|music video|lyric|lyrics|audio|hq|hd|live|performance|remix)/gi, ''); 
+                cleanT = cleanT.replace(/- -/g, '-').replace(/\s+/g, ' ').trim(); // Rapikan spasi dobel
+                
+                // Bersihin nama artis juga dari embel-embel "VEVO" atau "Official"
+                let cleanA = track.author?.name || 'YouTube';
+                cleanA = cleanA.replace(/vevo|official|topic|music|channel|records/gi, '').trim();
+
+                return { id: validId, title: cleanT, artist: cleanA, image: track.thumbnail };
               }).filter(track => track.id != null);
 
             const uniqueTexts = new Set();
             formattedResults.forEach(track => {
-              let cleanT = track.title.toLowerCase().replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').replace(/(official|music video|lyrics?|audio|hd|hq)/gi, '').replace(/[^a-z0-9\s-]/gi, '').trim();
-              if (cleanT.length > 2) uniqueTexts.add(cleanT);
+              let t = track.title.toLowerCase().replace(/[^a-z0-9\s-]/gi, '').trim();
+              if (t.length > 2) uniqueTexts.add(t);
             });
             
             const finalTexts = [qLower, ...Array.from(uniqueTexts).filter(t => t !== qLower)].slice(0, 6);
