@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ArrowLeft, CheckCircle2, Coffee, Download, X, Copy, Code, Github, Instagram, ExternalLink } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Coffee, Download, X, Copy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // 🔥 IMPORT GAMBAR SESUAI NAMA FILE LU 🔥
