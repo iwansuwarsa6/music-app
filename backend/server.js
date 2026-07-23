@@ -6,7 +6,7 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
-// 🔥 INI DIA 14 NYAWA VIP LU SEKARANG (TOTAL 7.000 REQUEST/BULAN) 🔥
+// 🔥 INI DIA 24 NYAWA VIP LU SEKARANG (TOTAL 12.000 REQUEST/BULAN) 🔥
 const apiKeys = [
     // --- 5 Akun Lama ---
     'f4e914fa55msh291e6fc92994ebep169f6djsn6468bdf8ea71', 
@@ -14,7 +14,8 @@ const apiKeys = [
     '937d750ff1msh90d3afecabf1714p10cbe5jsna5bc5d8d048c', 
     'bcbaddf86bmshec9743f2eb27790p1cbf3ajsnfa15a73d34fb', 
     '53e8414702msh6aab12dd31d3234p149546jsna80ea3f770ec',
-    // --- 9 Akun Baru (Hasil Panen Trik Googlemail) ---
+    
+    // --- 9 Akun Hasil Panen Pertama ---
     'f9290b3b7amshcd2e40de4f9b764p183576jsn1f87451eb25c',
     'f2b80f5a88msheb34d6fe043221ap180fc5jsn04038bd1e76a',
     '8e47420f4bmsh5a8cb3ccd37e3b0p17773bjsnaada21063b96',
@@ -23,7 +24,19 @@ const apiKeys = [
     'e9d49e2db8mshd0df9bbbee5ce26p1bc8d6jsn88590c8293df',
     '79255ed5d1msh07305152a465183p18b944jsn0dc9959e017d',
     '30496e0f53msh3ef636b039b4718p1a51ecjsn0b231b3b636e',
-    '09cb701317msh848e322d04fa0a0p1eadd4jsnbfe3d0b5ca51'
+    '09cb701317msh848e322d04fa0a0p1eadd4jsnbfe3d0b5ca51',
+
+    // --- 10 Akun Hasil Panen Kedua (Terbaru) ---
+    'd07a0ca60emshc30588abd75c3b0p1a780fjsn4f3765f95488',
+    'c190ef079amshccd4588309c2538p167d7fjsnc4600dde47b2',
+    '8e72544428msh10719b7e25a0a40p1d1809jsn81efa55849fb',
+    'e94f982c1bmshba4b3faf18d0a1ap1a2519jsn52c7639363e3',
+    'f1c8e896d4msh8909087a3ddcfedp197d09jsndeb4cfc9abcf',
+    '0eec7e381fmsh3f692247c4a505cp1f1b3djsn59bd0b8a5178',
+    '63d33de174msha0c73db9757aabfp1bc4f8jsnac87dcf011cf',
+    'e6288a50e7msh8f38dd47fdaa35fp15ec55jsn4b4cccf89399',
+    'a14813b9camsha5a1390a25fd0d2p1c6f87jsn07bb4bffd14b',
+    'f165b6e72emsh4c3bd80a3d6240cp1833f0jsn513edbb64c77'
 ];
 
 // Memory untuk nginget sistem lagi pakai akun nomor berapa
@@ -41,7 +54,7 @@ app.get('/api/audio', async (req, res) => {
     let audioUrl = null;
     let attempts = 0;
 
-    // Mesin bakal nyoba terus maksimal sesuai jumlah total akun (14 kali)
+    // Mesin bakal nyoba terus maksimal sesuai jumlah total akun (24 kali)
     while (attempts < apiKeys.length) {
         const activeKey = apiKeys[currentKeyIndex];
         console.log(`Mengetuk API menggunakan Akun ke-${currentKeyIndex + 1}...`);
