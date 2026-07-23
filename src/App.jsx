@@ -61,6 +61,9 @@ export default function App() {
   const [mediaMode, setMediaMode] = useState('audio'); 
   const [lyricsMode, setLyricsMode] = useState('synced'); 
 
+  // 🔥 STATE DETEKTOR MODE OFFLINE 🔥
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
   useEffect(() => {
     usePlayerStore.setState({ isPlaying: false });
     setIsExpanded(false);
@@ -70,6 +73,20 @@ export default function App() {
     const handleOpenPlayer = () => setIsExpanded(true);
     window.addEventListener('openFullScreenPlayer', handleOpenPlayer);
     return () => window.removeEventListener('openFullScreenPlayer', handleOpenPlayer);
+  }, []);
+
+  // 🔥 SENSOR ONLINE/OFFLINE AKTIF 🔥
+  useEffect(() => {
+    const handleOnline = () => { setIsOffline(false); showToast("🟢 Koneksi kembali! Mode Online aktif."); };
+    const handleOffline = () => { setIsOffline(true); showToast("🔴 Masuk ke Mode Offline. Memutar lagu dari memori HP."); };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -201,7 +218,6 @@ export default function App() {
           }
       }
       
-      // 🔥 TOAST DIKEMBALIKAN KE 5 MENIT 🔥
       showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 5 menit.`);
 
       if (workerRef.current) {
@@ -290,7 +306,6 @@ export default function App() {
           clearInterval(timer);
           adzanEndTime = 0;
         } else if (e.data.cmd === 'start_adzan') {
-          // 🔥 DURASI WORKER DIKEMBALIKAN KE 5 MENIT (300.000 MS) 🔥
           adzanEndTime = new Date().getTime() + 300000;
         } else if (e.data.cmd === 'start_test_adzan') {
           adzanEndTime = new Date().getTime() + 10000;
@@ -734,6 +749,12 @@ export default function App() {
             return;
         }
 
+        // 🔥 CEK JIKA OFFLINE, HENTIKAN PENCARIAN 🔥
+        if (isOffline) {
+          setIsFetchingSuggestions(false);
+          return;
+        }
+
         try {
           const queryPintar = encodeURIComponent(searchQuery.trim());
           const response = await fetch(`https://api.siputzx.my.id/api/s/youtube?query=${queryPintar}`);
@@ -773,7 +794,7 @@ export default function App() {
       } else { setLiveSuggestions([]); setTextSuggestions([]); }
     }, 500); 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery]); 
+  }, [searchQuery, isOffline]); 
 
   const executeSearch = (query) => {
     const q = query.trim();
@@ -788,6 +809,11 @@ export default function App() {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault(); 
+    // 🔥 JIKA OFFLINE, MUNCULKAN TOAST DAN HENTIKAN PENCARIAN 🔥
+    if (isOffline) {
+        showToast("🔴 Mode Offline: Tidak bisa melakukan pencarian lagu baru.");
+        return;
+    }
     executeSearch(searchQuery);
     if (document.activeElement) document.activeElement.blur(); 
   };
@@ -875,6 +901,14 @@ export default function App() {
 
   useEffect(() => {
       if (activeTab === 'artist' && displayArtist && displayArtist !== "Artis") {
+          
+          // 🔥 JIKA OFFLINE, HENTIKAN PENCARIAN LAGU TERKAIT 🔥
+          if (isOffline) {
+              setIsLoadingRelated(false);
+              setRelatedSongs([]);
+              return;
+          }
+
           const cacheKey = `related_${displayArtist}`;
           const cachedRelated = sessionStorage.getItem(cacheKey);
           
@@ -908,7 +942,7 @@ export default function App() {
               .catch(err => console.error(err))
               .finally(() => setIsLoadingRelated(false));
       }
-  }, [activeTab, displayArtist]);
+  }, [activeTab, displayArtist, isOffline]);
 
   useEffect(() => {
     if (!currentSong?.id) {
@@ -950,6 +984,15 @@ export default function App() {
     }
 
     if (currentSong?.title) {
+
+      // 🔥 JIKA OFFLINE, JANGAN CARI LIRIK KE INTERNET 🔥
+      if (isOffline) {
+          setIsLoadingLyrics(false);
+          setLyrics([{time: 0, text: "Lirik tidak tersedia dalam Mode Offline."}]);
+          setLyricsMode('full');
+          return;
+      }
+
       setIsLoadingLyrics(true); 
       setLyrics([]); 
       setActiveLyricIndex(-1);
@@ -1044,7 +1087,7 @@ export default function App() {
           
         }).finally(() => setIsLoadingLyrics(false));
     }
-  }, [currentSong?.id, displayTitle, displayArtist, API_BASE]);
+  }, [currentSong?.id, displayTitle, displayArtist, API_BASE, isOffline]);
 
   useEffect(() => {
     if (duration > 0 && lrclibDuration > 0) {
@@ -1272,7 +1315,11 @@ export default function App() {
           
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
             <img src="/rnctech.jpg" alt="RnCmusic logo" className="w-10 h-10 rounded-full object-cover shadow-[0_0_10px_rgba(62,166,255,0.3)]" />
-            <span className="text-2xl font-black tracking-tighter">RnCmusic</span>
+            <div className="flex flex-col">
+              <span className="text-2xl font-black tracking-tighter leading-none">RnCmusic</span>
+              {/* 🔥 TULISAN MERAH MUNCUL KALAU OFFLINE 🔥 */}
+              {isOffline && <span className="text-[10px] text-red-500 font-bold tracking-widest uppercase mt-0.5">OFFLINE MODE</span>}
+            </div>
           </div>
 
           <div className="flex items-center gap-8 ml-10">
@@ -1287,14 +1334,15 @@ export default function App() {
             <SearchIcon size={20} className="text-zinc-400 mr-3 shrink-0" />
             <input 
               type="text" 
-              placeholder="Telusuri lagu, album, artis, podcast" 
+              placeholder={isOffline ? "Pencarian dimatikan saat Offline..." : "Telusuri lagu, album, artis, podcast"} 
               className="bg-transparent border-none outline-none text-white w-full text-base placeholder:text-zinc-500 font-medium"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setShowSearchHistory(true)}
               onBlur={() => setTimeout(() => setShowSearchHistory(false), 200)}
+              disabled={isOffline} // 🔥 BLOKIR KOTAK SEARCH PAS OFFLINE 🔥
             />
-            {searchQuery && (
+            {searchQuery && !isOffline && (
               <button 
                 type="button" 
                 onClick={() => { setSearchQuery(''); document.activeElement.focus(); }} 
@@ -1306,7 +1354,7 @@ export default function App() {
             <button type="submit" className="hidden">Search</button>
           </form>
           
-          {showSearchHistory && (
+          {showSearchHistory && !isOffline && (
             <div className="absolute top-full left-0 right-0 bg-[#181818]/95 backdrop-blur-2xl border-x border-b border-white/10 rounded-b-xl shadow-2xl py-2 z-50 overflow-hidden flex flex-col max-h-[75vh]">
               {searchQuery.trim() === '' && searchHistory.length > 0 && searchHistory.map((item, idx) => (
                 <div 
@@ -1367,7 +1415,6 @@ export default function App() {
                             e.preventDefault();
                             setSearchQuery(song.title); 
                             
-                            // 🔥 DISPATCH EVENT BIAR LAYAR NAIK PAS KLIK SUGGESTION 🔥
                             window.dispatchEvent(new CustomEvent('openFullScreenPlayer'));
                             handlePlayClick(e, song, [song], 0);
                             
@@ -1531,6 +1578,7 @@ export default function App() {
               <Heart fill={isLiked ? "currentColor" : "none"} size={20} strokeWidth={isLiked ? 0 : 2} />
             </button>
             
+            {/* 🔥 TOMBOL SHUFFLE DENGAN TOAST 🔥 */}
             <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
@@ -1543,6 +1591,7 @@ export default function App() {
               <Shuffle size={18} />
             </button>
 
+            {/* 🔥 TOMBOL REPEAT DENGAN TOAST 3 MODE 🔥 */}
             <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
@@ -1675,6 +1724,7 @@ export default function App() {
               </div>
 
               <div className="flex items-center justify-between px-2 md:px-12 mt-2">
+                {/* 🔥 TOMBOL SHUFFLE MOBILE DENGAN TOAST 🔥 */}
                 <button 
                   onClick={(e) => { 
                     e.stopPropagation(); 
@@ -1686,6 +1736,7 @@ export default function App() {
                 >
                   <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
+
                 <button onClick={handlePrevLocal} className="text-white hover:text-zinc-300 hover:bg-white/10 rounded-full transition-all p-2 md:p-3">
                   <SkipBack fill="currentColor" className="w-7 h-7 md:w-8 md:h-8" />
                 </button>
@@ -1697,6 +1748,8 @@ export default function App() {
                 <button onClick={handleNextLocal} className="text-white hover:text-zinc-300 hover:bg-white/10 rounded-full transition-all p-2 md:p-3">
                   <SkipForward fill="currentColor" className="w-7 h-7 md:w-8 md:h-8" />
                 </button>
+
+                {/* 🔥 TOMBOL REPEAT MOBILE DENGAN TOAST 🔥 */}
                 <button 
                   onClick={(e) => { 
                     e.stopPropagation(); 
