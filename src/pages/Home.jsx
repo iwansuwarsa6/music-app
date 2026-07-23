@@ -201,7 +201,7 @@ export default function Home() {
     };
   }, [activeCategory]); 
 
-  // 🔥 ALGORITMA INSTAN DENGAN FILTER ANTI-KEMBAR 🔥
+  // 🔥 ALGORITMA INSTAN MIX RADIO (CAMPURAN BIAR GAK BOSEN) 🔥
   const handlePlay = (song, sectionTracks, index) => {
     if (currentSong?.id === song.id) {
       const audios = document.querySelectorAll('audio');
@@ -223,31 +223,33 @@ export default function Home() {
       return;
     }
     
-    const indoPop = /mahalini|bernadya|hindia|tiara|sal priadi|kunto|nadin|pamungkas|yura|maliq|feby|juicy|rizky|tulus|lyodra|ziva|keisya|andmesh|budi|vierratale|d'masiv|sheila|noah|ungu|geisha|armada|kangen/i;
-    const baratPop = /taylor|weeknd|bruno|ariana|bieber|post malone|dua lipa|coldplay|ed sheeran|sabrina|billie|shawn|olivia|maroon|charlie|katy|rihanna|beyonce/i;
-
     let cleanArtist = (song.artist || '').toLowerCase();
-    let isIndo = indoPop.test(cleanArtist);
-    let isBarat = baratPop.test(cleanArtist);
 
+    // 1. Kumpulin SEMUA lagu yang ada di Beranda
     let allHomeTracks = [];
     homeSections.forEach(sec => {
         if (sec.tracks) allHomeTracks = [...allHomeTracks, ...sec.tracks];
     });
 
-    let relatedTracks = allHomeTracks.filter(t => {
-        if (t.id === song.id) return false; 
-        let tArtist = (t.artist || '').toLowerCase();
-        if (isIndo) return indoPop.test(tArtist);
-        if (isBarat) return baratPop.test(tArtist);
-        return tArtist.includes(cleanArtist) || cleanArtist.includes(tArtist);
-    });
+    // 2. Ambil MAKSIMAL 3 LAGU dari artis yang sama
+    let sameArtistTracks = allHomeTracks.filter(t => 
+        t.id !== song.id && (t.artist || '').toLowerCase().includes(cleanArtist)
+    ).slice(0, 3);
+
+    // 3. Ambil lagu dari ARTIS LAIN buat campurannya
+    let otherTracks = allHomeTracks.filter(t => 
+        t.id !== song.id && !(t.artist || '').toLowerCase().includes(cleanArtist)
+    );
+
+    // 4. GABUNGIN & ACAK (Shuffle) biar posisinya natural kayak Radio
+    let mixedTracks = [...sameArtistTracks, ...otherTracks].sort(() => 0.5 - Math.random());
 
     let uniqueRelated = [];
     let baseTitleCheck = song.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
     let seenTitles = new Set([baseTitleCheck]);
 
-    relatedTracks.forEach(t => {
+    // 5. Radar Anti-Kembar (biar nggak ada judul lagu yang sama persis)
+    mixedTracks.forEach(t => {
         let tTitle = t.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
         let isDup = false;
         
@@ -261,7 +263,8 @@ export default function Home() {
         }
     });
     
-    uniqueRelated = uniqueRelated.sort(() => 0.5 - Math.random()).slice(0, 20);
+    // 6. Ambil 20 lagu untuk antrean
+    uniqueRelated = uniqueRelated.slice(0, 20);
     let newQueue = [song, ...uniqueRelated];
 
     if (newQueue.length < 5) {
