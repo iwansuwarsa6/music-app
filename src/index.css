@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* ======================================================= */
 /* 🔥 JURUS TEKS JALAN (MARQUEE PING-PONG OTOMATIS) 🔥 */
 /* ======================================================= */
@@ -10,7 +12,6 @@
   mask-image: linear-gradient(to right, #000 85%, transparent 100%);
 }
 
-/* Langsung tembak animasinya ke sini, tanpa perlu class :hover lagi */
 .scroll-text {
   display: inline-block;
   white-space: nowrap;
