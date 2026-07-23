@@ -413,10 +413,17 @@ export default function Home() {
                           {isPlaying && currentSong?.id === song.id ? <Pause fill="white" size={16} /> : <Play fill="white" size={16} className="ml-0.5" />}
                         </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-sm font-bold truncate mb-0.5 group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
-                        <div className="text-xs text-zinc-400 truncate">{song.artist}</div>
+                      
+                      {/* 🔥 JURUS TEKS BERJALAN GRID 🔥 */}
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="scroll-container mb-0.5">
+                          <div className={`text-sm font-bold scroll-text group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
+                        </div>
+                        <div className="scroll-container">
+                          <div className="text-xs text-zinc-400 scroll-text">{song.artist}</div>
+                        </div>
                       </div>
+
                       <button onClick={(e) => handleOpenMenu(e, song)} className="text-zinc-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1">
                         <MoreVertical size={18} />
                       </button>
@@ -439,8 +446,12 @@ export default function Home() {
                           {isPlaying && currentSong?.id === song.id ? <Pause fill="white" size={32} /> : <Play fill="white" size={32} className="ml-1" />}
                         </div>
                       </div>
-                      <div className="w-full text-center">
-                        <div className={`text-sm font-medium truncate w-full group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.artist}</div>
+                      
+                      {/* 🔥 JURUS TEKS BERJALAN CIRCLE 🔥 */}
+                      <div className="w-full text-center overflow-hidden">
+                        <div className="scroll-container w-full">
+                          <div className={`text-sm font-medium scroll-text w-full group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.artist}</div>
+                        </div>
                         <div className="text-[11px] text-zinc-500 mt-0.5">Artis</div>
                       </div>
                       
@@ -468,8 +479,14 @@ export default function Home() {
                           </button>
                         </div>
                       </div>
-                      <div className={`text-sm font-bold truncate mb-1 group-hover:underline pr-6 ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
-                      <div className="text-xs text-zinc-400 truncate whitespace-normal line-clamp-2 leading-tight pr-6">{song.artist}</div>
+                      
+                      {/* 🔥 JURUS TEKS BERJALAN SQUARE 🔥 */}
+                      <div className="scroll-container mb-1 pr-6">
+                        <div className={`text-sm font-bold scroll-text group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
+                      </div>
+                      <div className="scroll-container pr-6">
+                        <div className="text-xs text-zinc-400 scroll-text leading-tight">{song.artist}</div>
+                      </div>
                       
                       <button onClick={(e) => handleOpenMenu(e, song)} className="absolute bottom-2 right-0 text-zinc-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1">
                         <MoreVertical size={18} />
@@ -510,10 +527,17 @@ export default function Home() {
                         {isPlaying && currentSong?.id === song.id ? <Pause fill="white" size={16} /> : <Play fill="white" size={16} className="ml-0.5" />}
                       </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className={`text-sm font-bold truncate mb-0.5 group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
-                      <div className="text-xs text-zinc-400 truncate">{song.artist}</div>
+                    
+                    {/* 🔥 JURUS TEKS BERJALAN HISTORY 🔥 */}
+                    <div className="flex-1 min-w-0 overflow-hidden">
+                      <div className="scroll-container mb-0.5">
+                        <div className={`text-sm font-bold scroll-text group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
+                      </div>
+                      <div className="scroll-container">
+                        <div className="text-xs text-zinc-400 scroll-text">{song.artist}</div>
+                      </div>
                     </div>
+
                     <button onClick={(e) => handleOpenMenu(e, song)} className="text-zinc-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1">
                       <MoreVertical size={18} />
                     </button>

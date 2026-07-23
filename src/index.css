@@ -1,1 +1,39 @@
 @import "tailwindcss";
+
+/* ======================================================= */
+/* 🔥 JURUS TEKS JALAN (MARQUEE PING-PONG) 🔥 */
+/* ======================================================= */
+
+.scroll-container {
+  overflow: hidden;
+  width: 100%;
+  /* Bikin ujung kanan agak pudar/transparan dikit pas teksnya jalan */
+  -webkit-mask-image: linear-gradient(to right, #000 85%, transparent 100%);
+  mask-image: linear-gradient(to right, #000 85%, transparent 100%);
+}
+
+.scroll-text {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; /* Defaultnya tetep pake titik-titik (...) pas lagi diem */
+}
+
+/* Pas elemen pembungkus (class "group") disorot mouse atau dipencet di HP */
+.group:hover .scroll-container .scroll-text,
+.group:active .scroll-container .scroll-text {
+  overflow: visible;
+  display: inline-block;
+  animation: text-pingpong 4s ease-in-out infinite alternate;
+}
+
+/* Logika pergerakan teksnya */
+@keyframes text-pingpong {
+  0%, 15% { 
+    transform: translateX(0); 
+  }
+  85%, 100% { 
+    /* Geser teks ke kiri, atur angkanya kalo teksnya masih kurang kelihatan (misal -50%) */
+    transform: translateX(-40%); 
+  } 
+}
