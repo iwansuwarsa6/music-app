@@ -87,7 +87,7 @@ export default function App() {
   const audio1Ref = useRef(null);
   const audio2Ref = useRef(null);
   const activeEngine = useRef(1);
-  const workerRef = useRef(null); // 🔥 REF UNTUK WORKER WAKTU ABSOLUT 🔥
+  const workerRef = useRef(null); 
   
   const getActiveAudio = () => activeEngine.current === 1 ? audio1Ref.current : audio2Ref.current;
   const getGhostAudio = () => activeEngine.current === 1 ? audio2Ref.current : audio1Ref.current;
@@ -140,10 +140,6 @@ export default function App() {
       setTimeout(() => setToastMsg(""), 3500);
   };
 
-  // =========================================================================
-  // 🔥 ALGORITMA ADZAN BACKGROUND (ANTI-SLEEP & AUDIO FOCUS TRANSFER) 🔥
-  // =========================================================================
-
   const dismissAdzanPause = () => {
       if (!isAdzanPlayingRef.current) return;
       
@@ -188,7 +184,6 @@ export default function App() {
       if (wasPlayingBeforeAdzan.current) {
           usePlayerStore.setState({ isPlaying: false });
           
-          // 🔥 AUDIO FOCUS TRANSFER (Biar Android Gak Cabut Izin Audio)
           if (keepAliveAudioRef.current) {
               keepAliveAudioRef.current.play().then(() => {
                   if (mediaModeRef.current === 'video') {
@@ -208,7 +203,6 @@ export default function App() {
       
       showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 3 menit.`);
 
-      // Minta worker untuk mulai ngitung mundur waktu absolut
       if (workerRef.current) {
           workerRef.current.postMessage({ cmd: isTest ? 'start_test_adzan' : 'start_adzan' });
       }
@@ -272,7 +266,6 @@ export default function App() {
     }
   }, [adzanMode]);
 
-  // 🔥 WEB WORKER BARU (TIMER ANTI SLEEP / BACKGROUND) 🔥
   useEffect(() => {
     if (!adzanMode || prayerTimes.length === 0) return;
 
@@ -285,10 +278,8 @@ export default function App() {
             const now = new Date();
             const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
             
-            // Lapor jam tiap detik
             postMessage({ type: 'time_check', time: timeStr });
             
-            // Cek timer Adzan menggunakan jam absolut (Ga bakal telat walau HP di-lock)
             if (adzanEndTime > 0 && now.getTime() >= adzanEndTime) {
                adzanEndTime = 0;
                postMessage({ type: 'end_adzan' });
@@ -298,9 +289,9 @@ export default function App() {
           clearInterval(timer);
           adzanEndTime = 0;
         } else if (e.data.cmd === 'start_adzan') {
-          adzanEndTime = new Date().getTime() + 180000; // 3 Menit Exact
+          adzanEndTime = new Date().getTime() + 180000;
         } else if (e.data.cmd === 'start_test_adzan') {
-          adzanEndTime = new Date().getTime() + 10000; // 10 Detik Exact
+          adzanEndTime = new Date().getTime() + 10000;
         } else if (e.data.cmd === 'stop_adzan') {
           adzanEndTime = 0;
         }
@@ -719,9 +710,10 @@ export default function App() {
     if (q) setSearchQuery(q);
   }, [location.search]);
 
+  // 🔥 UDAH DIPERBAIKI: HAPUS location.pathname DARI SYARAT BIAR MUNCUL DI SEMUA HALAMAN 🔥
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
-      if (searchQuery.trim().length > 2 && location.pathname === '/search') {
+      if (searchQuery.trim().length > 2) {
         setIsFetchingSuggestions(true);
         const qLower = searchQuery.trim().toLowerCase();
         
@@ -765,7 +757,7 @@ export default function App() {
       } else { setLiveSuggestions([]); setTextSuggestions([]); }
     }, 500); 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, location.pathname]);
+  }, [searchQuery]); 
 
   const executeSearch = (query) => {
     const q = query.trim();
