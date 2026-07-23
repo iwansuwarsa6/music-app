@@ -1,7 +1,5 @@
-@import "tailwindcss";
-
 /* ======================================================= */
-/* 🔥 JURUS TEKS JALAN (MARQUEE PING-PONG) 🔥 */
+/* 🔥 JURUS TEKS JALAN (MARQUEE PING-PONG OTOMATIS) 🔥 */
 /* ======================================================= */
 
 .scroll-container {
@@ -12,19 +10,12 @@
   mask-image: linear-gradient(to right, #000 85%, transparent 100%);
 }
 
+/* Langsung tembak animasinya ke sini, tanpa perlu class :hover lagi */
 .scroll-text {
-  display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis; /* Defaultnya tetep pake titik-titik (...) pas lagi diem */
-}
-
-/* Pas elemen pembungkus (class "group") disorot mouse atau dipencet di HP */
-.group:hover .scroll-container .scroll-text,
-.group:active .scroll-container .scroll-text {
-  overflow: visible;
   display: inline-block;
-  animation: text-pingpong 4s ease-in-out infinite alternate;
+  white-space: nowrap;
+  /* Animasi jalan terus 24 jam nonstop */
+  animation: text-pingpong 6s ease-in-out infinite alternate;
 }
 
 /* Logika pergerakan teksnya */
@@ -33,7 +24,7 @@
     transform: translateX(0); 
   }
   85%, 100% { 
-    /* Geser teks ke kiri, atur angkanya kalo teksnya masih kurang kelihatan (misal -50%) */
+    /* Geser teks ke kiri */
     transform: translateX(-40%); 
   } 
 }
