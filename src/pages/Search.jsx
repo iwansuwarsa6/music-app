@@ -10,7 +10,8 @@ const isNonMusic = (title) => {
   const badWords = [
       'podcast', 'vlog', 'tutorial', 'review', 'unboxing', 'reaction',
       'trailer', 'movie', 'episode', 'berita', 'gameplay', 'how to', 'cara ',
-      'ceramah', 'pengajian', 'talkshow', 'interview', 'parody', 'parodi'
+      'ceramah', 'pengajian', 'talkshow', 'interview', 'parody', 'parodi',
+      '8d', '8 d' // 🔥 Blokir otomatis yang 8D di sini!
   ];
   return badWords.some(w => t.includes(w));
 };
@@ -54,19 +55,32 @@ export default function Search() {
     
     setIsLoading(true);
     try {
+      // 🔥 JURUS RAHASIA: Paksa Youtube ngasih "official audio" dari aslinya 🔥
       const queryPintar = encodeURIComponent(kataKunci.trim() + " official audio");
       const response = await fetch(`https://api.siputzx.my.id/api/s/youtube?query=${queryPintar}`);
       const resData = await response.json();
       
       if (resData.status && resData.data) {
         let formattedResults = resData.data
-          .filter(item => item.type === 'video' && !isNonMusic(item.title)) // 🔥 FILTER SAMPAH PODCAST/VLOG
+          .filter(item => item.type === 'video' && !isNonMusic(item.title)) // 🔥 FILTER SAMPAH KETAT
           .map(track => {
             const validId = track.id || track.videoId || (track.url ? track.url.split('v=')[1] : null);
+            
+            // 🔥 CUKUR HABIS EMBEL-EMBEL ALAY DARI JUDUL LAGU 🔥
+            let cleanT = track.title;
+            cleanT = cleanT.replace(/\([^)]*\)/g, ''); // Hapus semua (dalam kurung)
+            cleanT = cleanT.replace(/\[[^\]]*\]/g, ''); // Hapus semua [dalam kurung siku]
+            cleanT = cleanT.replace(/(official|music video|lyric|lyrics|audio|hq|hd|live|performance|remix)/gi, ''); 
+            cleanT = cleanT.replace(/- -/g, '-').replace(/\s+/g, ' ').trim(); // Rapikan spasi
+            
+            // 🔥 CUKUR NAMA ARTIS DARI "VEVO" DLL 🔥
+            let cleanA = track.author?.name || 'YouTube';
+            cleanA = cleanA.replace(/vevo|official|topic|music|channel|records/gi, '').trim();
+
             return {
               id: validId,
-              title: track.title,
-              artist: track.author?.name || 'YouTube',
+              title: cleanT,
+              artist: cleanA,
               image: track.thumbnail
             };
           })
@@ -78,17 +92,14 @@ export default function Search() {
           const hitungSkor = (judul) => {
             let skor = 0;
             if (judul.includes('audio')) skor += 3;
-            if (judul.includes('lyric') || judul.includes('lirik')) skor += 2;
-            if (judul.includes('official video') || judul.includes('music video') || judul.includes('mv')) skor -= 1;
-            if (judul.includes('live') || judul.includes('performance')) skor -= 2;
-            // 🔥 PENALTI BERAT BUAT KOMPILASI/ALBUM BIAR TURUN KE BAWAH 🔥
+            if (judul.includes('lyric') || judul.includes('lirik')) skor -= 1; // Kurangi poin buat video lirik
             if (isBadMix(judul)) skor -= 5; 
             return skor;
           };
           return hitungSkor(judulB) - hitungSkor(judulA);
         });
 
-        // 🔥 TAMBAHAN DIKIT: Bersihin hasil pencarian biar nggak nampilin judul kembar dempetan 🔥
+        // Bersihin hasil pencarian biar nggak nampilin judul kembar
         let cleanUnique = [];
         let usedTitles = new Set();
         formattedResults.forEach(item => {
@@ -116,7 +127,7 @@ export default function Search() {
     }
   };
 
-  // 🔥 EFEK NGETIK LIVE SUGGESTION 🔥
+  // 🔥 EFEK NGETIK LIVE SUGGESTION (SUDAH DIKASIH CUKURAN ALAY JUGA) 🔥
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (query.trim().length > 2) {
@@ -127,16 +138,24 @@ export default function Search() {
           const resData = await response.json();
           if (resData.status && resData.data) {
             let formattedResults = resData.data
-              .filter(item => item.type === 'video' && !isBadMix(item.title)) // 🔥 FILTER SUPER KETAT BUAT SUGGESTION
+              .filter(item => item.type === 'video' && !isBadMix(item.title) && !isNonMusic(item.title)) // 🔥 FILTER SUPER KETAT BUAT SUGGESTION
               .map(track => {
                 const validId = track.id || track.videoId || (track.url ? track.url.split('v=')[1] : null);
-                return { id: validId, title: track.title, artist: track.author?.name || 'YouTube', image: track.thumbnail };
+                
+                let cleanT = track.title;
+                cleanT = cleanT.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, ''); 
+                cleanT = cleanT.replace(/(official|music video|lyric|lyrics|audio|hq|hd|live|performance|remix)/gi, '').trim(); 
+                
+                let cleanA = track.author?.name || 'YouTube';
+                cleanA = cleanA.replace(/vevo|official|topic|music|channel|records/gi, '').trim();
+
+                return { id: validId, title: cleanT, artist: cleanA, image: track.thumbnail };
               }).filter(track => track.id != null);
 
             const qLower = query.trim().toLowerCase();
             const uniqueTexts = new Set();
             formattedResults.forEach(track => {
-              let cleanT = track.title.toLowerCase().replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').replace(/(official|music video|lyrics?|audio|hd|hq)/gi, '').replace(/[^a-z0-9\s-]/gi, '').trim();
+              let cleanT = track.title.toLowerCase().replace(/[^a-z0-9\s-]/gi, '').trim();
               let cleanA = track.artist.toLowerCase();
               if (cleanT.length > 2) uniqueTexts.add(cleanT);
               if (cleanT && cleanA) uniqueTexts.add(`${cleanT} ${cleanA}`);
@@ -190,18 +209,16 @@ export default function Search() {
   const handlePlayClick = (song, index, fromSuggestion = false) => {
     if (currentSong?.id === song.id) {
       togglePlay();
-      window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // Buka layar pas di-pause/play
+      window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); 
       return;
     }
     
-    // GAK PEDULI DARI SUGGESTION ATAU HASIL PENCARIAN,
-    // SELALU KIRIM 1 LAGU SAJA BIAR ALGORITMA APP.JSX YANG KERJA!
     playSong({
       ...song,
       url: `${API_BASE}/api/audio?id=${song.id}` 
     }, [song], 0); 
     
-    window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // Langsung pop up layarnya
+    window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); 
   };
 
   return (
