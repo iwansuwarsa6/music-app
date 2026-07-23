@@ -99,7 +99,7 @@ export default function Home() {
 
         let cleanTracks = [];
         let usedIds = new Set();
-        let usedTitles = new Set(); // 🔥 RADAR ANTI-KEMBAR 🔥
+        let usedTitles = new Set(); 
 
         allRawTracks.forEach(t => {
             if (t.type !== 'video') return;
@@ -118,11 +118,10 @@ export default function Home() {
             if (cleanTitle.includes('-')) cleanTitle = cleanTitle.split('-')[1];
             cleanTitle = cleanTitle.trim();
 
-            // Saringan Judul Kembar
             let titleCheck = cleanTitle.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
             if (titleCheck.length > 3) {
                 let isDup = Array.from(usedTitles).some(seen => seen.includes(titleCheck) || titleCheck.includes(seen));
-                if (isDup) return; // Buang kalau judulnya mirip!
+                if (isDup) return; 
                 usedTitles.add(titleCheck);
             }
 
@@ -220,7 +219,7 @@ export default function Home() {
         }), '*');
       }
       togglePlay();
-      window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 Buka pas dipause/play
+      window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); 
       return;
     }
     
@@ -248,7 +247,6 @@ export default function Home() {
     let baseTitleCheck = song.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
     let seenTitles = new Set([baseTitleCheck]);
 
-    // 🔥 Filter biar judul lagu nggak kembar di antrean 🔥
     relatedTracks.forEach(t => {
         let tTitle = t.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
         let isDup = false;
@@ -276,14 +274,14 @@ export default function Home() {
       url: `https://music-app-production-278c.up.railway.app/api/audio?id=${song.id}` 
     }, newQueue, 0);
 
-    window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 Otomatis Buka Player!
+    window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); 
   };
 
   const handlePlayAll = (e, sectionTracks) => {
     e.stopPropagation();
     if (sectionTracks && sectionTracks.length > 0) {
       handlePlay(sectionTracks[0], sectionTracks, 0);
-      window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); // 🔥 Otomatis Buka Player!
+      window.dispatchEvent(new CustomEvent('openFullScreenPlayer')); 
     }
   };
 
@@ -417,10 +415,10 @@ export default function Home() {
                       {/* 🔥 JURUS TEKS BERJALAN GRID 🔥 */}
                       <div className="flex-1 min-w-0 overflow-hidden">
                         <div className="scroll-container mb-0.5">
-                          <div className={`text-sm font-bold scroll-text group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
+                          <div className={`text-sm font-bold ${song.title?.length > 18 ? 'scroll-active' : 'scroll-text'} group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
                         </div>
                         <div className="scroll-container">
-                          <div className="text-xs text-zinc-400 scroll-text">{song.artist}</div>
+                          <div className={`text-xs text-zinc-400 ${song.artist?.length > 20 ? 'scroll-active' : 'scroll-text'}`}>{song.artist}</div>
                         </div>
                       </div>
 
@@ -450,7 +448,7 @@ export default function Home() {
                       {/* 🔥 JURUS TEKS BERJALAN CIRCLE 🔥 */}
                       <div className="w-full text-center overflow-hidden">
                         <div className="scroll-container w-full">
-                          <div className={`text-sm font-medium scroll-text w-full group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.artist}</div>
+                          <div className={`text-sm font-medium ${song.artist?.length > 13 ? 'scroll-active' : 'scroll-text'} w-full group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.artist}</div>
                         </div>
                         <div className="text-[11px] text-zinc-500 mt-0.5">Artis</div>
                       </div>
@@ -482,10 +480,10 @@ export default function Home() {
                       
                       {/* 🔥 JURUS TEKS BERJALAN SQUARE 🔥 */}
                       <div className="scroll-container mb-1 pr-6">
-                        <div className={`text-sm font-bold scroll-text group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
+                        <div className={`text-sm font-bold ${song.title?.length > 15 ? 'scroll-active' : 'scroll-text'} group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
                       </div>
                       <div className="scroll-container pr-6">
-                        <div className="text-xs text-zinc-400 scroll-text leading-tight">{song.artist}</div>
+                        <div className={`text-xs text-zinc-400 ${song.artist?.length > 18 ? 'scroll-active' : 'scroll-text'} leading-tight`}>{song.artist}</div>
                       </div>
                       
                       <button onClick={(e) => handleOpenMenu(e, song)} className="absolute bottom-2 right-0 text-zinc-500 hover:text-white opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1">
@@ -531,10 +529,10 @@ export default function Home() {
                     {/* 🔥 JURUS TEKS BERJALAN HISTORY 🔥 */}
                     <div className="flex-1 min-w-0 overflow-hidden">
                       <div className="scroll-container mb-0.5">
-                        <div className={`text-sm font-bold scroll-text group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
+                        <div className={`text-sm font-bold ${song.title?.length > 18 ? 'scroll-active' : 'scroll-text'} group-hover:underline ${currentSong?.id === song.id ? 'text-[#3ea6ff]' : 'text-white'}`}>{song.title}</div>
                       </div>
                       <div className="scroll-container">
-                        <div className="text-xs text-zinc-400 scroll-text">{song.artist}</div>
+                        <div className={`text-xs text-zinc-400 ${song.artist?.length > 20 ? 'scroll-active' : 'scroll-text'}`}>{song.artist}</div>
                       </div>
                     </div>
 

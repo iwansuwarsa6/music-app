@@ -1,31 +1,32 @@
 @import "tailwindcss";
 
 /* ======================================================= */
-/* 🔥 JURUS TEKS JALAN (MARQUEE PING-PONG OTOMATIS) 🔥 */
+/* 🔥 JURUS TEKS JALAN PINTAR (MARQUEE OTOMATIS) 🔥 */
 /* ======================================================= */
 
 .scroll-container {
   overflow: hidden;
   width: 100%;
-  /* Bikin ujung kanan agak pudar/transparan dikit pas teksnya jalan */
   -webkit-mask-image: linear-gradient(to right, #000 85%, transparent 100%);
   mask-image: linear-gradient(to right, #000 85%, transparent 100%);
 }
 
+/* Mode 1: Buat teks pendek (Diam & pakai titik-titik) */
 .scroll-text {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis; 
+}
+
+/* Mode 2: Buat teks panjang (Jalan otomatis) */
+.scroll-active {
   display: inline-block;
   white-space: nowrap;
-  /* Animasi jalan terus 24 jam nonstop */
   animation: text-pingpong 6s ease-in-out infinite alternate;
 }
 
-/* Logika pergerakan teksnya */
 @keyframes text-pingpong {
-  0%, 15% { 
-    transform: translateX(0); 
-  }
-  85%, 100% { 
-    /* Geser teks ke kiri */
-    transform: translateX(-40%); 
-  } 
+  0%, 15% { transform: translateX(0); }
+  85%, 100% { transform: translateX(-40%); } 
 }
