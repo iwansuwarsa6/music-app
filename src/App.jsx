@@ -704,10 +704,9 @@ export default function App() {
     }
   }, [currentSong?.id, currentIndex, queue.length]);
 
-  // 🔥 JURUS AUTO-SAPU: BERSIHKAN TEKS JIKA PINDAH HALAMAN (KECUALI SEARCH) 🔥
   useEffect(() => {
     if (location.pathname !== '/search') {
-      setSearchQuery(''); // Langsung hapus teks kalau bukan di Search
+      setSearchQuery(''); 
       setShowSearchHistory(false);
     } else {
       const params = new URLSearchParams(location.search);
@@ -716,7 +715,6 @@ export default function App() {
     }
   }, [location.pathname, location.search]);
 
-  // 🔥 JURUS SENSOR PINTAR: MEMBERSIHKAN JUDUL ALAY DARI HASIL PENCARIAN 🔥
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
       if (searchQuery.trim().length > 2) {
@@ -744,14 +742,12 @@ export default function App() {
               .map(track => {
                 const validId = track.id || track.videoId || (track.url ? track.url.split('v=')[1] : null);
                 
-                // 🔥 PROSES CUKUR TEKS ALAY (Lyrics, HD, MV, dll) 🔥
                 let cleanT = track.title;
-                cleanT = cleanT.replace(/\([^)]*\)/g, ''); // Hapus semua teks dalam kurung biasa ()
-                cleanT = cleanT.replace(/\[[^\]]*\]/g, ''); // Hapus semua teks dalam kurung siku []
+                cleanT = cleanT.replace(/\([^)]*\)/g, ''); 
+                cleanT = cleanT.replace(/\[[^\]]*\]/g, ''); 
                 cleanT = cleanT.replace(/(official|music video|lyric|lyrics|audio|hq|hd|live|performance|remix)/gi, ''); 
-                cleanT = cleanT.replace(/- -/g, '-').replace(/\s+/g, ' ').trim(); // Rapikan spasi dobel
+                cleanT = cleanT.replace(/- -/g, '-').replace(/\s+/g, ' ').trim(); 
                 
-                // Bersihin nama artis juga dari embel-embel "VEVO" atau "Official"
                 let cleanA = track.author?.name || 'YouTube';
                 cleanA = cleanA.replace(/vevo|official|topic|music|channel|records/gi, '').trim();
 
@@ -1532,10 +1528,34 @@ export default function App() {
             <button onClick={toggleLike} className={`transition-colors ${isLiked ? 'text-[#3ea6ff]' : 'text-zinc-400 hover:text-white'}`}>
               <Heart fill={isLiked ? "currentColor" : "none"} size={20} strokeWidth={isLiked ? 0 : 2} />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); setIsShuffle(!isShuffle); }} className={`transition-colors ${isShuffle ? 'text-[#3ea6ff]' : 'text-zinc-400 hover:text-white'}`}>
+            
+            {/* 🔥 TOMBOL SHUFFLE DENGAN TOAST 🔥 */}
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                const nextVal = !isShuffle;
+                setIsShuffle(nextVal); 
+                showToast(nextVal ? "Pemutaran acak diaktifkan" : "Pemutaran acak dimatikan");
+              }} 
+              className={`transition-colors ${isShuffle ? 'text-[#3ea6ff]' : 'text-zinc-400 hover:text-white'}`}
+            >
               <Shuffle size={18} />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); toggleRepeat(); }} className={`transition-colors ${repeatMode !== 'off' ? 'text-[#3ea6ff]' : 'text-zinc-400 hover:text-white'}`}>
+
+            {/* 🔥 TOMBOL REPEAT DENGAN TOAST 3 MODE 🔥 */}
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                toggleRepeat(); 
+                setTimeout(() => {
+                  const m = usePlayerStore.getState().repeatMode;
+                  if (m === 'all') showToast("Mengulang semua lagu");
+                  else if (m === 'one') showToast("Mengulang lagu ini");
+                  else showToast("Pengulangan dimatikan");
+                }, 50);
+              }} 
+              className={`transition-colors ${repeatMode !== 'off' ? 'text-[#3ea6ff]' : 'text-zinc-400 hover:text-white'}`}
+            >
               {repeatMode === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
             </button>
           </div>
@@ -1655,7 +1675,7 @@ export default function App() {
               </div>
 
               <div className="flex items-center justify-between px-2 md:px-12 mt-2">
-                <button onClick={() => setIsShuffle(!isShuffle)} className={`transition-all duration-300 p-2 md:p-3 rounded-full ${isShuffle ? 'bg-[#3ea6ff]/20 text-[#3ea6ff]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}>
+                <button onClick={(e) => { e.stopPropagation(); const nextVal = !isShuffle; setIsShuffle(nextVal); showToast(nextVal ? "Pemutaran acak diaktifkan" : "Pemutaran acak dimatikan"); }} className={`transition-all duration-300 p-2 md:p-3 rounded-full ${isShuffle ? 'bg-[#3ea6ff]/20 text-[#3ea6ff]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}>
                   <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
                 <button onClick={handlePrevLocal} className="text-white hover:text-zinc-300 hover:bg-white/10 rounded-full transition-all p-2 md:p-3">
@@ -1669,7 +1689,7 @@ export default function App() {
                 <button onClick={handleNextLocal} className="text-white hover:text-zinc-300 hover:bg-white/10 rounded-full transition-all p-2 md:p-3">
                   <SkipForward fill="currentColor" className="w-7 h-7 md:w-8 md:h-8" />
                 </button>
-                <button onClick={toggleRepeat} className={`transition-all duration-300 p-2 md:p-3 rounded-full ${repeatMode !== 'off' ? 'bg-[#3ea6ff]/20 text-[#3ea6ff]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}>
+                <button onClick={(e) => { e.stopPropagation(); toggleRepeat(); setTimeout(() => { const m = usePlayerStore.getState().repeatMode; if (m === 'all') showToast("Mengulang semua lagu"); else if (m === 'one') showToast("Mengulang lagu ini"); else showToast("Pengulangan dimatikan"); }, 50); }} className={`transition-all duration-300 p-2 md:p-3 rounded-full ${repeatMode !== 'off' ? 'bg-[#3ea6ff]/20 text-[#3ea6ff]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}>
                   {repeatMode === 'one' ? <Repeat1 className="w-5 h-5 md:w-6 md:h-6" /> : <Repeat className="w-5 h-5 md:w-6 md:h-6" />}
                 </button>
               </div>
