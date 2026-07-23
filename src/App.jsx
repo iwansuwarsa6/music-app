@@ -201,7 +201,8 @@ export default function App() {
           }
       }
       
-      showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 3 menit.`);
+      // 🔥 TOAST DIKEMBALIKAN KE 5 MENIT 🔥
+      showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 5 menit.`);
 
       if (workerRef.current) {
           workerRef.current.postMessage({ cmd: isTest ? 'start_test_adzan' : 'start_adzan' });
@@ -289,7 +290,8 @@ export default function App() {
           clearInterval(timer);
           adzanEndTime = 0;
         } else if (e.data.cmd === 'start_adzan') {
-          adzanEndTime = new Date().getTime() + 180000;
+          // 🔥 DURASI WORKER DIKEMBALIKAN KE 5 MENIT (300.000 MS) 🔥
+          adzanEndTime = new Date().getTime() + 300000;
         } else if (e.data.cmd === 'start_test_adzan') {
           adzanEndTime = new Date().getTime() + 10000;
         } else if (e.data.cmd === 'stop_adzan') {
@@ -1193,7 +1195,7 @@ export default function App() {
         onWaiting={handleWaiting} onPlaying={handlePlaying} className="hidden"
       />
 
-      {/* 🔥 OVERLAY POP UP ADZAN PAUSE 3 MENIT 🔥 */}
+      {/* 🔥 OVERLAY POP UP ADZAN PAUSE 5 MENIT 🔥 */}
       {activePrayerName && (
         <div 
           className="fixed inset-0 bg-black/95 backdrop-blur-xl z-[999999] flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300"
@@ -1203,7 +1205,7 @@ export default function App() {
           </div>
           <h2 className="text-3xl font-black text-white mb-4">Waktu Adzan {activePrayerName} Tiba</h2>
           <p className="text-zinc-400 text-base md:text-lg mb-8 max-w-sm leading-relaxed">
-            Musik dijeda otomatis selama 3 menit untuk menghormati waktu adzan.
+            Musik dijeda otomatis selama 5 menit untuk menghormati waktu adzan.
           </p>
           
           <button 
@@ -1529,7 +1531,6 @@ export default function App() {
               <Heart fill={isLiked ? "currentColor" : "none"} size={20} strokeWidth={isLiked ? 0 : 2} />
             </button>
             
-            {/* 🔥 TOMBOL SHUFFLE DENGAN TOAST 🔥 */}
             <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
@@ -1542,7 +1543,6 @@ export default function App() {
               <Shuffle size={18} />
             </button>
 
-            {/* 🔥 TOMBOL REPEAT DENGAN TOAST 3 MODE 🔥 */}
             <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
@@ -1675,7 +1675,15 @@ export default function App() {
               </div>
 
               <div className="flex items-center justify-between px-2 md:px-12 mt-2">
-                <button onClick={(e) => { e.stopPropagation(); const nextVal = !isShuffle; setIsShuffle(nextVal); showToast(nextVal ? "Pemutaran acak diaktifkan" : "Pemutaran acak dimatikan"); }} className={`transition-all duration-300 p-2 md:p-3 rounded-full ${isShuffle ? 'bg-[#3ea6ff]/20 text-[#3ea6ff]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}>
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    const nextVal = !isShuffle;
+                    setIsShuffle(nextVal); 
+                    showToast(nextVal ? "Pemutaran acak diaktifkan" : "Pemutaran acak dimatikan");
+                  }} 
+                  className={`transition-all duration-300 p-2 md:p-3 rounded-full ${isShuffle ? 'bg-[#3ea6ff]/20 text-[#3ea6ff]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}
+                >
                   <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
                 <button onClick={handlePrevLocal} className="text-white hover:text-zinc-300 hover:bg-white/10 rounded-full transition-all p-2 md:p-3">
@@ -1689,7 +1697,19 @@ export default function App() {
                 <button onClick={handleNextLocal} className="text-white hover:text-zinc-300 hover:bg-white/10 rounded-full transition-all p-2 md:p-3">
                   <SkipForward fill="currentColor" className="w-7 h-7 md:w-8 md:h-8" />
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); toggleRepeat(); setTimeout(() => { const m = usePlayerStore.getState().repeatMode; if (m === 'all') showToast("Mengulang semua lagu"); else if (m === 'one') showToast("Mengulang lagu ini"); else showToast("Pengulangan dimatikan"); }, 50); }} className={`transition-all duration-300 p-2 md:p-3 rounded-full ${repeatMode !== 'off' ? 'bg-[#3ea6ff]/20 text-[#3ea6ff]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}>
+                <button 
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    toggleRepeat(); 
+                    setTimeout(() => {
+                      const m = usePlayerStore.getState().repeatMode;
+                      if (m === 'all') showToast("Mengulang semua lagu");
+                      else if (m === 'one') showToast("Mengulang lagu ini");
+                      else showToast("Pengulangan dimatikan");
+                    }, 50);
+                  }} 
+                  className={`transition-all duration-300 p-2 md:p-3 rounded-full ${repeatMode !== 'off' ? 'bg-[#3ea6ff]/20 text-[#3ea6ff]' : 'text-zinc-400 hover:bg-white/10 hover:text-white'}`}
+                >
                   {repeatMode === 'one' ? <Repeat1 className="w-5 h-5 md:w-6 md:h-6" /> : <Repeat className="w-5 h-5 md:w-6 md:h-6" />}
                 </button>
               </div>
