@@ -51,7 +51,8 @@ const isBadMix = (title) => {
   return badMixWords.some(w => t.includes(w));
 };
 
-export default function App() {
+// 🔥 UBAH NAMA DARI "export default function App" JADI "function MainApp" 🔥
+function MainApp() {
   const { currentSong, isPlaying, togglePlay, playNext, playPrev, playSong, queue, currentIndex } = usePlayerStore();
   const location = useLocation();
   const navigate = useNavigate();
@@ -1578,7 +1579,6 @@ export default function App() {
               <Heart fill={isLiked ? "currentColor" : "none"} size={20} strokeWidth={isLiked ? 0 : 2} />
             </button>
             
-            {/* 🔥 TOMBOL SHUFFLE DENGAN TOAST 🔥 */}
             <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
@@ -1591,7 +1591,6 @@ export default function App() {
               <Shuffle size={18} />
             </button>
 
-            {/* 🔥 TOMBOL REPEAT DENGAN TOAST 3 MODE 🔥 */}
             <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
@@ -1724,7 +1723,6 @@ export default function App() {
               </div>
 
               <div className="flex items-center justify-between px-2 md:px-12 mt-2">
-                {/* 🔥 TOMBOL SHUFFLE MOBILE DENGAN TOAST 🔥 */}
                 <button 
                   onClick={(e) => { 
                     e.stopPropagation(); 
@@ -1749,7 +1747,6 @@ export default function App() {
                   <SkipForward fill="currentColor" className="w-7 h-7 md:w-8 md:h-8" />
                 </button>
 
-                {/* 🔥 TOMBOL REPEAT MOBILE DENGAN TOAST 🔥 */}
                 <button 
                   onClick={(e) => { 
                     e.stopPropagation(); 
@@ -2003,6 +2000,83 @@ export default function App() {
         .eq-2 { animation: eq 0.9s ease-in-out infinite 0.3s; }
         .eq-3 { animation: eq 0.9s ease-in-out infinite 0.6s; }
       `}</style>
+    </div>
+  );
+}
+
+// 🔥 PINTU GERBANG VIP (LOGIN SCREEN) 🔥
+export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => localStorage.getItem('rnc_vip_access') === 'true');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(false);
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    
+    // 🔥 TRIK 1: KODE HARIAN OTOMATIS GANTI TIAP JAM 12 MALAM 🔥
+    // Rumus: "rnc" + Tanggal + Bulan. 
+    // Contoh: Kalau hari ini tanggal 24 Juli, kodenya otomatis jadi "rnc247"
+    const date = new Date();
+    const dailyCode = `rnc${date.getDate()}${date.getMonth() + 1}`;
+
+    // 🔥 TRIK 2: DAFTAR KODE VOUCHER MANUAL (Bisa lu atur semaunya) 🔥
+    const validCodes = [
+      dailyCode,         // Panggil kode harian di atas
+      'budi15k',         // Kode khusus Budi
+      'aseplunas',       // Kode khusus Asep
+      'tamuVVIP2024'     // Kode khusus bebas
+    ];
+
+    // Cek apakah input dari user cocok sama salah satu kode di atas
+    if (validCodes.includes(password.toLowerCase().trim())) {
+      localStorage.setItem('rnc_vip_access', 'true');
+      setIsAuthenticated(true);
+    } else {
+      setError(true);
+      setTimeout(() => setError(false), 3000);
+    }
+  };
+
+  if (isAuthenticated) {
+    return <MainApp />;
+  }
+
+  return (
+    <div className="h-screen bg-gradient-to-br from-[#13151f] via-[#0f0f0f] to-[#000000] flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
+      
+      <div className="bg-[#181818]/80 backdrop-blur-xl p-8 md:p-10 rounded-3xl shadow-2xl border border-white/10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500 text-center">
+        <div className="w-20 h-20 mx-auto bg-black rounded-full mb-6 p-1 border-2 border-[#3ea6ff] shadow-[0_0_20px_rgba(62,166,255,0.4)]">
+          <img src="/rnctech.jpg" alt="Logo" className="w-full h-full rounded-full object-cover" />
+        </div>
+        
+        <h1 className="text-3xl font-black text-white mb-2 tracking-tight">RnCmusic <span className="text-[#3ea6ff]">VIP</span></h1>
+        <p className="text-zinc-400 text-sm mb-8">Masukkan kode akses premium untuk mulai mendengarkan musik tanpa batas & tanpa iklan.</p>
+
+        <form onSubmit={handleLogin} className="flex flex-col gap-4">
+          <div className="relative">
+            <input 
+              type="password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Masukkan Kode Akses..." 
+              className={`w-full bg-black/50 border ${error ? 'border-red-500' : 'border-white/20 focus:border-[#3ea6ff]'} rounded-xl px-5 py-4 text-white placeholder:text-zinc-600 outline-none transition-all text-center tracking-widest font-bold`}
+            />
+            {error && <p className="text-red-500 text-xs font-bold mt-2 absolute -bottom-5 left-0 right-0 animate-bounce">❌ Kode Akses Salah / Kedaluwarsa!</p>}
+          </div>
+          
+          <button 
+            type="submit" 
+            className="w-full mt-4 bg-[#3ea6ff] hover:bg-[#2c8cdb] text-black font-black py-4 rounded-xl transition-all hover:scale-[1.02] shadow-[0_0_15px_rgba(62,166,255,0.3)] uppercase tracking-wider"
+          >
+            Buka Akses
+          </button>
+        </form>
+
+        <p className="mt-8 text-[10px] text-zinc-600 uppercase font-bold tracking-widest">
+          Build for personal use • No Ads
+        </p>
+      </div>
     </div>
   );
 }
