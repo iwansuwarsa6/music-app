@@ -1,0 +1,17 @@
+{
+  "name": "RnCmusic Premium",
+  "short_name": "RnCmusic",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f0f",
+  "theme_color": "#3ea6ff",
+  "description": "Platform streaming musik tanpa batas",
+  "icons": [
+    {
+      "src": "/rnctech.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
