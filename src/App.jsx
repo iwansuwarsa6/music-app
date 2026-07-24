@@ -1734,7 +1734,6 @@ function MainApp() {
                 >
                   <Shuffle className="w-5 h-5 md:w-6 md:h-6" />
                 </button>
-
                 <button onClick={handlePrevLocal} className="text-white hover:text-zinc-300 hover:bg-white/10 rounded-full transition-all p-2 md:p-3">
                   <SkipBack fill="currentColor" className="w-7 h-7 md:w-8 md:h-8" />
                 </button>
@@ -1746,7 +1745,6 @@ function MainApp() {
                 <button onClick={handleNextLocal} className="text-white hover:text-zinc-300 hover:bg-white/10 rounded-full transition-all p-2 md:p-3">
                   <SkipForward fill="currentColor" className="w-7 h-7 md:w-8 md:h-8" />
                 </button>
-
                 <button 
                   onClick={(e) => { 
                     e.stopPropagation(); 
@@ -2042,16 +2040,28 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen bg-gradient-to-br from-[#13151f] via-[#0f0f0f] to-[#000000] flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+    <div className="h-screen bg-gradient-to-br from-[#13151f] via-[#0f0f0f] to-[#000000] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden font-sans">
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
       
-      <div className="bg-[#181818]/80 backdrop-blur-xl p-8 md:p-10 rounded-3xl shadow-2xl border border-white/10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500 text-center">
-        <div className="w-20 h-20 mx-auto bg-black rounded-full mb-6 p-1 border-2 border-[#3ea6ff] shadow-[0_0_20px_rgba(62,166,255,0.4)]">
+      <div className="bg-[#181818]/80 backdrop-blur-xl p-6 md:p-10 rounded-3xl shadow-2xl border border-white/10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500 text-center">
+        <div className="w-20 h-20 mx-auto bg-black rounded-full mb-4 p-1 border-2 border-[#3ea6ff] shadow-[0_0_20px_rgba(62,166,255,0.4)]">
           <img src="/rnctech.jpg" alt="Logo" className="w-full h-full rounded-full object-cover" />
         </div>
         
         <h1 className="text-3xl font-black text-white mb-2 tracking-tight">RnCmusic <span className="text-[#3ea6ff]">VIP</span></h1>
-        <p className="text-zinc-400 text-sm mb-8">Masukkan kode akses premium untuk mulai mendengarkan musik tanpa batas & tanpa iklan.</p>
+        <p className="text-zinc-400 text-sm mb-6">Masukkan kode akses premium untuk mulai mendengarkan musik tanpa batas & tanpa iklan.</p>
+
+        {/* 🔥 KOTAK INFO PEMBAYARAN DANA & IG 🔥 */}
+        <div className="bg-[#3ea6ff]/10 border border-[#3ea6ff]/20 rounded-xl p-4 mb-6 text-left shadow-inner">
+          <p className="font-bold text-white text-sm mb-2 flex items-center gap-2">
+            <span className="bg-[#3ea6ff] text-black text-[10px] px-2 py-0.5 rounded-sm uppercase tracking-widest">Info</span>
+            Belum punya kode akses?
+          </p>
+          <ul className="text-xs md:text-sm text-zinc-300 space-y-2 list-disc pl-4 marker:text-[#3ea6ff]">
+            <li>Transfer <b className="text-[#3ea6ff]">Rp 15.000</b> via DANA ke nomor: <br/><span className="text-white tracking-widest font-mono text-base bg-black/50 px-2 py-1 rounded inline-block mt-1">085716827409</span></li>
+            <li>Kirim bukti transfer via DM ke Instagram <a href="https://instagram.com/rizal8813" target="_blank" rel="noreferrer" className="text-[#3ea6ff] font-bold hover:underline">@rizal8813</a> untuk mendapatkan kode hari ini.</li>
+          </ul>
+        </div>
 
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div className="relative">
