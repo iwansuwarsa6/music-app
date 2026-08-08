@@ -612,6 +612,13 @@ function MainApp() {
           usePlayerStore.setState({ queue: newQ });
           showToast("Lagu akan diputar selanjutnya");
       }
+      
+      // 🔥 FIX BUG: MATIKAN REPEAT 1X BIAR LAGU SELANJUTNYA BISA JALAN 🔥
+      if (st.repeatMode === 'one') {
+          usePlayerStore.setState({ repeatMode: 'all' });
+          showToast("Mode putar ulang 1x dimatikan");
+      }
+      
       setContextMenu(p => ({...p, isOpen: false}));
   };
 
@@ -619,6 +626,12 @@ function MainApp() {
       const st = usePlayerStore.getState();
       usePlayerStore.setState({ queue: [...st.queue, contextMenu.song] });
       showToast("Ditambahkan ke antrean");
+      
+      // 🔥 FIX BUG: MATIKAN REPEAT 1X BIAR LAGU SELANJUTNYA BISA JALAN 🔥
+      if (st.repeatMode === 'one') {
+          usePlayerStore.setState({ repeatMode: 'all' });
+      }
+
       setContextMenu(p => ({...p, isOpen: false}));
   };
 
@@ -677,7 +690,7 @@ function MainApp() {
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
 
-    // 1. EKSTRAK ARTIS ASLI DARI JUDUL (Jurus Anti Uploader Nyasar)
+    // 1. EKSTRAK ARTIS ASLI DARI JUDUL BIAR GAK NYASAR KE NAMA UPLOADER COVER
     let realTitle = baseSong.title || "";
     let realArtist = baseSong.artist || "Official";
 
@@ -688,11 +701,11 @@ function MainApp() {
     }
 
     let cleanTitle = realTitle.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').replace(/(official|lyric|lyrics|audio|video|music|cover|remix)/gi, '').trim();
-    let cleanArtist = realArtist.split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/vevo|official|topic|music|channel|records/gi, '').trim();
+    let cleanArtist = realArtist.split(/feat\.|ft\.| x |,|\||-|•/i)[0].replace(/(official|vevo|channel|music|records)/gi, '').trim();
     
     if (!cleanArtist || cleanArtist.toLowerCase() === 'youtube') cleanArtist = "Pop Hits";
 
-    const cacheKey = `algomix_personal_v2_${cleanTitle}_${cleanArtist}`;
+    const cacheKey = `algomix_smart_v3_${cleanTitle}_${cleanArtist}`;
     const cachedMix = sessionStorage.getItem(cacheKey);
     
     if (cachedMix) {
@@ -706,32 +719,24 @@ function MainApp() {
         return;
     }
 
-    // 2. BACA HISTORY BIAR SESUAI SELERA USER
-    const history = JSON.parse(localStorage.getItem('ytm_play_history') || '[]');
-    const liked = JSON.parse(localStorage.getItem('ytm_liked_songs') || '[]');
-    const personalPool = [...history, ...liked];
-
-    let personalArtists = [...new Set(personalPool.map(s => {
-        let sArtist = s.artist || '';
-        if (s.title && s.title.includes('-')) {
-            sArtist = s.title.split('-')[0];
-        }
-        return sArtist.split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
-    }))].filter(a => a && a.toLowerCase() !== cleanArtist.toLowerCase() && a.toLowerCase() !== 'youtube');
-
-    personalArtists = personalArtists.sort(() => 0.5 - Math.random());
+    const indoPopArr = ["Mahalini", "Bernadya", "Hindia", "Tiara Andini", "Sal Priadi", "Kunto Aji", "Nadin Amizah", "Pamungkas", "Yura Yunita", "Maliq & D'Essentials", "Juicy Luicy", "Rizky Febian", "Tulus", "Lyodra", "Ziva Magnolya", "Nadhif Basalamah", "Anggi Marito", "Budi Doremi", "Ghea Indrawari", "Virgoun", "Sheila On 7", "D'Masiv", "Noah"];
+    const baratPopArr = ["Taylor Swift", "The Weeknd", "Bruno Mars", "Ariana Grande", "Justin Bieber", "Post Malone", "Dua Lipa", "Coldplay", "Ed Sheeran", "Sabrina Carpenter", "Billie Eilish", "Shawn Mendes", "Olivia Rodrigo", "Clairo", "Conan Gray", "Charlie Puth", "Benson Boone"];
 
     let queryPool = [
-        `"${cleanArtist}" official music video`, 
-        `${cleanArtist} lagu pop hits terbaru`
+        `"${cleanArtist}" ${cleanTitle} official audio`,
+        `${cleanArtist} lagu pop hits`,
     ]; 
 
-    if (personalArtists.length >= 2) {
-        queryPool.push(`"${personalArtists[0]}" official audio`);
-        queryPool.push(`"${personalArtists[1]}" official music video`);
+    const isBarat = baratPopArr.some(a => cleanArtist.toLowerCase().includes(a.toLowerCase()));
+    
+    if (isBarat) {
+        const randomHits = baratPopArr.sort(() => 0.5 - Math.random()).slice(0, 2);
+        queryPool.push(`"${randomHits[0]}" official music video`);
+        queryPool.push(`"${randomHits[1]}" official audio`);
     } else {
-        queryPool.push(`lagu pop indonesia hits official audio`);
-        queryPool.push(`"${cleanArtist}" live performance`);
+        const randomHits = indoPopArr.sort(() => 0.5 - Math.random()).slice(0, 2);
+        queryPool.push(`"${randomHits[0]}" official music video`);
+        queryPool.push(`"${randomHits[1]}" official audio`);
     }
 
     try {
@@ -748,6 +753,8 @@ function MainApp() {
         let mix = [];
         let usedIds = new Set([baseSong.id]); 
         let usedTitles = new Set([cleanTitle.toLowerCase()]);
+        
+        // 🔥 2. JURUS ANTI MONOPOLI CHANNEL: MAKSIMAL 2 LAGU DARI UPLOADER SAMA 🔥
         let uploaderCount = {}; 
 
         combined.filter(t => t.type === 'video' && !isBadMix(t.title)).forEach(t => {
@@ -768,11 +775,10 @@ function MainApp() {
             let uploaderName = t.author?.name || 'YouTube';
             let uploaderLow = uploaderName.toLowerCase();
             
-            // JURUS ANTI RINGTONE DAN DJ DARI UPLOADER
+            // 3. Buang channel ringtone/dj dari peredaran
             if (uploaderLow.includes('ringtone') || uploaderLow.includes('dj ') || uploaderLow.includes('karaoke')) return;
-            if (tCleanT.toLowerCase().includes('ringtone') || tCleanT.toLowerCase().includes('dj ')) return;
 
-            // BATASI 2 LAGU PER CHANNEL!
+            // Batasi! (Contoh: Kalo ARFATIEZ udah nyumbang 2 lagu, sisanya diblokir!)
             if (uploaderCount[uploaderName] >= 2) return;
             uploaderCount[uploaderName] = (uploaderCount[uploaderName] || 0) + 1;
 
@@ -939,6 +945,12 @@ function MainApp() {
   const handleIframeLoad = () => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
       iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
+      
+      const active = getActiveAudio();
+      if (active) {
+          iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [active.currentTime, true] }), '*');
+      }
+
       if (mediaMode === 'audio') {
           iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
           iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
@@ -961,13 +973,13 @@ function MainApp() {
           const active = getActiveAudio();
           if (mediaMode === 'audio') {
               if (active) active.muted = false;
-              iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
               iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
           } else {
               if (active) active.muted = true;
               if (active) {
                   iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [active.currentTime, true] }), '*');
               }
+              
               iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
               if (isPlaying) {
                   iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
@@ -1273,11 +1285,13 @@ function MainApp() {
       if (e.target !== getActiveAudio()) return;
       if (mediaMode === 'audio') setDuration(e.target.duration);
   };
+  
   const handleCanPlay = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
       if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) e.target.play().catch(()=>{});
   };
+  
   const handleError = (e) => {
       if (e.target !== getActiveAudio()) return;
       if (mediaMode === 'audio' && currentSong?.id && e.target.src) {
@@ -1287,10 +1301,12 @@ function MainApp() {
           setTimeout(() => { handleNextLocal(null); }, 2500);
       }
   };
+  
   const handleWaiting = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(true);
   };
+  
   const handlePlaying = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
@@ -1377,6 +1393,9 @@ function MainApp() {
            onClick={(e) => e.stopPropagation()}
         >
            <button onClick={(e) => { 
+               const st = usePlayerStore.getState();
+               if (st.repeatMode === 'one') usePlayerStore.setState({ repeatMode: 'all' });
+
                handlePlayClick(e, contextMenu.song, [contextMenu.song], 0);
                generateRadioMix(contextMenu.song); 
                showToast("Memulai Radio Mix...");
