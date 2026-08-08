@@ -1,13 +1,46 @@
-import { useState, useEffect } from 'react';
-import { Play, Pause, MoreVertical, Heart, Download, TrendingUp, ArrowLeft, Shuffle, Disc3, Mic2, Users, Import, X, Loader2, ListPlus, Link as LinkIcon, Search, ListMusic, Trash2, LogIn, DownloadCloud, History } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
+import { 
+  Home as HomeIcon, Search as SearchIcon, Library as LibraryIcon, User, 
+  Play, SkipBack, SkipForward, Heart, Pause, 
+  ChevronDown, Cast, MoreVertical, ListPlus, Shuffle, Repeat, Repeat1, Mic2, Music, Film, Target,
+  History, Trash2, X, Loader2, Minus, Plus, Radio, ListVideo, Bookmark, ThumbsUp, Download, DownloadCloud, Disc3, Users, Import, LogIn
+} from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
 // 🔥 KUNCI PINTU MASUK GOOGLE LU 🔥
 const CLIENT_ID = "1062485226707-a0eqjr4d0j0hfinfiio1085d3k71vei6.apps.googleusercontent.com";
 
+// 🔥 FILTER KETAT ANTI RINGTONE, PODCAST & DJ ANEH 🔥
+const isNonMusic = (title) => {
+  if (!title) return false;
+  const t = title.toLowerCase();
+  const badWords = [
+      'podcast', 'vlog', 'tutorial', 'review', 'unboxing', 'reaction',
+      'trailer', 'movie', 'episode', 'berita', 'gameplay', 'how to', 'cara ',
+      'ceramah', 'pengajian', 'talkshow', 'interview', 'parody', 'parodi',
+      'ringtone', 'nada dering', 'sound effect'
+  ];
+  return badWords.some(w => t.includes(w));
+};
+
+const isBadMix = (title) => {
+  if (!title) return false;
+  if (isNonMusic(title)) return true;
+  const t = title.toLowerCase();
+  const badMixWords = [
+      'full album', 'kompilasi', 'compilation', '1 jam', '2 jam', ' hours', ' hour',
+      'karaoke', 'instrumental', 'tanpa vokal', 'live at', 'live in', 
+      'konser', 'short', 'shorts', '8d', '8 d', 'sped up', 'slowed', 'reverb',
+      'kumpulan', 'terbaik', 'pilihan', 'nonstop', 'non stop', '2023', '2024', '2025', '2026', '2027', 
+      'hits tiktok', 'viral', 'dj ', 'remix', 'type beat', 'chords', 'lirik lagu'
+  ];
+  return badMixWords.some(w => t.includes(w));
+};
+
 function LibraryContent() {
-  const { currentSong, isPlaying, playSong, togglePlay } = usePlayerStore();
+  const { currentSong, isPlaying, playSong, togglePlay, queue, currentIndex } = usePlayerStore();
   
   const [activeTab, setActiveTab] = useState('Daftar putar');
   const [selectedPlaylist, setSelectedPlaylist] = useState(null); 
@@ -23,7 +56,6 @@ function LibraryContent() {
   const [importProgress, setImportProgress] = useState("");
   const [toastMsg, setToastMsg] = useState("");
   
-  // 🔥 STATE UNTUK LOADING SINKRONISASI GOOGLE 🔥
   const [isSyncing, setIsSyncing] = useState(false);
 
   const API_BASE = "https://music-app-production-278c.up.railway.app";
@@ -94,7 +126,36 @@ function LibraryContent() {
       window.dispatchEvent(new CustomEvent('openFullScreenPlayer'));
       return;
     }
-    playSong({ ...song, url: `${API_BASE}/api/audio?id=${song.id}` }, list, index);
+    
+    // Siapkan antrean yang bersih
+    let cleanQueue = [];
+    let usedTitles = new Set();
+    let baseTitle = (song.title || '').toLowerCase().replace(/[^a-z0-9\s]/gi, '').trim();
+    usedTitles.add(baseTitle);
+    cleanQueue.push(song); 
+
+    if (Array.isArray(list)) {
+      list.forEach(t => {
+          if (t.id === song.id) return; 
+          let tTitle = (t.title || '').toLowerCase().replace(/[^a-z0-9\s]/gi, '').trim();
+          let isDup = false;
+          if (tTitle.length > 3) {
+              isDup = Array.from(usedTitles).some(seen => seen.includes(tTitle) || tTitle.includes(seen));
+          }
+          if (!isDup) {
+              cleanQueue.push(t);
+              if (tTitle.length > 3) usedTitles.add(tTitle);
+          }
+      });
+    }
+
+    if (cleanQueue.length <= 3) {
+        playSong({ ...song, url: `${API_BASE}/api/audio?id=${song.id}` }, cleanQueue, 0);
+        generateRadioMix(song);
+    } else {
+        playSong({ ...song, url: `${API_BASE}/api/audio?id=${song.id}` }, cleanQueue, 0);
+    }
+
     window.dispatchEvent(new CustomEvent('openFullScreenPlayer'));
   };
 
@@ -115,12 +176,9 @@ function LibraryContent() {
       }
   };
 
-  // 🔥 JURUS HAPUS LAGU OFFLINE SAMPAI KE AKAR (CACHE) 🔥
   const handleDeleteDownload = async (e, songId) => {
     e.stopPropagation(); 
-    
     if(!window.confirm("Yakin mau hapus lagu ini dari perangkat?")) return;
-
     const updated = downloadedSongs.filter(s => s.id !== songId);
     setDownloadedSongs(updated);
     localStorage.setItem('ytm_downloaded_songs', JSON.stringify(updated));
@@ -135,17 +193,12 @@ function LibraryContent() {
     }
   };
 
-  // ===========================================================================
-  // 🔥 ALGORITMA SINKRONISASI AKUN YOUTUBE LU SECARA GHAIB (OAUTH 2.0) 🔥
-  // ===========================================================================
   const loginWithGoogle = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       setIsSyncing(true);
       showToast("⏳ Berhasil masuk! Sedang menyedot isi YouTube lu...");
       try {
         const token = tokenResponse.access_token;
-        
-        // 1. Tarik Daftar Playlist lu
         const res = await fetch(`https://youtube.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&maxResults=50&mine=true`, {
           headers: { Authorization: `Bearer ${token}` }
         });
@@ -153,8 +206,6 @@ function LibraryContent() {
         
         if (data.items && data.items.length > 0) {
           let newPlaylists = [];
-          
-          // 2. Tarik isi lagu dari masing-masing Playlist
           for (let pl of data.items) {
             const plRes = await fetch(`https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${pl.id}`, {
               headers: { Authorization: `Bearer ${token}` }
@@ -177,7 +228,6 @@ function LibraryContent() {
               }).filter(t => t.title && t.title !== 'Private video' && t.title !== 'Deleted video');
             }
             
-            // Cuma masukin playlist yang ada isi lagunya
             if(tracks.length > 0) {
                 newPlaylists.push({
                   id: pl.id,
@@ -188,9 +238,7 @@ function LibraryContent() {
             }
           }
 
-          // 3. Gabungin playlist baru ke brankas memori lu
           const updatedPlaylists = [...newPlaylists, ...customPlaylists];
-          // Buang duplikat ID kalau lu narik 2 kali
           const uniquePlaylists = Array.from(new Map(updatedPlaylists.map(item => [item.id, item])).values());
 
           setCustomPlaylists(uniquePlaylists);
@@ -200,7 +248,6 @@ function LibraryContent() {
           showToast("❌ Lu belum punya satupun playlist di YouTube.");
         }
       } catch(e) {
-        console.error(e);
         showToast("❌ Gagal terhubung ke server YouTube.");
       } finally {
         setIsSyncing(false);
@@ -227,7 +274,6 @@ function LibraryContent() {
 
     try {
         let extractedTitles = [];
-
         const ytMatch = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
         if (ytMatch) {
             const playlistId = ytMatch[1];
@@ -294,14 +340,6 @@ function LibraryContent() {
                    const rawNames = trackMatches.map(m => m.split('":"')[1]).filter(n => n.length > 3 && !n.includes("Spotify") && !n.includes("Playlist"));
                    extractedTitles = [...new Set(rawNames)];
                }
-            }
-
-            if (extractedTitles.length === 0) {
-                const descMatch = html.match(/<meta name="description" content="([^"]+)"/i);
-                if (descMatch && descMatch[1]) {
-                    const rawDesc = descMatch[1].replace(/·/g, '').replace(/Playlist/gi, '').replace(/[0-9]+\s+songs/gi, '').replace(/[0-9]+\s+likes/gi, '');
-                    extractedTitles = rawDesc.split(',').map(s => s.trim()).filter(s => s.length > 3);
-                }
             }
         } else {
             showToast("❌ Hanya mendukung link YouTube Playlist (ada '?list=') dan Spotify Playlist!");
@@ -377,6 +415,108 @@ function LibraryContent() {
     } finally {
         setIsImporting(false);
     }
+  };
+
+  // ===========================================================================
+  // 🔥 LOGIKA BARU: RADIO MIX PERSONAL (BACA HISTORY & LIKES USER) 🔥
+  // ===========================================================================
+  const generateRadioMix = async (baseSong) => {
+    if(!baseSong) return;
+    let cleanArtist = (baseSong.artist || 'Official').split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
+    
+    // Ganti nama cache biar reset
+    const cacheKey = `algomix_personal_v1_${cleanArtist}`;
+    const cachedMix = sessionStorage.getItem(cacheKey);
+    
+    if (cachedMix) {
+        const parsedMix = JSON.parse(cachedMix);
+        usePlayerStore.setState(state => {
+            const existingIds = new Set(state.queue.map(q => q.id));
+            const newUnique = parsedMix.filter(m => !existingIds.has(m.id));
+            if (newUnique.length === 0) return state; 
+            return { queue: [...state.queue, ...newUnique] }; 
+        });
+        return;
+    }
+
+    // 1. Tarik Data Seleranya User (History & Liked)
+    const history = JSON.parse(localStorage.getItem('ytm_play_history') || '[]');
+    const liked = JSON.parse(localStorage.getItem('ytm_liked_songs') || '[]');
+    const personalPool = [...history, ...liked];
+
+    // 2. Kumpulin Artis yang sering dia denger (selain artis yang lagi diputer)
+    let personalArtists = [...new Set(personalPool.map(s => {
+        return (s.artist || '').split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
+    }))].filter(a => a && a.toLowerCase() !== cleanArtist.toLowerCase() && a.toLowerCase() !== 'youtube');
+
+    // 3. Acak biar ga itu-itu aja yang keluar
+    personalArtists = personalArtists.sort(() => 0.5 - Math.random());
+
+    // Wajib masukin lagu dari artis yang lagi diputar
+    let queryPool = [`"${cleanArtist}" official music video`, `"${cleanArtist}" official audio`]; 
+
+    if (personalArtists.length >= 2) {
+        // Kalo ada history, racik pake selera dia
+        queryPool.push(`"${personalArtists[0]}" official audio`);
+        queryPool.push(`"${personalArtists[1]}" official music video`);
+    } else if (personalArtists.length === 1) {
+        queryPool.push(`"${personalArtists[0]}" official audio`);
+        queryPool.push(`"${cleanArtist}" live performance`);
+    } else {
+        // Fallback kalo bener-bener user baru (belum punya history)
+        queryPool.push(`"Mahalini" official audio`);
+        queryPool.push(`"Taylor Swift" official audio`);
+    }
+
+    try {
+        const responses = await Promise.all(queryPool.map(q => fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(q)}`)));
+        const datasets = await Promise.all(responses.map(r => r.json()));
+        let combined = [];
+        
+        datasets.forEach(d => { 
+            if(d.status && d.data) {
+                combined = [...combined, ...d.data.sort(() => 0.5 - Math.random())]; 
+            }
+        });
+        
+        let mix = [];
+        let usedIds = new Set([baseSong.id]); 
+        
+        let baseTitleCheck = baseSong.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '').trim();
+        let usedTitles = new Set([baseTitleCheck]);
+
+        // 🔥 FILTERNYA GUA BIKIN MAKIN GALAK BUAT NANGKIS RINGTONE & DJ 🔥
+        combined.filter(t => t.type === 'video' && !isBadMix(t.title)).forEach(t => {
+            const validId = t.id || t.videoId || (t.url ? t.url.split('v=')[1] : null);
+            if (!validId || usedIds.has(validId)) return;
+            
+            let cleanTitle = t.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
+            if (cleanTitle.includes('-')) cleanTitle = cleanTitle.split('-')[1];
+            cleanTitle = cleanTitle.trim();
+
+            let titleCheck = cleanTitle.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '').trim();
+            if (titleCheck.length > 3) {
+                let isDup = Array.from(usedTitles).some(seen => seen.includes(titleCheck) || titleCheck.includes(seen));
+                if (isDup) return; 
+                usedTitles.add(titleCheck);
+            }
+
+            mix.push({
+                id: validId, title: cleanTitle, artist: t.author?.name || 'YouTube', image: t.thumbnail
+            });
+            usedIds.add(validId);
+        });
+
+        mix = mix.slice(0, 25);
+        if (mix.length > 0) {
+            sessionStorage.setItem(cacheKey, JSON.stringify(mix)); 
+            usePlayerStore.setState(state => {
+                const existingIds = new Set(state.queue.map(q => q.id));
+                const newUnique = mix.filter(m => !existingIds.has(m.id));
+                return { queue: [...state.queue, ...newUnique] }; 
+            });
+        }
+    } catch (e) {}
   };
 
   if (selectedPlaylist) {
@@ -475,7 +615,6 @@ function LibraryContent() {
         </div>
         
         <div className="flex items-center gap-3">
-          {/* 🔥 TOMBOL LOGIN GOOGLE SAKTI 🔥 */}
           <button 
             onClick={() => loginWithGoogle()}
             disabled={isSyncing}
