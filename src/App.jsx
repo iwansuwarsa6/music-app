@@ -341,6 +341,32 @@ function MainApp() {
     };
   }, [adzanMode, prayerTimes]);
 
+  // 🔥 FUNGSI PEMUTAR AUDIO CERDAS (BISA BACA CACHE OFFLINE WEB) 🔥
+  const loadAudioSource = async (audioEl, songId, autoPlay = false) => {
+    if (!audioEl || !songId) return;
+    const originalUrl = `${API_BASE}/api/audio?id=${songId}`;
+    
+    try {
+        const cache = await caches.open('rncmusic-offline-audio');
+        const cachedRes = await cache.match(originalUrl);
+        
+        if (cachedRes) {
+            const blob = await cachedRes.blob();
+            // Trik jenius: Pasang hash ID biar kodingan lu yang lain ga error
+            audioEl.src = URL.createObjectURL(blob) + `#id=${songId}`;
+        } else {
+            audioEl.src = originalUrl;
+        }
+    } catch (e) {
+        audioEl.src = originalUrl;
+    }
+    
+    audioEl.load();
+    if (autoPlay && !isAdzanPlayingRef.current) {
+        audioEl.play().catch(()=>{});
+    }
+  };
+
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
@@ -386,10 +412,10 @@ function MainApp() {
       } else {
           const active = getActiveAudio();
           if (active && currentSong && !active.src.includes(currentSong.id)) {
-              active.src = `${API_BASE}/api/audio?id=${currentSong.id}`;
-              active.load();
+              loadAudioSource(active, currentSong.id, true);
+          } else {
+              active?.play().catch(()=>{});
           }
-          active?.play().catch(()=>{});
           if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
           togglePlay();
       }
@@ -408,9 +434,7 @@ function MainApp() {
       
       const active = getActiveAudio();
       if (active) {
-          active.src = `${API_BASE}/api/audio?id=${qSong.id}`;
-          active.load();
-          active.play().catch(()=>{});
+          loadAudioSource(active, qSong.id, true);
       }
       
       usePlayerStore.getState().playSong(qSong, queue, idx);
@@ -430,9 +454,7 @@ function MainApp() {
       
       const active = getActiveAudio();
       if (active) {
-          active.src = `${API_BASE}/api/audio?id=${song.id}`;
-          active.load();
-          active.play().catch(()=>{});
+          loadAudioSource(active, song.id, true);
       }
 
       let cleanQueue = [];
@@ -489,58 +511,43 @@ function MainApp() {
     }
   };
 
-  // 🔥 FUNGSI DOWNLOAD OTOMATIS MP3 KE HP + SIMPAN KE PUSTAKA 🔥
+  // 🔥 FUNGSI DOWNLOAD OFFLINE MURNI KE DALAM WEB STORAGE 🔥
   const handleDownloadMp3 = async (songToDownload) => {
     try {
-      showToast(`⏳ Mengunduh: ${songToDownload.title}... (Jangan ditutup)`);
+      showToast(`⏳ Menyimpan offline: ${songToDownload.title}...`);
       setContextMenu(p => ({...p, isOpen: false}));
 
       const audioUrl = `${API_BASE}/api/audio?id=${songToDownload.id}`;
       
-      // Ambil file MP3 secara fisik (Blob)
-      const response = await fetch(audioUrl);
-      if (!response.ok) throw new Error("Gagal mengambil file");
+      const cache = await caches.open('rncmusic-offline-audio');
+      const existing = await cache.match(audioUrl);
       
-      const blob = await response.blob();
-      
-      // Buat jembatan download ke storage HP/Laptop
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `${songToDownload.title} - ${songToDownload.artist}.mp3`;
-      
-      // Eksekusi download otomatis
-      document.body.appendChild(a);
-      a.click();
-      
-      // Bersihkan jembatan
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      if (!existing) {
+          const response = await fetch(audioUrl);
+          if (!response.ok) throw new Error("Gagal mengambil file audio");
+          await cache.put(audioUrl, response.clone());
+      }
 
-      // 👇👇👇 BAGIAN PENTING: LAPORAN KE PUSTAKA 👇👇👇
       const downloaded = JSON.parse(localStorage.getItem('ytm_downloaded_songs') || '[]');
       if (!downloaded.some(s => s.id === songToDownload.id)) {
           downloaded.unshift(songToDownload);
           localStorage.setItem('ytm_downloaded_songs', JSON.stringify(downloaded));
-          window.dispatchEvent(new Event('downloadedSongsUpdated')); // Kasih tau Pustaka buat update
+          window.dispatchEvent(new Event('downloadedSongsUpdated'));
       }
       
-      showToast(`✅ Berhasil mendownload: ${songToDownload.title}`);
+      showToast(`✅ Tersimpan di Pustaka Web: ${songToDownload.title}`);
     } catch (error) {
-      console.error("Gagal download:", error);
-      showToast("❌ Gagal mendownload MP3. Coba lagi nanti.");
+      console.error("Gagal simpan offline:", error);
+      showToast("❌ Gagal menyimpan lagu. Pastikan koneksi stabil.");
     }
   };
 
   useEffect(() => {
     const nextSong = queue[currentIndex + 1];
     if (nextSong && nextSong.id) {
-        const nextUrl = `${API_BASE}/api/audio?id=${nextSong.id}`;
         const ghost = getGhostAudio();
         if (ghost && !ghost.src.includes(nextSong.id)) {
-            ghost.src = nextUrl;
-            ghost.load(); 
+            loadAudioSource(ghost, nextSong.id, false);
         }
     }
   }, [queue, currentIndex, API_BASE, currentSong]);
@@ -1016,15 +1023,11 @@ function MainApp() {
         const likedSongs = JSON.parse(localStorage.getItem('ytm_liked_songs') || '[]');
         setIsLiked(likedSongs.some(song => song.id === currentSong.id));
         
-        if (activeAudio && activeAudio.src !== expectedUrl) {
-            if (!activeAudio.src.includes(currentSong.id)) {
-                activeAudio.src = expectedUrl;
-                activeAudio.load();
-            }
+        if (activeAudio && !activeAudio.src.includes(currentSong.id)) {
             setIsBuffering(true);
-            if (isPlaying && !isAdzanPlayingRef.current) {
-                activeAudio.play().catch(()=>{});
-            }
+            loadAudioSource(activeAudio, currentSong.id, isPlaying && !isAdzanPlayingRef.current);
+        } else if (activeAudio && isPlaying && !isAdzanPlayingRef.current) {
+            activeAudio.play().catch(()=>{});
         }
     }
 
@@ -1348,7 +1351,7 @@ function MainApp() {
            
            {/* 🔥 TOMBOL DOWNLOAD YANG UDAH DIKONEKSIIN 🔥 */}
            <button onClick={() => handleDownloadMp3(contextMenu.song)} className="flex items-center gap-4 px-4 py-3 hover:bg-white/10 text-sm font-medium text-white text-left transition-colors">
-               <Download size={20} className="text-[#3ea6ff]" /> Download MP3
+               <Download size={20} className="text-[#3ea6ff]" /> Simpan Offline
            </button>
         </div>
       )}
