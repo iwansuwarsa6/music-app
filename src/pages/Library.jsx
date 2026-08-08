@@ -1,11 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  Home as HomeIcon, Search as SearchIcon, Library as LibraryIcon, User, 
-  Play, SkipBack, SkipForward, Heart, Pause, 
-  ChevronDown, Cast, MoreVertical, ListPlus, Shuffle, Repeat, Repeat1, Mic2, Music, Film, Target,
-  History, Trash2, X, Loader2, Minus, Plus, Radio, ListVideo, Bookmark, ThumbsUp, Download, DownloadCloud, Disc3, Users, Import, LogIn
-} from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { Play, Pause, MoreVertical, Heart, Download, TrendingUp, ArrowLeft, Shuffle, Disc3, Mic2, Users, Import, X, Loader2, ListPlus, Link as LinkIcon, Search, ListMusic, Trash2, LogIn, DownloadCloud, History } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
@@ -40,7 +34,7 @@ const isBadMix = (title) => {
 };
 
 function LibraryContent() {
-  const { currentSong, isPlaying, playSong, togglePlay, queue, currentIndex } = usePlayerStore();
+  const { currentSong, isPlaying, playSong, togglePlay } = usePlayerStore();
   
   const [activeTab, setActiveTab] = useState('Daftar putar');
   const [selectedPlaylist, setSelectedPlaylist] = useState(null); 
@@ -68,10 +62,10 @@ function LibraryContent() {
 
   useEffect(() => {
     const loadData = () => {
-      setLikedSongs(JSON.parse(localStorage.getItem('ytm_liked_songs') || '[]'));
-      setHistorySongs(JSON.parse(localStorage.getItem('ytm_play_history') || '[]'));
-      setDownloadedSongs(JSON.parse(localStorage.getItem('ytm_downloaded_songs') || '[]'));
-      setCustomPlaylists(JSON.parse(localStorage.getItem('ytm_custom_playlists') || '[]'));
+      setLikedSongs(JSON.parse(localStorage.getItem('ytm_liked_songs')) || []);
+      setHistorySongs(JSON.parse(localStorage.getItem('ytm_play_history')) || []);
+      setDownloadedSongs(JSON.parse(localStorage.getItem('ytm_downloaded_songs')) || []);
+      setCustomPlaylists(JSON.parse(localStorage.getItem('ytm_custom_playlists')) || []);
     };
     
     loadData();
@@ -110,6 +104,98 @@ function LibraryContent() {
     }
   ];
 
+  // 🔥 ALGORITMA RADIO MIX PERSONAL KHUSUS LIBRARY 🔥
+  const generateRadioMix = async (baseSong) => {
+    if(!baseSong) return;
+    let cleanArtist = (baseSong.artist || 'Official').split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
+    
+    const cacheKey = `algomix_personal_v1_${cleanArtist}`;
+    const cachedMix = sessionStorage.getItem(cacheKey);
+    
+    if (cachedMix) {
+        const parsedMix = JSON.parse(cachedMix);
+        usePlayerStore.setState(state => {
+            const existingIds = new Set(state.queue.map(q => q.id));
+            const newUnique = parsedMix.filter(m => !existingIds.has(m.id));
+            if (newUnique.length === 0) return state; 
+            return { queue: [...state.queue, ...newUnique] }; 
+        });
+        return;
+    }
+
+    const history = JSON.parse(localStorage.getItem('ytm_play_history') || '[]');
+    const liked = JSON.parse(localStorage.getItem('ytm_liked_songs') || '[]');
+    const personalPool = [...history, ...liked];
+
+    let personalArtists = [...new Set(personalPool.map(s => {
+        return (s.artist || '').split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
+    }))].filter(a => a && a.toLowerCase() !== cleanArtist.toLowerCase() && a.toLowerCase() !== 'youtube');
+
+    personalArtists = personalArtists.sort(() => 0.5 - Math.random());
+
+    let queryPool = [`"${cleanArtist}" official music video`, `"${cleanArtist}" official audio`]; 
+
+    if (personalArtists.length >= 2) {
+        queryPool.push(`"${personalArtists[0]}" official audio`);
+        queryPool.push(`"${personalArtists[1]}" official music video`);
+    } else if (personalArtists.length === 1) {
+        queryPool.push(`"${personalArtists[0]}" official audio`);
+        queryPool.push(`"${cleanArtist}" live performance`);
+    } else {
+        queryPool.push(`"Mahalini" official audio`);
+        queryPool.push(`"Taylor Swift" official audio`);
+    }
+
+    try {
+        const responses = await Promise.all(queryPool.map(q => fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(q)}`)));
+        const datasets = await Promise.all(responses.map(r => r.json()));
+        let combined = [];
+        
+        datasets.forEach(d => { 
+            if(d.status && d.data) {
+                combined = [...combined, ...d.data.sort(() => 0.5 - Math.random())]; 
+            }
+        });
+        
+        let mix = [];
+        let usedIds = new Set([baseSong.id]); 
+        
+        let baseTitleCheck = baseSong.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '').trim();
+        let usedTitles = new Set([baseTitleCheck]);
+
+        combined.filter(t => t.type === 'video' && !isBadMix(t.title)).forEach(t => {
+            const validId = t.id || t.videoId || (t.url ? t.url.split('v=')[1] : null);
+            if (!validId || usedIds.has(validId)) return;
+            
+            let cleanTitle = t.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
+            if (cleanTitle.includes('-')) cleanTitle = cleanTitle.split('-')[1];
+            cleanTitle = cleanTitle.trim();
+
+            let titleCheck = cleanTitle.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '').trim();
+            if (titleCheck.length > 3) {
+                let isDup = Array.from(usedTitles).some(seen => seen.includes(titleCheck) || titleCheck.includes(seen));
+                if (isDup) return; 
+                usedTitles.add(titleCheck);
+            }
+
+            mix.push({
+                id: validId, title: cleanTitle, artist: t.author?.name || 'YouTube', image: t.thumbnail
+            });
+            usedIds.add(validId);
+        });
+
+        mix = mix.slice(0, 25);
+        if (mix.length > 0) {
+            sessionStorage.setItem(cacheKey, JSON.stringify(mix)); 
+            usePlayerStore.setState(state => {
+                const existingIds = new Set(state.queue.map(q => q.id));
+                const newUnique = mix.filter(m => !existingIds.has(m.id));
+                return { queue: [...state.queue, ...newUnique] }; 
+            });
+        }
+    } catch (e) {}
+  };
+
   const handlePlayAll = (songs) => {
     if (songs.length === 0) return;
     playSong({ ...songs[0], url: `${API_BASE}/api/audio?id=${songs[0].id}` }, songs, 0);
@@ -127,7 +213,6 @@ function LibraryContent() {
       return;
     }
     
-    // Siapkan antrean yang bersih
     let cleanQueue = [];
     let usedTitles = new Set();
     let baseTitle = (song.title || '').toLowerCase().replace(/[^a-z0-9\s]/gi, '').trim();
@@ -165,6 +250,7 @@ function LibraryContent() {
     window.dispatchEvent(new CustomEvent('openSongMenu', { detail: { event: e, song: song } }));
   };
 
+  // 🔥 TOMBOL HAPUS PLAYLIST 🔥
   const handleDeleteCustomPlaylist = (e, id) => {
       e.stopPropagation();
       const confirmDelete = window.confirm("Yakin mau hapus playlist ini selamanya?");
@@ -176,6 +262,7 @@ function LibraryContent() {
       }
   };
 
+  // 🔥 TOMBOL HAPUS DOWNLOAD CACHE 🔥
   const handleDeleteDownload = async (e, songId) => {
     e.stopPropagation(); 
     if(!window.confirm("Yakin mau hapus lagu ini dari perangkat?")) return;
@@ -425,108 +512,6 @@ function LibraryContent() {
     }
   };
 
-  // ===========================================================================
-  // 🔥 LOGIKA BARU: RADIO MIX PERSONAL (BACA HISTORY & LIKES USER) 🔥
-  // ===========================================================================
-  const generateRadioMix = async (baseSong) => {
-    if(!baseSong) return;
-    let cleanArtist = (baseSong.artist || 'Official').split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
-    
-    // Ganti nama cache biar reset
-    const cacheKey = `algomix_personal_v1_${cleanArtist}`;
-    const cachedMix = sessionStorage.getItem(cacheKey);
-    
-    if (cachedMix) {
-        const parsedMix = JSON.parse(cachedMix);
-        usePlayerStore.setState(state => {
-            const existingIds = new Set(state.queue.map(q => q.id));
-            const newUnique = parsedMix.filter(m => !existingIds.has(m.id));
-            if (newUnique.length === 0) return state; 
-            return { queue: [...state.queue, ...newUnique] }; 
-        });
-        return;
-    }
-
-    // 1. Tarik Data Seleranya User (History & Liked)
-    const history = JSON.parse(localStorage.getItem('ytm_play_history') || '[]');
-    const liked = JSON.parse(localStorage.getItem('ytm_liked_songs') || '[]');
-    const personalPool = [...history, ...liked];
-
-    // 2. Kumpulin Artis yang sering dia denger (selain artis yang lagi diputer)
-    let personalArtists = [...new Set(personalPool.map(s => {
-        return (s.artist || '').split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
-    }))].filter(a => a && a.toLowerCase() !== cleanArtist.toLowerCase() && a.toLowerCase() !== 'youtube');
-
-    // 3. Acak biar ga itu-itu aja yang keluar
-    personalArtists = personalArtists.sort(() => 0.5 - Math.random());
-
-    // Wajib masukin lagu dari artis yang lagi diputar
-    let queryPool = [`"${cleanArtist}" official music video`, `"${cleanArtist}" official audio`]; 
-
-    if (personalArtists.length >= 2) {
-        // Kalo ada history, racik pake selera dia
-        queryPool.push(`"${personalArtists[0]}" official audio`);
-        queryPool.push(`"${personalArtists[1]}" official music video`);
-    } else if (personalArtists.length === 1) {
-        queryPool.push(`"${personalArtists[0]}" official audio`);
-        queryPool.push(`"${cleanArtist}" live performance`);
-    } else {
-        // Fallback kalo bener-bener user baru (belum punya history)
-        queryPool.push(`"Mahalini" official audio`);
-        queryPool.push(`"Taylor Swift" official audio`);
-    }
-
-    try {
-        const responses = await Promise.all(queryPool.map(q => fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(q)}`)));
-        const datasets = await Promise.all(responses.map(r => r.json()));
-        let combined = [];
-        
-        datasets.forEach(d => { 
-            if(d.status && d.data) {
-                combined = [...combined, ...d.data.sort(() => 0.5 - Math.random())]; 
-            }
-        });
-        
-        let mix = [];
-        let usedIds = new Set([baseSong.id]); 
-        
-        let baseTitleCheck = baseSong.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '').trim();
-        let usedTitles = new Set([baseTitleCheck]);
-
-        // 🔥 FILTERNYA GUA BIKIN MAKIN GALAK BUAT NANGKIS RINGTONE & DJ 🔥
-        combined.filter(t => t.type === 'video' && !isBadMix(t.title)).forEach(t => {
-            const validId = t.id || t.videoId || (t.url ? t.url.split('v=')[1] : null);
-            if (!validId || usedIds.has(validId)) return;
-            
-            let cleanTitle = t.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
-            if (cleanTitle.includes('-')) cleanTitle = cleanTitle.split('-')[1];
-            cleanTitle = cleanTitle.trim();
-
-            let titleCheck = cleanTitle.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '').trim();
-            if (titleCheck.length > 3) {
-                let isDup = Array.from(usedTitles).some(seen => seen.includes(titleCheck) || titleCheck.includes(seen));
-                if (isDup) return; 
-                usedTitles.add(titleCheck);
-            }
-
-            mix.push({
-                id: validId, title: cleanTitle, artist: t.author?.name || 'YouTube', image: t.thumbnail
-            });
-            usedIds.add(validId);
-        });
-
-        mix = mix.slice(0, 25);
-        if (mix.length > 0) {
-            sessionStorage.setItem(cacheKey, JSON.stringify(mix)); 
-            usePlayerStore.setState(state => {
-                const existingIds = new Set(state.queue.map(q => q.id));
-                const newUnique = mix.filter(m => !existingIds.has(m.id));
-                return { queue: [...state.queue, ...newUnique] }; 
-            });
-        }
-    } catch (e) {}
-  };
-
   if (selectedPlaylist) {
     const pl = playlists.find(p => p.id === selectedPlaylist) || customPlaylists.find(p => p.id === selectedPlaylist);
     
@@ -579,7 +564,7 @@ function LibraryContent() {
                 </div>
                 
                 <div className="flex items-center gap-1 md:gap-3">
-                  {/* 🔥 TOMBOL HAPUS WARNA PUTIH KALEM 🔥 */}
+                  {/* 🔥 TOMBOL HAPUS WARNA ABU-ABU KALEM (PUTIH SAAT HOVER) 🔥 */}
                   {pl.id === 'diunduh' && (
                     <button 
                       onClick={(e) => handleDeleteDownload(e, song.id)}
@@ -659,7 +644,7 @@ function LibraryContent() {
                 <p className="text-sm text-zinc-400 font-medium leading-none">{pl.desc}</p>
               </div>
               
-              {/* 🔥 TOMBOL HAPUS WARNA PUTIH KALEM 🔥 */}
+              {/* 🔥 TOMBOL HAPUS WARNA ABU-ABU KALEM (PUTIH SAAT HOVER) 🔥 */}
               <button 
                 onClick={(e) => handleDeleteCustomPlaylist(e, pl.id)} 
                 className="absolute right-4 p-2 text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-white/10 rounded-full"
