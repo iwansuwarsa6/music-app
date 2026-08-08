@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Play, Pause, MoreVertical, Heart, Download, TrendingUp, ArrowLeft, Shuffle, Disc3, Mic2, Users, Import, X, Loader2, ListPlus, Link as LinkIcon, Search, ListMusic, Trash2, LogIn } from 'lucide-react';
+import { Play, Pause, MoreVertical, Heart, Download, TrendingUp, ArrowLeft, Shuffle, Disc3, Mic2, Users, Import, X, Loader2, ListPlus, Link as LinkIcon, Search, ListMusic, Trash2, LogIn, DownloadCloud, History } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
@@ -66,7 +66,7 @@ function LibraryContent() {
         id: 'diunduh', 
         title: 'Tersimpan (Offline)', 
         desc: `${downloadedSongs.length} lagu`, 
-        icon: <Download size={28} className="text-white" />, 
+        icon: <DownloadCloud size={28} className="text-white" />, 
         data: downloadedSongs 
     },
     { 
@@ -113,6 +113,26 @@ function LibraryContent() {
           localStorage.setItem('ytm_custom_playlists', JSON.stringify(updated));
           showToast("Playlist berhasil dihapus.");
       }
+  };
+
+  // 🔥 JURUS HAPUS LAGU OFFLINE SAMPAI KE AKAR (CACHE) 🔥
+  const handleDeleteDownload = async (e, songId) => {
+    e.stopPropagation(); 
+    
+    if(!window.confirm("Yakin mau hapus lagu ini dari perangkat?")) return;
+
+    const updated = downloadedSongs.filter(s => s.id !== songId);
+    setDownloadedSongs(updated);
+    localStorage.setItem('ytm_downloaded_songs', JSON.stringify(updated));
+    window.dispatchEvent(new Event('downloadedSongsUpdated'));
+
+    try {
+        const cache = await caches.open('rncmusic-offline-audio');
+        const audioUrl = `${API_BASE}/api/audio?id=${songId}`;
+        await cache.delete(audioUrl);
+    } catch (err) {
+        console.error("Gagal hapus file dari memori cache:", err);
+    }
   };
 
   // ===========================================================================
@@ -410,9 +430,20 @@ function LibraryContent() {
                   <p className="text-sm text-zinc-400 truncate mt-0.5">{song.artist}</p>
                 </div>
                 
-                <button onClick={(e) => openMenu(e, song)} className="text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity p-2">
-                    <MoreVertical size={20} />
-                </button>
+                <div className="flex items-center gap-1 md:gap-3">
+                  {pl.id === 'diunduh' && (
+                    <button 
+                      onClick={(e) => handleDeleteDownload(e, song.id)}
+                      className="p-3 text-red-400 hover:text-red-500 hover:bg-red-500/20 rounded-full transition-all"
+                      title="Hapus dari HP"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  )}
+                  <button onClick={(e) => openMenu(e, song)} className="text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity p-2">
+                      <MoreVertical size={20} />
+                  </button>
+                </div>
               </div>
             )
           }) : (
