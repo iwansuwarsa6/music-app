@@ -44,14 +44,15 @@ export default function Home() {
       const cacheKey = `ytm_home_cache_v6_${activeCategory || 'default'}`;
       const cachedData = localStorage.getItem(cacheKey);
       
+      // 🔥 JURUS LOADING 0 DETIK (STALE-WHILE-REVALIDATE) 🔥
       if (cachedData) {
         setHomeSections(JSON.parse(cachedData));
-        setIsLoading(false);
-        return; 
+        setIsLoading(false); // Skeleton mati, lagu langsung muncul!
+        // Sengaja nggak dikasih "return;" biar dia lanjut nyari lagu baru di bawah
+      } else {
+        setIsLoading(true); // Kalau baru pertama kali buka (cache kosong), baru nyalain skeleton
+        setHomeSections([]); 
       }
-
-      setIsLoading(true);
-      setHomeSections([]); 
 
       let userDNA = JSON.parse(localStorage.getItem('ytm_vibe_dna') || '[]');
       userDNA = userDNA.filter(name => name.length < 20 && !name.toLowerCase().includes('zaini') && !name.toLowerCase().includes('cover'));
@@ -183,6 +184,7 @@ export default function Home() {
 
         setHomeSections(sections);
         
+        // 🔥 UPDATE DATA CACHE DI BACKGROUND BIAR FRESH TERUS 🔥
         if (isMounted) {
             localStorage.setItem(cacheKey, JSON.stringify(sections));
         }
