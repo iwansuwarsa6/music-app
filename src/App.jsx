@@ -1157,6 +1157,7 @@ function MainApp() {
     }
   }, [duration, lrclibDuration]);
 
+  // 🔥 JURUS ANTI SCROLL BOCOR PAS PLAYER DIMINIMIZE 🔥
   useEffect(() => {
     if (lyrics.length > 0 && !isSyncMode && lyricsMode === 'synced') {
       const adjustedTime = currentTime - lyricOffset;
@@ -1166,13 +1167,15 @@ function MainApp() {
       });
       if (currentIndex !== activeLyricIndex && currentIndex !== -1) {
         setActiveLyricIndex(currentIndex);
-        if (lyricsContainerRef.current) {
+        
+        // HANYA SCROLL JIKA PLAYER DIBUKA (isExpanded) DAN TAB LIRIK AKTIF
+        if (isExpanded && activeTab === 'lyrics' && lyricsContainerRef.current) {
           const activeElement = lyricsContainerRef.current.children[currentIndex];
           if (activeElement) activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
       }
     }
-  }, [currentTime, lyrics, activeLyricIndex, lyricOffset, isSyncMode, lyricsMode]);
+  }, [currentTime, lyrics, activeLyricIndex, lyricOffset, isSyncMode, lyricsMode, isExpanded, activeTab]);
 
   const toggleRepeat = () => {
     usePlayerStore.setState(prev => {
