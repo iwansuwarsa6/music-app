@@ -1053,42 +1053,48 @@ function MainApp() {
         .then(async data => {
           let trackFound = false;
           if (Array.isArray(data) && data.length > 0) {
-            const safeTitle = cleanTitleAPI.toLowerCase();
-            const exactMatches = data.filter(t => t.trackName?.toLowerCase().includes(safeTitle) || safeTitle.includes(t.trackName?.toLowerCase()));
-            let track = exactMatches.length > 0 
-                ? (exactMatches.find(t => t.syncedLyrics) || exactMatches.find(t => t.plainLyrics) || exactMatches[0]) 
-                : (data.find(t => t.syncedLyrics) || data.find(t => t.plainLyrics) || data[0]);
+            // 🔥 JURUS FILTER KETAT ANTI SALAH LIRIK 🔥
+            const safeTitle = cleanTitleAPI.toLowerCase().replace(/[^a-z0-9]/g, '');
+            
+            const exactMatches = data.filter(t => {
+                if (!t.trackName) return false;
+                const apiTitle = t.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return apiTitle.includes(safeTitle) || safeTitle.includes(apiTitle);
+            });
 
-            if (track) {
-              trackFound = true;
-              setLrclibDuration(track.duration || 0);
-              
-              if (track.syncedLyrics) {
-                const parsed = track.syncedLyrics.split('\n').map(line => {
-                  const match = line.match(/\[(\d{1,3}):(\d{1,2}(?:\.\d{1,3})?)\](.*)/);
-                  if (match && match[3].trim() !== '') {
-                      return { 
-                          time: parseInt(match[1], 10) * 60 + parseFloat(match[2]), 
-                          text: match[3].trim() 
-                      };
+            if (exactMatches.length > 0) {
+                let track = exactMatches.find(t => t.syncedLyrics) || exactMatches.find(t => t.plainLyrics) || exactMatches[0];
+                if (track) {
+                  trackFound = true;
+                  setLrclibDuration(track.duration || 0);
+                  
+                  if (track.syncedLyrics) {
+                    const parsed = track.syncedLyrics.split('\n').map(line => {
+                      const match = line.match(/\[(\d{1,3}):(\d{1,2}(?:\.\d{1,3})?)\](.*)/);
+                      if (match && match[3].trim() !== '') {
+                          return { 
+                              time: parseInt(match[1], 10) * 60 + parseFloat(match[2]), 
+                              text: match[3].trim() 
+                          };
+                      }
+                      return null;
+                    }).filter(item => item !== null);
+                    
+                    if (parsed.length > 0) { 
+                        setLyrics(parsed); 
+                        setLyricsMode('synced'); 
+                        return; 
+                    }
                   }
-                  return null;
-                }).filter(item => item !== null);
-                
-                if (parsed.length > 0) { 
-                    setLyrics(parsed); 
-                    setLyricsMode('synced'); 
-                    return; 
+                  if (track.plainLyrics) {
+                    const parsed = track.plainLyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
+                    if (parsed.length > 0) { 
+                        setLyrics(parsed); 
+                        setLyricsMode('full'); 
+                        return; 
+                    }
+                  }
                 }
-              }
-              if (track.plainLyrics) {
-                const parsed = track.plainLyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
-                if (parsed.length > 0) { 
-                    setLyrics(parsed); 
-                    setLyricsMode('full'); 
-                    return; 
-                }
-              }
             }
           }
           
@@ -1112,10 +1118,16 @@ function MainApp() {
                   const fallbackData = JSON.parse(fallbackDataWrapped.contents);
                   
                   if (fallbackData && fallbackData.lyrics) {
-                      const parsed = fallbackData.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
-                      if (parsed.length > 0) { 
-                          setLyrics(parsed); 
-                          setLyricsMode('full');
+                      // 🔥 Validasi Lyrist (Biar Lyrist juga ga main asal kasih lirik) 🔥
+                      const safeTitle = cleanTitleAPI.toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const lyristTitle = (fallbackData.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                      
+                      if (lyristTitle.includes(safeTitle) || safeTitle.includes(lyristTitle)) {
+                          const parsed = fallbackData.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
+                          if (parsed.length > 0) { 
+                              setLyrics(parsed); 
+                              setLyricsMode('full'); 
+                          }
                       }
                   }
               } catch(err) {}
