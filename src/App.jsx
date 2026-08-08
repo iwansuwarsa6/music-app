@@ -1044,96 +1044,108 @@ function MainApp() {
       }
 
       let cleanTitleAPI = rawTitle.split(/\||\(|\[|"/)[0].replace(/(official|music|video|lyric|lyrics|audio|indonesian|clip|records|hq|hd|4k|8k|live|cover)/gi, '').trim();
-      let cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/(official|vevo|channel|music|records)/gi, '').trim(); 
       
-      const searchQueryAPI = `${cleanTitleAPI} ${cleanArtistAPI}`.trim();
+      // 🔥 FIX ARTIS: Potong di tanda bulat (•) biar "Kualitas Premium" nggak ikut ke-search 🔥
+      let cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,|\||-|•/i)[0].replace(/(official|vevo|channel|music|records)/gi, '').trim(); 
+      
+      const searchAPI = async () => {
+          try {
+              let res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitleAPI + ' ' + cleanArtistAPI)}`);
+              let data = await res.json();
+              
+              // 🔥 JURUS FALLBACK: Kalau pakai nama asli artis gagal (karena di database pakainya nama panggung "Clairo"), cari judulnya doang! 🔥
+              if (!Array.isArray(data) || data.length === 0) {
+                  res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitleAPI)}`);
+                  data = await res.json();
+              }
 
-      fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(searchQueryAPI)}`)
-        .then(res => res.json())
-        .then(async data => {
-          let trackFound = false;
-          if (Array.isArray(data) && data.length > 0) {
-            // 🔥 JURUS FILTER KETAT ANTI SALAH LIRIK 🔥
-            const safeTitle = cleanTitleAPI.toLowerCase().replace(/[^a-z0-9]/g, '');
-            
-            const exactMatches = data.filter(t => {
-                if (!t.trackName) return false;
-                const apiTitle = t.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-                return apiTitle.includes(safeTitle) || safeTitle.includes(apiTitle);
-            });
-
-            if (exactMatches.length > 0) {
-                let track = exactMatches.find(t => t.syncedLyrics) || exactMatches.find(t => t.plainLyrics) || exactMatches[0];
-                if (track) {
-                  trackFound = true;
-                  setLrclibDuration(track.duration || 0);
+              let trackFound = false;
+              if (Array.isArray(data) && data.length > 0) {
+                  const safeTitle = cleanTitleAPI.toLowerCase().replace(/[^a-z0-9]/g, '');
                   
-                  if (track.syncedLyrics) {
-                    const parsed = track.syncedLyrics.split('\n').map(line => {
-                      const match = line.match(/\[(\d{1,3}):(\d{1,2}(?:\.\d{1,3})?)\](.*)/);
-                      if (match && match[3].trim() !== '') {
-                          return { 
-                              time: parseInt(match[1], 10) * 60 + parseFloat(match[2]), 
-                              text: match[3].trim() 
-                          };
-                      }
-                      return null;
-                    }).filter(item => item !== null);
-                    
-                    if (parsed.length > 0) { 
-                        setLyrics(parsed); 
-                        setLyricsMode('synced'); 
-                        return; 
-                    }
-                  }
-                  if (track.plainLyrics) {
-                    const parsed = track.plainLyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
-                    if (parsed.length > 0) { 
-                        setLyrics(parsed); 
-                        setLyricsMode('full'); 
-                        return; 
-                    }
-                  }
-                }
-            }
-          }
-          
-          if (!trackFound) {
-              try {
-                  const resOvh = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtistAPI)}/${encodeURIComponent(cleanTitleAPI)}`);
-                  if (resOvh.ok) {
-                      const dataOvh = await resOvh.json();
-                      if (dataOvh && dataOvh.lyrics) {
-                          const parsed = dataOvh.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
-                          if (parsed.length > 0) { 
-                              setLyrics(parsed); setLyricsMode('full'); 
-                              return; 
+                  const exactMatches = data.filter(t => {
+                      if (!t.trackName) return false;
+                      const apiTitle = t.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+                      return apiTitle.includes(safeTitle) || safeTitle.includes(apiTitle);
+                  });
+
+                  if (exactMatches.length > 0) {
+                      let track = exactMatches.find(t => t.syncedLyrics) || exactMatches.find(t => t.plainLyrics) || exactMatches[0];
+                      if (track) {
+                          trackFound = true;
+                          setLrclibDuration(track.duration || 0);
+                          
+                          if (track.syncedLyrics) {
+                              const parsed = track.syncedLyrics.split('\n').map(line => {
+                                  const match = line.match(/\[(\d{1,3}):(\d{1,2}(?:\.\d{1,3})?)\](.*)/);
+                                  if (match && match[3].trim() !== '') {
+                                      return { 
+                                          time: parseInt(match[1], 10) * 60 + parseFloat(match[2]), 
+                                          text: match[3].trim() 
+                                      };
+                                  }
+                                  return null;
+                              }).filter(item => item !== null);
+                              
+                              if (parsed.length > 0) { 
+                                  setLyrics(parsed); 
+                                  setLyricsMode('synced'); 
+                                  return; 
+                              }
+                          }
+                          if (track.plainLyrics) {
+                              const parsed = track.plainLyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
+                              if (parsed.length > 0) { 
+                                  setLyrics(parsed); 
+                                  setLyricsMode('full'); 
+                                  return; 
+                              }
                           }
                       }
                   }
-                  
-                  const targetUrl = `https://lyrist.vercel.app/api/${encodeURIComponent(searchQueryAPI)}`;
-                  const fallbackRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
-                  const fallbackDataWrapped = await fallbackRes.json();
-                  const fallbackData = JSON.parse(fallbackDataWrapped.contents);
-                  
-                  if (fallbackData && fallbackData.lyrics) {
-                      // 🔥 Validasi Lyrist (Biar Lyrist juga ga main asal kasih lirik) 🔥
-                      const safeTitle = cleanTitleAPI.toLowerCase().replace(/[^a-z0-9]/g, '');
-                      const lyristTitle = (fallbackData.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+              }
+
+              if (!trackFound) {
+                  try {
+                      const resOvh = await fetch(`https://api.lyrics.ovh/v1/${encodeURIComponent(cleanArtistAPI)}/${encodeURIComponent(cleanTitleAPI)}`);
+                      if (resOvh.ok) {
+                          const dataOvh = await resOvh.json();
+                          if (dataOvh && dataOvh.lyrics) {
+                              const parsed = dataOvh.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
+                              if (parsed.length > 0) { 
+                                  setLyrics(parsed); setLyricsMode('full'); 
+                                  return; 
+                              }
+                          }
+                      }
                       
-                      if (lyristTitle.includes(safeTitle) || safeTitle.includes(lyristTitle)) {
-                          const parsed = fallbackData.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
-                          if (parsed.length > 0) { 
-                              setLyrics(parsed); 
-                              setLyricsMode('full'); 
+                      const targetUrl = `https://lyrist.vercel.app/api/${encodeURIComponent(cleanTitleAPI + ' ' + cleanArtistAPI)}`;
+                      const fallbackRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`);
+                      const fallbackDataWrapped = await fallbackRes.json();
+                      const fallbackData = JSON.parse(fallbackDataWrapped.contents);
+                      
+                      if (fallbackData && fallbackData.lyrics) {
+                          const safeTitle = cleanTitleAPI.toLowerCase().replace(/[^a-z0-9]/g, '');
+                          const lyristTitle = (fallbackData.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                          
+                          if (lyristTitle.includes(safeTitle) || safeTitle.includes(lyristTitle)) {
+                              const parsed = fallbackData.lyrics.split('\n').map(line => ({ time: 0, text: line.trim() })).filter(item => item.text !== '');
+                              if (parsed.length > 0) { 
+                                  setLyrics(parsed); 
+                                  setLyricsMode('full'); 
+                              }
                           }
                       }
-                  }
-              } catch(err) {}
+                  } catch(err) {}
+              }
+          } catch (e) {
+              console.error("Lyrics fetch error:", e);
+          } finally {
+              setIsLoadingLyrics(false);
           }
-          
-        }).finally(() => setIsLoadingLyrics(false));
+      };
+
+      searchAPI();
     }
   }, [currentSong?.id, displayTitle, displayArtist, API_BASE, isOffline]);
 
