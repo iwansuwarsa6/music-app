@@ -27,13 +27,15 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
 
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
 
+// 🔥 JURUS FILTER KETAT ANTI RINGTONE & PODCAST 🔥
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
   const badWords = [
       'podcast', 'vlog', 'tutorial', 'review', 'unboxing', 'reaction',
       'trailer', 'movie', 'episode', 'berita', 'gameplay', 'how to', 'cara ',
-      'ceramah', 'pengajian', 'talkshow', 'interview', 'parody', 'parodi'
+      'ceramah', 'pengajian', 'talkshow', 'interview', 'parody', 'parodi',
+      'ringtone', 'nada dering', 'sound effect'
   ];
   return badWords.some(w => t.includes(w));
 };
@@ -46,7 +48,8 @@ const isBadMix = (title) => {
       'full album', 'kompilasi', 'compilation', '1 jam', '2 jam', ' hours', ' hour',
       'karaoke', 'instrumental', 'tanpa vokal', 'live at', 'live in', 
       'konser', 'short', 'shorts', '8d', '8 d', 'sped up', 'slowed', 'reverb',
-      'kumpulan', 'terbaik', 'pilihan', 'nonstop', 'non stop', '2023', '2024', '2025', '2026', '2027', 'hits tiktok', 'viral'
+      'kumpulan', 'terbaik', 'pilihan', 'nonstop', 'non stop', '2023', '2024', '2025', '2026', '2027', 
+      'hits tiktok', 'viral', 'dj ', 'remix', 'type beat', 'chords', 'lirik lagu'
   ];
   return badMixWords.some(w => t.includes(w));
 };
@@ -669,12 +672,13 @@ function MainApp() {
     window.dispatchEvent(new Event('likedSongsUpdated'));
   };
 
+  // 🔥 JURUS SMART RADIO MIX (ANTI LAGU ANEH/RINGTONE) 🔥
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
-    let cleanArtist = (baseSong.artist || 'Official').split('-')[0].trim();
-    cleanArtist = cleanArtist.replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
+    let cleanArtist = (baseSong.artist || 'Official').split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
     
-    const cacheKey = `algomix_infinite_v2_${cleanArtist}`;
+    // Ganti Cache Key biar ngereset mix lama yang udah nyangkut
+    const cacheKey = `algomix_vip_v4_${cleanArtist}`;
     const cachedMix = sessionStorage.getItem(cacheKey);
     
     if (cachedMix) {
@@ -688,24 +692,30 @@ function MainApp() {
         return;
     }
 
-    const indoPopArr = ["Mahalini", "Bernadya", "Hindia", "Tiara Andini", "Sal Priadi", "Kunto Aji", "Nadin Amizah", "Pamungkas", "Yura Yunita", "Maliq & D'Essentials", "Feby Putri", "Juicy Luicy", "Rizky Febian", "Tulus", "Lyodra", "Ziva Magnolya", "Keisya Levronka"];
-    const baratPopArr = ["Taylor Swift", "The Weeknd", "Bruno Mars", "Ariana Grande", "Justin Bieber", "Post Malone", "Dua Lipa", "Coldplay", "Ed Sheeran", "Sabrina Carpenter", "Billie Eilish", "Shawn Mendes", "Olivia Rodrigo"];
+    const indoPopArr = ["Mahalini", "Bernadya", "Hindia", "Tiara Andini", "Sal Priadi", "Kunto Aji", "Nadin Amizah", "Pamungkas", "Yura Yunita", "Maliq & D'Essentials", "Feby Putri", "Juicy Luicy", "Rizky Febian", "Tulus", "Lyodra", "Ziva Magnolya", "Keisya Levronka", "Nadhif Basalamah", "Anggi Marito", "Budi Doremi", "Ghea Indrawari", "Batas Senja", "Virgoun"];
+    const baratPopArr = ["Taylor Swift", "The Weeknd", "Bruno Mars", "Ariana Grande", "Justin Bieber", "Post Malone", "Dua Lipa", "Coldplay", "Ed Sheeran", "Sabrina Carpenter", "Billie Eilish", "Shawn Mendes", "Olivia Rodrigo", "Clairo", "Conan Gray", "Charlie Puth", "Benson Boone"];
 
-    const isIndo = /mahalini|bernadya|hindia|tiara|sal|kunto|nadin|pamungkas|yura|maliq|feby|juicy|rizky|tulus|lyodra|ziva|keisya|andmesh|budi|vierratale|d'masiv/i.test(cleanArtist);
-    const isBarat = /taylor|weeknd|bruno|ariana|bieber|post malone|dua lipa|coldplay|ed sheeran|sabrina|billie|shawn|olivia/i.test(cleanArtist);
+    const isIndo = /mahalini|bernadya|hindia|tiara|sal|kunto|nadin|pamungkas|yura|maliq|feby|juicy|rizky|tulus|lyodra|ziva|keisya|nadhif|anggi|budi|ghea|batas|virgoun/i.test(cleanArtist);
+    const isBarat = /taylor|weeknd|bruno|ariana|bieber|post malone|dua lipa|coldplay|ed sheeran|sabrina|billie|shawn|olivia|clairo|conan|charlie|benson/i.test(cleanArtist);
 
-    let queryPool = [`${cleanArtist} official audio`]; 
+    // Pakai kutip (") biar YouTube wajib nyari artis resminya, ga melenceng ke ringtone!
+    let queryPool = [`"${cleanArtist}" official music video`, `"${cleanArtist}" official audio`]; 
 
     if (isIndo) {
-        const randomArtists = indoPopArr.sort(() => 0.5 - Math.random()).slice(0, 2);
-        queryPool.push(`${randomArtists[0]} official audio`);
-        queryPool.push(`${randomArtists[1]} official audio`);
+        const randomArtists = indoPopArr.filter(a => !a.toLowerCase().includes(cleanArtist.toLowerCase())).sort(() => 0.5 - Math.random()).slice(0, 3);
+        queryPool.push(`"${randomArtists[0]}" official music video`);
+        queryPool.push(`"${randomArtists[1]}" official audio`);
+        queryPool.push(`"${randomArtists[2]}" pop hits`);
     } else if (isBarat) {
-        const randomArtists = baratPopArr.sort(() => 0.5 - Math.random()).slice(0, 2);
-        queryPool.push(`${randomArtists[0]} official audio`);
-        queryPool.push(`${randomArtists[1]} official audio`);
+        const randomArtists = baratPopArr.filter(a => !a.toLowerCase().includes(cleanArtist.toLowerCase())).sort(() => 0.5 - Math.random()).slice(0, 3);
+        queryPool.push(`"${randomArtists[0]}" official music video`);
+        queryPool.push(`"${randomArtists[1]}" official audio`);
+        queryPool.push(`"${randomArtists[2]}" pop hits`);
     } else {
-        queryPool.push(`${cleanArtist} similar artists official audio`);
+        const rIndo = indoPopArr.sort(() => 0.5 - Math.random())[0];
+        const rBarat = baratPopArr.sort(() => 0.5 - Math.random())[0];
+        queryPool.push(`"${rIndo}" official music video`);
+        queryPool.push(`"${rBarat}" official audio`);
     }
 
     try {
@@ -725,7 +735,7 @@ function MainApp() {
         let baseTitleCheck = baseSong.title.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music|8d|cover|remix|live|sped up|slowed|reverb)/gi, '').trim();
         let usedTitles = new Set([baseTitleCheck]);
 
-        combined.filter(t => t.type === 'video' && !isBadMix(t.title)).forEach(t => {
+        combined.filter(t => t.type === 'video' && !isBadMix(t.title) && !t.title.toLowerCase().includes('ringtone') && !t.title.toLowerCase().includes('dj ')).forEach(t => {
             const validId = t.id || t.videoId || (t.url ? t.url.split('v=')[1] : null);
             if (!validId || usedIds.has(validId)) return;
             
@@ -1044,8 +1054,6 @@ function MainApp() {
       }
 
       let cleanTitleAPI = rawTitle.split(/\||\(|\[|"/)[0].replace(/(official|music|video|lyric|lyrics|audio|indonesian|clip|records|hq|hd|4k|8k|live|cover)/gi, '').trim();
-      
-      // 🔥 FIX ARTIS: Potong di tanda bulat (•) biar "Kualitas Premium" nggak ikut ke-search 🔥
       let cleanArtistAPI = displayArtist.split(/feat\.|ft\.| x |,|\||-|•/i)[0].replace(/(official|vevo|channel|music|records)/gi, '').trim(); 
       
       const searchAPI = async () => {
@@ -1053,7 +1061,6 @@ function MainApp() {
               let res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitleAPI + ' ' + cleanArtistAPI)}`);
               let data = await res.json();
               
-              // 🔥 JURUS FALLBACK: Kalau pakai nama asli artis gagal (karena di database pakainya nama panggung "Clairo"), cari judulnya doang! 🔥
               if (!Array.isArray(data) || data.length === 0) {
                   res = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitleAPI)}`);
                   data = await res.json();
@@ -1157,7 +1164,6 @@ function MainApp() {
     }
   }, [duration, lrclibDuration]);
 
-  // 🔥 JURUS ANTI SCROLL BOCOR PAS PLAYER DIMINIMIZE 🔥
   useEffect(() => {
     if (lyrics.length > 0 && !isSyncMode && lyricsMode === 'synced') {
       const adjustedTime = currentTime - lyricOffset;
@@ -1167,8 +1173,6 @@ function MainApp() {
       });
       if (currentIndex !== activeLyricIndex && currentIndex !== -1) {
         setActiveLyricIndex(currentIndex);
-        
-        // HANYA SCROLL JIKA PLAYER DIBUKA (isExpanded) DAN TAB LIRIK AKTIF
         if (isExpanded && activeTab === 'lyrics' && lyricsContainerRef.current) {
           const activeElement = lyricsContainerRef.current.children[currentIndex];
           if (activeElement) activeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
