@@ -109,6 +109,12 @@ export default function Library() {
     let url = importUrl.trim();
     if (!url) return;
 
+    // Deteksi kalau lagi offline nggak usah dilanjut
+    if (!navigator.onLine) {
+        showToast("🔴 Mode Offline aktif, ga bisa tarik lagu dari link!");
+        return;
+    }
+
     setIsImporting(true);
     setImportProgress("Menganalisa link playlist...");
 
@@ -121,28 +127,41 @@ export default function Library() {
             const playlistId = ytMatch[1];
             setImportProgress("Menembus API Alternatif YouTube...");
             
-            // 🔥 TRIK DEWA: Pakai API Invidious (YouTube Open Source). 
-            // Bypass HTML Scraping, Bypass CORS, langsung dapet JSON bersih!
-            const invidiousInstances = [
+            // 🔥 TRIK DEWA: Pakai Piped API yang lebih badak + Invidious sebagai cadangan
+            const ytApis = [
+                `https://pipedapi.kavin.rocks/playlists/${playlistId}`, // API paling stabil
+                `https://pipedapi.moomoo.me/playlists/${playlistId}`,
                 `https://vid.puffyan.us/api/v1/playlists/${playlistId}`,
-                `https://invidious.jing.rocks/api/v1/playlists/${playlistId}`,
                 `https://inv.tux.pizza/api/v1/playlists/${playlistId}`
             ];
 
             let successApi = false;
-            for (let api of invidiousInstances) {
+            for (let api of ytApis) {
                 try {
-                    const res = await fetch(api);
+                    // Pakai sistem timer 6 detik. Kalau server lemot, langsung putus dan ganti server!
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 6000);
+                    
+                    const res = await fetch(api, { signal: controller.signal });
+                    clearTimeout(timeoutId);
+
                     if (res.ok) {
                         const data = await res.json();
-                        if (data.videos && data.videos.length > 0) {
+                        // Format Piped API
+                        if (data.relatedStreams && data.relatedStreams.length > 0) {
+                            extractedTitles = data.relatedStreams.map(v => v.title);
+                            successApi = true;
+                            break;
+                        } 
+                        // Format Invidious API
+                        else if (data.videos && data.videos.length > 0) {
                             extractedTitles = data.videos.map(v => v.title);
                             successApi = true;
-                            break; // Langsung keluar loop kalau berhasil
+                            break;
                         }
                     }
                 } catch(e) { 
-                    console.warn("API Invidious gagal, coba server lain..."); 
+                    console.warn(`API ${api} gagal/lemot, ganti server lain...`); 
                 }
             }
 
@@ -155,8 +174,6 @@ export default function Library() {
             if (!spotMatch) throw new Error("Link Spotify tidak valid");
             
             const spotId = spotMatch[1];
-            // 🔥 TRIK DEWA 2: Targetin halaman Embed (Widget) karena HTML-nya enteng banget
-            // Bebas dari 408 Request Timeout!
             const embedUrl = `https://open.spotify.com/embed/playlist/${spotId}`;
             const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(embedUrl)}`;
             
@@ -166,23 +183,33 @@ export default function Library() {
             
             if (!html) throw new Error("Gagal mengambil data Spotify");
 
-            // Jurus 1: Ekstrak dari <meta name="description">
-            const descMatch = html.match(/<meta name="description" content="([^"]+)"/);
-            if (descMatch && descMatch[1]) {
-                const rawDesc = descMatch[1].replace(/·/g, '').replace(/Playlist/gi, '').replace(/[0-9]+ songs/gi, '');
-                extractedTitles = rawDesc.split(',').map(s => s.trim()).filter(s => s.length > 3);
+            // JURUS 1: Cari dari Script JSON Rahasia __NEXT_DATA__
+            const jsonMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">({.*?})<\/script>/);
+            if (jsonMatch && jsonMatch[1]) {
+                try {
+                    const spotData = JSON.parse(jsonMatch[1]);
+                    const tracks = spotData?.props?.pageProps?.state?.data?.entity?.trackList || [];
+                    extractedTitles = tracks.map(t => t.title || t.name).filter(Boolean);
+                } catch(e) {}
             }
-            
-            // Jurus 2: Nembus script JSON rahasia __NEXT_DATA__
+
+            // JURUS 2: Kalau format web Spotify ganti, kita hajar pake Brutal Regex
             if (extractedTitles.length === 0) {
-               const jsonMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">({.*?})<\/script>/);
-               if (jsonMatch && jsonMatch[1]) {
-                   try {
-                       const spotData = JSON.parse(jsonMatch[1]);
-                       const tracks = spotData?.props?.pageProps?.state?.data?.entity?.trackList || [];
-                       extractedTitles = tracks.map(t => t.title || t.name).filter(Boolean);
-                   } catch(e) {}
+               const trackMatches = html.match(/"name":"([^"]+)"/g);
+               if (trackMatches) {
+                   // Ekstrak stringnya, buang keyword yang bukan judul lagu
+                   const rawNames = trackMatches.map(m => m.split('":"')[1]).filter(n => n.length > 3 && !n.includes("Spotify") && !n.includes("Playlist"));
+                   extractedTitles = [...new Set(rawNames)];
                }
+            }
+
+            // JURUS 3: Fallback mentok dari Meta Description
+            if (extractedTitles.length === 0) {
+                const descMatch = html.match(/<meta name="description" content="([^"]+)"/i);
+                if (descMatch && descMatch[1]) {
+                    const rawDesc = descMatch[1].replace(/·/g, '').replace(/Playlist/gi, '').replace(/[0-9]+\s+songs/gi, '').replace(/[0-9]+\s+likes/gi, '');
+                    extractedTitles = rawDesc.split(',').map(s => s.trim()).filter(s => s.length > 3);
+                }
             }
         } else {
             showToast("❌ Hanya mendukung link YouTube Playlist (ada '?list=') dan Spotify Playlist!");
@@ -190,9 +217,9 @@ export default function Library() {
             return;
         }
 
-        // Hapus judul sampah dan batasin 15 lagu biar API siputzx lu aman
+        // Filter judul sampah dan batasin 15 lagu biar API siputzx lu ngga jebol
         extractedTitles = [...new Set(extractedTitles)]
-            .filter(t => t !== "Hapus" && t !== "Simpan" && t !== "Private video" && t !== "Deleted video")
+            .filter(t => t && t !== "Hapus" && t !== "Simpan" && t !== "Private video" && t !== "Deleted video")
             .slice(0, 15);
 
         if (extractedTitles.length === 0) {
@@ -232,7 +259,7 @@ export default function Library() {
                 console.error("Gagal nyari lagu:", extractedTitles[i]);
             }
             // Tahan nafas bentar biar ga kena Limit API
-            await new Promise(resolve => setTimeout(resolve, 600));
+            await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         if (newTracks.length > 0) {
@@ -246,7 +273,7 @@ export default function Library() {
         }
 
     } catch (error) {
-        showToast("❌ Server sumber ngambek. Coba cek link, atau pakai Import Teks!");
+        showToast("❌ Server sumber ngambek. Pastikan link lu bener atau coba lagi nanti!");
     } finally {
         setIsImporting(false);
     }
