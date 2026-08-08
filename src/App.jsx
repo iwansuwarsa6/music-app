@@ -489,6 +489,42 @@ function MainApp() {
     }
   };
 
+  // 🔥 FUNGSI DOWNLOAD OTOMATIS MP3 KE HP 🔥
+  const handleDownloadMp3 = async (songToDownload) => {
+    try {
+      showToast(`⏳ Mengunduh: ${songToDownload.title}... (Jangan ditutup)`);
+      setContextMenu(p => ({...p, isOpen: false}));
+
+      const audioUrl = `${API_BASE}/api/audio?id=${songToDownload.id}`;
+      
+      // Ambil file MP3 secara fisik (Blob)
+      const response = await fetch(audioUrl);
+      if (!response.ok) throw new Error("Gagal mengambil file");
+      
+      const blob = await response.blob();
+      
+      // Buat jembatan download ke storage HP/Laptop
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `${songToDownload.title} - ${songToDownload.artist}.mp3`;
+      
+      // Eksekusi download otomatis
+      document.body.appendChild(a);
+      a.click();
+      
+      // Bersihkan jembatan
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      showToast(`✅ Berhasil mendownload: ${songToDownload.title}`);
+    } catch (error) {
+      console.error("Gagal download:", error);
+      showToast("❌ Gagal mendownload MP3. Coba lagi nanti.");
+    }
+  };
+
   useEffect(() => {
     const nextSong = queue[currentIndex + 1];
     if (nextSong && nextSong.id) {
@@ -1270,6 +1306,7 @@ function MainApp() {
           </div>
       )}
 
+      {/* 🔥 MENU TITIK TIGA DENGAN TOMBOL DOWNLOAD AKTIF 🔥 */}
       {contextMenu.isOpen && contextMenu.song && (
         <div 
            className="fixed z-[9999] bg-[#282828] border border-white/10 rounded-lg shadow-2xl py-2 w-64 flex flex-col animate-in fade-in zoom-in duration-200"
@@ -1301,11 +1338,9 @@ function MainApp() {
                <ThumbsUp size={20} className="text-zinc-400" /> Tambahkan ke disukai
            </button>
            
-           <button onClick={() => {
-               window.open(`${API_BASE}/api/download?id=${contextMenu.song.id}`, '_blank');
-               setContextMenu(p => ({...p, isOpen: false}));
-           }} className="flex items-center gap-4 px-4 py-3 hover:bg-white/10 text-sm font-medium text-white text-left transition-colors">
-               <Download size={20} className="text-zinc-400" /> Download MP3
+           {/* 🔥 TOMBOL DOWNLOAD YANG UDAH DIKONEKSIIN 🔥 */}
+           <button onClick={() => handleDownloadMp3(contextMenu.song)} className="flex items-center gap-4 px-4 py-3 hover:bg-white/10 text-sm font-medium text-white text-left transition-colors">
+               <Download size={20} className="text-[#3ea6ff]" /> Download MP3
            </button>
         </div>
       )}
