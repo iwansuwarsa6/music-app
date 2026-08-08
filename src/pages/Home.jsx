@@ -44,19 +44,33 @@ export default function Home() {
       const cacheKey = `ytm_home_cache_v6_${activeCategory || 'default'}`;
       const cachedData = localStorage.getItem(cacheKey);
       
-      // 🔥 JURUS LOADING 0 DETIK (STALE-WHILE-REVALIDATE) 🔥
+      // 🔥 DATA PANCINGAN ALA SPOTIFY HITS BUAT USER BARU 🔥
+      const starterPack = [
+        {
+          title: "Trending Now",
+          type: "square",
+          tracks: [
+            { id: "WqEwa0tE9-s", title: "Sial", artist: "Mahalini", image: "https://i.ytimg.com/vi/WqEwa0tE9-s/hqdefault.jpg", coreArtist: "mahalini" },
+            { id: "a2Z-D35Tqj0", title: "Satu Bulan", artist: "Bernadya", image: "https://i.ytimg.com/vi/a2Z-D35Tqj0/hqdefault.jpg", coreArtist: "bernadya" },
+            { id: "ic8j13piAhQ", title: "Cruel Summer", artist: "Taylor Swift", image: "https://i.ytimg.com/vi/ic8j13piAhQ/hqdefault.jpg", coreArtist: "taylor swift" },
+            { id: "L0MK7qz13bU", title: "Let It Go", artist: "James Bay", image: "https://i.ytimg.com/vi/L0MK7qz13bU/hqdefault.jpg", coreArtist: "james bay" }
+          ]
+        }
+      ];
+
+      // 🔥 JURUS LOADING 0 DETIK ALL USER 🔥
       if (cachedData) {
         setHomeSections(JSON.parse(cachedData));
-        setIsLoading(false); // Skeleton mati, lagu langsung muncul!
-        // Sengaja nggak dikasih "return;" biar dia lanjut nyari lagu baru di bawah
+        setIsLoading(false); 
       } else {
-        setIsLoading(true); // Kalau baru pertama kali buka (cache kosong), baru nyalain skeleton
-        setHomeSections([]); 
+        setHomeSections(starterPack); 
+        setIsLoading(false); 
       }
 
       let userDNA = JSON.parse(localStorage.getItem('ytm_vibe_dna') || '[]');
       userDNA = userDNA.filter(name => name.length < 20 && !name.toLowerCase().includes('zaini') && !name.toLowerCase().includes('cover'));
 
+      // 🔥 ARTIS MURNI POP INDO & BARAT (TIDAK ADA DANGDUT) 🔥
       const indoPop = ["Mahalini", "Bernadya", "Hindia", "Tiara Andini", "Sal Priadi", "Kunto Aji", "Nadin Amizah", "Pamungkas", "Yura Yunita", "Maliq & D'Essentials", "Feby Putri", "Juicy Luicy", "Rizky Febian", "Tulus", "Lyodra", "Ziva Magnolya", "Keisya Levronka"];
       const westPop = ["Taylor Swift", "The Weeknd", "Bruno Mars", "Ariana Grande", "Justin Bieber", "Post Malone", "Dua Lipa", "Coldplay", "Ed Sheeran", "Burna Boy", "Sabrina Carpenter", "Billie Eilish", "Shawn Mendes"];
 
