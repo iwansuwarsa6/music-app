@@ -61,7 +61,6 @@ function MainApp() {
   const [mediaMode, setMediaMode] = useState('audio'); 
   const [lyricsMode, setLyricsMode] = useState('synced'); 
 
-  // 🔥 STATE DETEKTOR MODE OFFLINE 🔥
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
   useEffect(() => {
@@ -75,7 +74,6 @@ function MainApp() {
     return () => window.removeEventListener('openFullScreenPlayer', handleOpenPlayer);
   }, []);
 
-  // 🔥 SENSOR ONLINE/OFFLINE AKTIF 🔥
   useEffect(() => {
     const handleOnline = () => { setIsOffline(false); showToast("🟢 Koneksi kembali! Mode Online aktif."); };
     const handleOffline = () => { setIsOffline(true); showToast("🔴 Masuk ke Mode Offline. Memutar lagu dari memori HP."); };
@@ -508,7 +506,6 @@ function MainApp() {
     }
   };
 
-  // 🔥 FUNGSI DOWNLOAD OFFLINE MURNI KE DALAM WEB STORAGE 🔥
   const handleDownloadMp3 = async (songToDownload) => {
     try {
       showToast(`⏳ Menyimpan offline: ${songToDownload.title}...`);
@@ -1201,12 +1198,10 @@ function MainApp() {
     }
   }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying]);
 
-  // 🔥 JURUS OPTIMASI 1: MENCEGAH RE-RENDER BRUTAL DARI PROGRESS BAR 🔥
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
       if (!isDragging && mediaMode === 'audio') {
           const newTime = e.target.currentTime;
-          // Update state cuma tiap 0.5 detik sekali biar web lu ga nge-lag
           if (Math.abs(currentTimeRef.current - newTime) >= 0.5) {
               setCurrentTime(newTime);
               currentTimeRef.current = newTime;
@@ -1309,7 +1304,7 @@ function MainApp() {
       )}
 
       {toastMsg && (
-          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-6 py-3 rounded-full text-sm font-semibold shadow-2xl z-[99999] animate-in slide-in-from-bottom-5 whitespace-nowrap">
+          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-6 py-3 rounded-full text-sm font-semibold shadow-2xl z-[99999] animate-in slide-in-from-bottom-5 whitespace-nowrap border border-white/5">
               {toastMsg}
           </div>
       )}
@@ -1352,8 +1347,8 @@ function MainApp() {
         </div>
       )}
 
-      {/* NAVBAR ATAS */}
-      <div className="hidden md:flex fixed top-0 left-0 right-0 h-[72px] bg-[#050505] border-b border-white/10 z-[45] items-center justify-between px-6">
+      {/* 🔥 JURUS FAKE GLASS: NAVBAR 🔥 */}
+      <div className="hidden md:flex fixed top-0 left-0 right-0 h-[72px] bg-gradient-to-b from-black to-[#0a0a0a]/95 border-b border-white/10 shadow-xl z-[45] items-center justify-between px-6">
         <div className="flex items-center">
           
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
@@ -1372,7 +1367,7 @@ function MainApp() {
         </div>
         
         <div className="flex-1 max-w-xl relative mx-8">
-          <form onSubmit={handleSearchSubmit} className={`flex items-center bg-white/5 border ${showSearchHistory ? 'border-white/30 rounded-t-xl' : 'border-white/10 rounded-xl'} px-4 py-2.5 transition-all w-full`}>
+          <form onSubmit={handleSearchSubmit} className={`flex items-center bg-[#181818] border ${showSearchHistory ? 'border-white/30 rounded-t-xl' : 'border-white/10 rounded-xl'} px-4 py-2.5 transition-all w-full shadow-inner`}>
             <SearchIcon size={20} className="text-zinc-400 mr-3 shrink-0" />
             <input 
               type="text" 
@@ -1519,17 +1514,17 @@ function MainApp() {
         </Routes>
       </div>
 
-      {/* MOBILE BOTTOM NAV */}
-      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-[#0a0a0a] flex justify-around items-center text-[10px] z-40 pb-1 border-t border-white/5 transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
+      {/* 🔥 JURUS FAKE GLASS: MOBILE BOTTOM NAV 🔥 */}
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-gradient-to-t from-black to-[#111] flex justify-around items-center text-[10px] z-40 pb-1 border-t border-white/10 transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
         <Link to="/" className={`flex flex-col items-center gap-1 ${location.pathname === '/' ? 'text-white' : 'text-zinc-400'}`}><HomeIcon size={24} /><span>Beranda</span></Link>
         <Link to="/search" className={`flex flex-col items-center gap-1 ${location.pathname === '/search' ? 'text-white' : 'text-zinc-400'}`}><SearchIcon size={24} /><span>Mencari</span></Link>
         <Link to="/library" className={`flex flex-col items-center gap-1 ${location.pathname === '/library' ? 'text-white' : 'text-zinc-400'}`}><Library size={24} /><span>Pustaka</span></Link>
         <Link to="/developer" className={`flex flex-col items-center gap-1 ${location.pathname === '/developer' ? 'text-white' : 'text-zinc-400'}`}><User size={24} /><span>Developer</span></Link>
       </div>
 
-      {/* MINI PLAYER BAR */}
+      {/* 🔥 JURUS FAKE GLASS: MINI PLAYER BAR 🔥 */}
       <div 
-        className={`fixed left-0 right-0 h-[64px] md:h-[72px] bg-[#212121] border-t border-black flex flex-col justify-center px-4 md:px-6 z-[90] cursor-pointer hover:bg-[#2a2a2a] transition-all duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
+        className={`fixed left-0 right-0 h-[64px] md:h-[72px] bg-gradient-to-t from-[#111] to-[#222] border-t border-white/10 shadow-[0_-10px_30px_rgba(0,0,0,0.8)] flex flex-col justify-center px-4 md:px-6 z-[90] cursor-pointer hover:from-[#1a1a1a] hover:to-[#2a2a2a] transition-all duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
         ${!currentSong?.id ? 'translate-y-[150vh] opacity-0 pointer-events-none' 
         : isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto bottom-0' 
         : 'translate-y-0 opacity-100 bottom-[60px] md:bottom-0'}`}
@@ -1586,7 +1581,7 @@ function MainApp() {
             </button>
             <button 
               onClick={handleTogglePlayLocal} 
-              className="w-10 h-10 flex items-center justify-center bg-[#2a2a2a] hover:bg-white/20 text-white rounded-full transition-colors"
+              className="w-10 h-10 flex items-center justify-center bg-[#2a2a2a] hover:bg-white/20 text-white rounded-full transition-colors border border-white/10"
             >
               {isPlaying ? <Pause fill="currentColor" size={20} /> : <Play className="ml-1" fill="currentColor" size={20} />}
             </button>
@@ -1707,7 +1702,6 @@ function MainApp() {
                  ></iframe>
 
                  <div className={`absolute inset-0 bg-zinc-900 flex items-center justify-center z-20 transition-opacity duration-300 ${mediaMode === 'audio' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-                     {/* 🔥 JURUS OPTIMASI 2: Dibuang Blur-nya biar GPU ga nangis 🔥 */}
                      {currentSong?.image && <img loading="lazy" src={currentSong.image} className="w-full h-full object-cover opacity-10 absolute inset-0" alt="bg" />}
                      {currentSong?.image ? (
                        <img loading="lazy" src={currentSong.image} className="w-full h-full object-cover shadow-2xl z-30" alt="cover" />
@@ -2091,7 +2085,8 @@ export default function App() {
     <div className="h-screen bg-gradient-to-br from-[#13151f] via-[#0f0f0f] to-[#000000] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden font-sans">
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
       
-      <div className="bg-[#181818] p-6 md:p-10 rounded-3xl shadow-2xl border border-white/10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500 text-center">
+      {/* 🔥 JURUS FAKE GLASS: LOGIN PANEL 🔥 */}
+      <div className="bg-[#181818] bg-gradient-to-br from-white/5 to-transparent p-6 md:p-10 rounded-3xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border border-white/10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500 text-center">
         <div className="w-20 h-20 mx-auto bg-black rounded-full mb-4 p-1 border-2 border-[#3ea6ff] shadow-[0_0_20px_rgba(62,166,255,0.4)]">
           <img loading="lazy" src="/rnctech.jpg" alt="Logo" className="w-full h-full rounded-full object-cover" />
         </div>
