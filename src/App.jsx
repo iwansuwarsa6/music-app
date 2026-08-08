@@ -51,7 +51,6 @@ const isBadMix = (title) => {
   return badMixWords.some(w => t.includes(w));
 };
 
-// 🔥 UBAH NAMA DARI "export default function App" JADI "function MainApp" 🔥
 function MainApp() {
   const { currentSong, isPlaying, togglePlay, playNext, playPrev, playSong, queue, currentIndex } = usePlayerStore();
   const location = useLocation();
@@ -1287,7 +1286,7 @@ function MainApp() {
       {/* OVERLAY POP UP ADZAN PAUSE */}
       {activePrayerName && (
         <div 
-          className="fixed inset-0 bg-black/95 backdrop-blur-md z-[999999] flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300"
+          className="fixed inset-0 bg-black/95 z-[999999] flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300"
         >
           <div className="w-24 h-24 bg-[#3ea6ff]/20 rounded-full flex items-center justify-center mb-6 animate-pulse border border-[#3ea6ff]/30">
             <MosqueIcon size={48} className="text-[#3ea6ff]" />
@@ -1354,7 +1353,7 @@ function MainApp() {
       )}
 
       {/* NAVBAR ATAS */}
-      <div className="hidden md:flex fixed top-0 left-0 right-0 h-[72px] bg-[#050505]/80 backdrop-blur-lg z-[45] items-center justify-between px-6 border-b border-white/5">
+      <div className="hidden md:flex fixed top-0 left-0 right-0 h-[72px] bg-[#050505] border-b border-white/10 z-[45] items-center justify-between px-6">
         <div className="flex items-center">
           
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
@@ -1373,7 +1372,7 @@ function MainApp() {
         </div>
         
         <div className="flex-1 max-w-xl relative mx-8">
-          <form onSubmit={handleSearchSubmit} className={`flex items-center bg-white/5 backdrop-blur-md border ${showSearchHistory ? 'border-white/30 rounded-t-xl' : 'border-white/10 rounded-xl'} px-4 py-2.5 transition-all w-full`}>
+          <form onSubmit={handleSearchSubmit} className={`flex items-center bg-white/5 border ${showSearchHistory ? 'border-white/30 rounded-t-xl' : 'border-white/10 rounded-xl'} px-4 py-2.5 transition-all w-full`}>
             <SearchIcon size={20} className="text-zinc-400 mr-3 shrink-0" />
             <input 
               type="text" 
@@ -1398,7 +1397,7 @@ function MainApp() {
           </form>
           
           {showSearchHistory && !isOffline && (
-            <div className="absolute top-full left-0 right-0 bg-[#181818]/95 backdrop-blur-lg border-x border-b border-white/10 rounded-b-xl shadow-2xl py-2 z-50 overflow-hidden flex flex-col max-h-[75vh]">
+            <div className="absolute top-full left-0 right-0 bg-[#181818] border-x border-b border-white/10 rounded-b-xl shadow-2xl py-2 z-50 overflow-hidden flex flex-col max-h-[75vh]">
               {searchQuery.trim() === '' && searchHistory.length > 0 && searchHistory.map((item, idx) => (
                 <div 
                   key={`hist-${idx}`} 
@@ -1521,7 +1520,7 @@ function MainApp() {
       </div>
 
       {/* MOBILE BOTTOM NAV */}
-      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-[#0a0a0a]/90 backdrop-blur-lg flex justify-around items-center text-[10px] z-40 pb-1 border-t border-white/5 transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-[#0a0a0a] flex justify-around items-center text-[10px] z-40 pb-1 border-t border-white/5 transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
         <Link to="/" className={`flex flex-col items-center gap-1 ${location.pathname === '/' ? 'text-white' : 'text-zinc-400'}`}><HomeIcon size={24} /><span>Beranda</span></Link>
         <Link to="/search" className={`flex flex-col items-center gap-1 ${location.pathname === '/search' ? 'text-white' : 'text-zinc-400'}`}><SearchIcon size={24} /><span>Mencari</span></Link>
         <Link to="/library" className={`flex flex-col items-center gap-1 ${location.pathname === '/library' ? 'text-white' : 'text-zinc-400'}`}><Library size={24} /><span>Pustaka</span></Link>
@@ -1530,7 +1529,7 @@ function MainApp() {
 
       {/* MINI PLAYER BAR */}
       <div 
-        className={`fixed left-0 right-0 h-[64px] md:h-[72px] bg-[#212121]/95 backdrop-blur-lg border-t border-black flex flex-col justify-center px-4 md:px-6 z-[90] cursor-pointer hover:bg-[#2a2a2a]/95 transition-all duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
+        className={`fixed left-0 right-0 h-[64px] md:h-[72px] bg-[#212121] border-t border-black flex flex-col justify-center px-4 md:px-6 z-[90] cursor-pointer hover:bg-[#2a2a2a] transition-all duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
         ${!currentSong?.id ? 'translate-y-[150vh] opacity-0 pointer-events-none' 
         : isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto bottom-0' 
         : 'translate-y-0 opacity-100 bottom-[60px] md:bottom-0'}`}
@@ -1587,7 +1586,7 @@ function MainApp() {
             </button>
             <button 
               onClick={handleTogglePlayLocal} 
-              className="w-10 h-10 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors"
+              className="w-10 h-10 flex items-center justify-center bg-[#2a2a2a] hover:bg-white/20 text-white rounded-full transition-colors"
             >
               {isPlaying ? <Pause fill="currentColor" size={20} /> : <Play className="ml-1" fill="currentColor" size={20} />}
             </button>
@@ -1661,7 +1660,7 @@ function MainApp() {
             <ChevronDown size={32} />
           </button>
           
-          <div className="flex bg-white/10 rounded-full p-1 backdrop-blur-md">
+          <div className="flex bg-[#2a2a2a] rounded-full p-1 border border-white/10">
             <button onClick={(e) => { e.stopPropagation(); setMediaMode('audio'); }} className={`flex items-center gap-1.5 px-6 py-1.5 rounded-full text-sm font-bold transition-colors ${mediaMode === 'audio' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}><Music size={16} /> Lagu</button>
             <button onClick={(e) => { e.stopPropagation(); setMediaMode('video'); }} className={`flex items-center gap-1.5 px-6 py-1.5 rounded-full text-sm font-bold transition-colors ${mediaMode === 'video' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}><Film size={16} /> Video</button>
           </div>
@@ -1708,12 +1707,12 @@ function MainApp() {
                  ></iframe>
 
                  <div className={`absolute inset-0 bg-zinc-900 flex items-center justify-center z-20 transition-opacity duration-300 ${mediaMode === 'audio' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-                     {/* 🔥 JURUS OPTIMASI 2: Blur-2xl diubah ke Blur-lg dan opacity turunin dikit biar GPU ga kerja rodi 🔥 */}
-                     {currentSong?.image && <img loading="lazy" src={currentSong.image} className="w-full h-full object-cover opacity-30 blur-lg absolute inset-0" alt="bg" />}
+                     {/* 🔥 JURUS OPTIMASI 2: Dibuang Blur-nya biar GPU ga nangis 🔥 */}
+                     {currentSong?.image && <img loading="lazy" src={currentSong.image} className="w-full h-full object-cover opacity-10 absolute inset-0" alt="bg" />}
                      {currentSong?.image ? (
                        <img loading="lazy" src={currentSong.image} className="w-full h-full object-cover shadow-2xl z-30" alt="cover" />
                      ) : (
-                       <div className="w-full h-full shadow-2xl z-30 bg-white/5 flex items-center justify-center text-zinc-500 backdrop-blur-md">
+                       <div className="w-full h-full shadow-2xl z-30 bg-white/5 flex items-center justify-center text-zinc-500">
                          <Music size={64} />
                        </div>
                      )}
@@ -1884,7 +1883,7 @@ function MainApp() {
                         <p className="text-[12px] text-zinc-400 font-medium mb-1">Diputar dari</p>
                         <h3 className="text-xl font-bold text-white leading-none">Antrean Anda</h3>
                       </div>
-                      <button className="flex items-center gap-2 bg-white/10 backdrop-blur-md text-white px-4 py-1.5 rounded-full text-sm font-bold hover:bg-white hover:text-black transition-colors">
+                      <button className="flex items-center gap-2 bg-white/10 text-white px-4 py-1.5 rounded-full text-sm font-bold hover:bg-white hover:text-black transition-colors">
                         <ListPlus size={18} /> Simpan
                       </button>
                     </div>
@@ -1919,7 +1918,6 @@ function MainApp() {
                           </div>
                           
                           <div className="flex items-center">
-                              {/* 🔥 JURUS OPTIMASI 3: Matiin animasi EQ kalau lagu lagi di-pause biar hemat CPU 🔥 */}
                               {isCurrent && (
                                 <div className="flex gap-1 items-end h-4 mr-3">
                                   <div className={`eq-bar ${isPlaying ? 'eq-1' : 'h-1'}`}></div>
@@ -1946,21 +1944,21 @@ function MainApp() {
                {activeTab === 'lyrics' && (
                  <div className="flex flex-col min-h-full animate-in fade-in duration-300">
                     {lyrics.length > 0 && !isLoadingLyrics && (
-                      <div className="sticky top-0 z-20 bg-black/50 backdrop-blur-md px-6 py-4 flex flex-col gap-4 border-b border-white/10 shadow-2xl">
+                      <div className="sticky top-0 z-20 bg-[#121212] px-6 py-4 flex flex-col gap-4 border-b border-white/10 shadow-2xl">
                         <div className="flex justify-between items-center">
-                          <div className="flex bg-white/5 backdrop-blur-md rounded-full p-1 border border-white/10">
+                          <div className="flex bg-white/5 rounded-full p-1 border border-white/10">
                             <button onClick={() => setLyricsMode('synced')} className={`px-4 py-1.5 rounded-full text-[11px] font-bold transition-all uppercase tracking-wider ${lyricsMode === 'synced' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}>Running</button>
                             <button onClick={() => setLyricsMode('full')} className={`px-4 py-1.5 rounded-full text-[11px] font-bold transition-all uppercase tracking-wider ${lyricsMode === 'full' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}>Full Text</button>
                           </div>
                           {lyricsMode === 'synced' && (
-                            <button onClick={() => setIsSyncMode(!isSyncMode)} className={`p-2 rounded-full border transition-all ${isSyncMode ? 'bg-red-500/90 border-red-400 animate-pulse text-white' : 'bg-white/5 backdrop-blur-md border-white/10 text-zinc-400 hover:text-white'}`} title="Mode Kalibrasi">
+                            <button onClick={() => setIsSyncMode(!isSyncMode)} className={`p-2 rounded-full border transition-all ${isSyncMode ? 'bg-red-500/90 border-red-400 animate-pulse text-white' : 'bg-[#2a2a2a] border-white/10 text-zinc-400 hover:text-white'}`} title="Mode Kalibrasi">
                               <Target size={16} />
                             </button>
                           )}
                         </div>
                         
                         {lyricsMode === 'synced' && (
-                          <div className="flex items-center gap-2 bg-white/5 backdrop-blur-md px-3 py-1.5 md:py-2 rounded-full border border-white/10">
+                          <div className="flex items-center gap-2 bg-[#2a2a2a] px-3 py-1.5 md:py-2 rounded-full border border-white/10">
                             <span className="text-[10px] font-bold text-zinc-400 mr-1 hidden md:block">SYNC:</span>
                             
                             <button onClick={() => setLyricOffset(prev => Math.max(-100, prev - 0.5))} className="p-1 text-zinc-400 hover:text-white hover:bg-white/10 rounded-full transition-colors">
@@ -2019,6 +2017,11 @@ function MainApp() {
       </div>
       
       <style>{`
+        * {
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+
         html, body {
           background-color: #0f0f0f;
           overscroll-behavior-y: none;
@@ -2031,6 +2034,7 @@ function MainApp() {
         .smooth-scroll {
           scroll-behavior: smooth;
           -webkit-overflow-scrolling: touch;
+          will-change: transform, scroll-position;
         }
         
         @keyframes eq {
@@ -2087,7 +2091,7 @@ export default function App() {
     <div className="h-screen bg-gradient-to-br from-[#13151f] via-[#0f0f0f] to-[#000000] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden font-sans">
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
       
-      <div className="bg-[#181818]/80 backdrop-blur-md p-6 md:p-10 rounded-3xl shadow-2xl border border-white/10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500 text-center">
+      <div className="bg-[#181818] p-6 md:p-10 rounded-3xl shadow-2xl border border-white/10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500 text-center">
         <div className="w-20 h-20 mx-auto bg-black rounded-full mb-4 p-1 border-2 border-[#3ea6ff] shadow-[0_0_20px_rgba(62,166,255,0.4)]">
           <img loading="lazy" src="/rnctech.jpg" alt="Logo" className="w-full h-full rounded-full object-cover" />
         </div>
