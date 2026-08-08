@@ -82,7 +82,12 @@ export default function Library() {
 
   const handlePlaySong = (song, list, index) => {
     if (currentSong?.id === song.id) {
-      togglePlay();
+      // 🔥 FIX BUG: Panggil Saklar Pusat di App.jsx biar audio & icon sinkron 🔥
+      if (window.saklarPusat) {
+          window.saklarPusat(null);
+      } else {
+          togglePlay();
+      }
       window.dispatchEvent(new CustomEvent('openFullScreenPlayer'));
       return;
     }
