@@ -196,11 +196,14 @@ export default function Home() {
             sections.push({ title: s.title, type: s.type, tracks: trks });
         }
 
-        setHomeSections(sections);
-        
-        // 🔥 UPDATE DATA CACHE DI BACKGROUND BIAR FRESH TERUS 🔥
-        if (isMounted) {
-            localStorage.setItem(cacheKey, JSON.stringify(sections));
+        // 🔥 JURUS ANTI-BLANK (SAFETY NET) 🔥
+        if (backupPool.length > 0) {
+            setHomeSections(sections);
+            if (isMounted) {
+                localStorage.setItem(cacheKey, JSON.stringify(sections));
+            }
+        } else {
+            console.log("API lagi lemot/kosong, amanin pake data pancingan!");
         }
 
       } catch (error) {
