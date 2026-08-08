@@ -341,7 +341,6 @@ function MainApp() {
     };
   }, [adzanMode, prayerTimes]);
 
-  // 🔥 FUNGSI PEMUTAR AUDIO CERDAS (BISA BACA CACHE OFFLINE WEB) 🔥
   const loadAudioSource = async (audioEl, songId, autoPlay = false) => {
     if (!audioEl || !songId) return;
     const originalUrl = `${API_BASE}/api/audio?id=${songId}`;
@@ -352,7 +351,6 @@ function MainApp() {
         
         if (cachedRes) {
             const blob = await cachedRes.blob();
-            // Trik jenius: Pasang hash ID biar kodingan lu yang lain ga error
             audioEl.src = URL.createObjectURL(blob) + `#id=${songId}`;
         } else {
             audioEl.src = originalUrl;
@@ -801,7 +799,6 @@ function MainApp() {
             return;
         }
 
-        // 🔥 CEK JIKA OFFLINE, HENTIKAN PENCARIAN 🔥
         if (isOffline) {
           setIsFetchingSuggestions(false);
           return;
@@ -861,7 +858,6 @@ function MainApp() {
 
   const handleSearchSubmit = (e) => {
     e.preventDefault(); 
-    // 🔥 JIKA OFFLINE, MUNCULKAN TOAST DAN HENTIKAN PENCARIAN 🔥
     if (isOffline) {
         showToast("🔴 Mode Offline: Tidak bisa melakukan pencarian lagu baru.");
         return;
@@ -953,8 +949,6 @@ function MainApp() {
 
   useEffect(() => {
       if (activeTab === 'artist' && displayArtist && displayArtist !== "Artis") {
-          
-          // 🔥 JIKA OFFLINE, HENTIKAN PENCARIAN LAGU TERKAIT 🔥
           if (isOffline) {
               setIsLoadingRelated(false);
               setRelatedSongs([]);
@@ -1032,8 +1026,6 @@ function MainApp() {
     }
 
     if (currentSong?.title) {
-
-      // 🔥 JIKA OFFLINE, JANGAN CARI LIRIK KE INTERNET 🔥
       if (isOffline) {
           setIsLoadingLyrics(false);
           setLyrics([{time: 0, text: "Lirik tidak tersedia dalam Mode Offline."}]);
@@ -1210,13 +1202,19 @@ function MainApp() {
     }
   }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying]);
 
+  // 🔥 JURUS OPTIMASI 1: MENCEGAH RE-RENDER BRUTAL DARI PROGRESS BAR 🔥
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
       if (!isDragging && mediaMode === 'audio') {
-          setCurrentTime(e.target.currentTime);
-          currentTimeRef.current = e.target.currentTime;
+          const newTime = e.target.currentTime;
+          // Update state cuma tiap 0.5 detik sekali biar web lu ga nge-lag
+          if (Math.abs(currentTimeRef.current - newTime) >= 0.5) {
+              setCurrentTime(newTime);
+              currentTimeRef.current = newTime;
+          }
       }
   };
+
   const handleLoadedMetadata = (e) => {
       if (e.target !== getActiveAudio()) return;
       if (mediaMode === 'audio') setDuration(e.target.duration);
@@ -1269,7 +1267,7 @@ function MainApp() {
   window.saklarPusat = handleTogglePlayLocal;
 
   return (
-    <div className="h-screen bg-gradient-to-br from-[#13151f] via-[#0f0f0f] to-[#000000] text-white flex flex-col font-sans overflow-hidden relative">
+    <div className="h-screen bg-[#0f0f0f] text-white flex flex-col font-sans overflow-hidden relative">
       
       <audio ref={keepAliveAudioRef} src={SILENT_MP3} loop playsInline className="hidden" />
 
@@ -1286,10 +1284,10 @@ function MainApp() {
         onWaiting={handleWaiting} onPlaying={handlePlaying} className="hidden"
       />
 
-      {/* 🔥 OVERLAY POP UP ADZAN PAUSE 5 MENIT 🔥 */}
+      {/* OVERLAY POP UP ADZAN PAUSE */}
       {activePrayerName && (
         <div 
-          className="fixed inset-0 bg-black/95 backdrop-blur-xl z-[999999] flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300"
+          className="fixed inset-0 bg-black/95 backdrop-blur-md z-[999999] flex flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300"
         >
           <div className="w-24 h-24 bg-[#3ea6ff]/20 rounded-full flex items-center justify-center mb-6 animate-pulse border border-[#3ea6ff]/30">
             <MosqueIcon size={48} className="text-[#3ea6ff]" />
@@ -1317,7 +1315,7 @@ function MainApp() {
           </div>
       )}
 
-      {/* 🔥 MENU TITIK TIGA DENGAN TOMBOL DOWNLOAD AKTIF 🔥 */}
+      {/* MENU TITIK TIGA DENGAN TOMBOL DOWNLOAD AKTIF */}
       {contextMenu.isOpen && contextMenu.song && (
         <div 
            className="fixed z-[9999] bg-[#282828] border border-white/10 rounded-lg shadow-2xl py-2 w-64 flex flex-col animate-in fade-in zoom-in duration-200"
@@ -1349,7 +1347,6 @@ function MainApp() {
                <ThumbsUp size={20} className="text-zinc-400" /> Tambahkan ke disukai
            </button>
            
-           {/* 🔥 TOMBOL DOWNLOAD YANG UDAH DIKONEKSIIN 🔥 */}
            <button onClick={() => handleDownloadMp3(contextMenu.song)} className="flex items-center gap-4 px-4 py-3 hover:bg-white/10 text-sm font-medium text-white text-left transition-colors">
                <Download size={20} className="text-[#3ea6ff]" /> Simpan Offline
            </button>
@@ -1357,14 +1354,13 @@ function MainApp() {
       )}
 
       {/* NAVBAR ATAS */}
-      <div className="hidden md:flex fixed top-0 left-0 right-0 h-[72px] bg-[#050505]/60 backdrop-blur-xl z-[45] items-center justify-between px-6 border-b border-white/5">
+      <div className="hidden md:flex fixed top-0 left-0 right-0 h-[72px] bg-[#050505]/80 backdrop-blur-lg z-[45] items-center justify-between px-6 border-b border-white/5">
         <div className="flex items-center">
           
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-            <img src="/rnctech.jpg" alt="RnCmusic logo" className="w-10 h-10 rounded-full object-cover shadow-[0_0_10px_rgba(62,166,255,0.3)]" />
+            <img loading="lazy" src="/rnctech.jpg" alt="RnCmusic logo" className="w-10 h-10 rounded-full object-cover shadow-[0_0_10px_rgba(62,166,255,0.3)]" />
             <div className="flex flex-col">
               <span className="text-2xl font-black tracking-tighter leading-none">RnCmusic</span>
-              {/* 🔥 TULISAN MERAH MUNCUL KALAU OFFLINE 🔥 */}
               {isOffline && <span className="text-[10px] text-red-500 font-bold tracking-widest uppercase mt-0.5">OFFLINE MODE</span>}
             </div>
           </div>
@@ -1387,7 +1383,7 @@ function MainApp() {
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setShowSearchHistory(true)}
               onBlur={() => setTimeout(() => setShowSearchHistory(false), 200)}
-              disabled={isOffline} // 🔥 BLOKIR KOTAK SEARCH PAS OFFLINE 🔥
+              disabled={isOffline}
             />
             {searchQuery && !isOffline && (
               <button 
@@ -1402,7 +1398,7 @@ function MainApp() {
           </form>
           
           {showSearchHistory && !isOffline && (
-            <div className="absolute top-full left-0 right-0 bg-[#181818]/95 backdrop-blur-2xl border-x border-b border-white/10 rounded-b-xl shadow-2xl py-2 z-50 overflow-hidden flex flex-col max-h-[75vh]">
+            <div className="absolute top-full left-0 right-0 bg-[#181818]/95 backdrop-blur-lg border-x border-b border-white/10 rounded-b-xl shadow-2xl py-2 z-50 overflow-hidden flex flex-col max-h-[75vh]">
               {searchQuery.trim() === '' && searchHistory.length > 0 && searchHistory.map((item, idx) => (
                 <div 
                   key={`hist-${idx}`} 
@@ -1469,7 +1465,7 @@ function MainApp() {
                           }}
                         >
                           <div className="flex items-center gap-4 min-w-0">
-                            <img src={song.image} alt={song.title} className="w-10 h-10 md:w-12 md:h-12 object-cover rounded" />
+                            <img loading="lazy" src={song.image} alt={song.title} className="w-10 h-10 md:w-12 md:h-12 object-cover rounded" />
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-bold text-white line-clamp-1">{song.title}</p>
                               <p className="text-xs text-zinc-400 truncate mt-0.5">Lagu • {song.artist}</p>
@@ -1514,8 +1510,7 @@ function MainApp() {
         </div>
       </div>
 
-      {/* 🔥 KONTEN UTAMA DENGAN PADDING DINAMIS 🔥 */}
-      <div className={`flex-1 overflow-y-auto pt-0 md:pt-[72px] z-10 transition-all duration-[600ms] ${currentSong?.id ? 'pb-[140px] md:pb-[100px]' : 'pb-20 md:pb-8'}`}>
+      <div className={`flex-1 overflow-y-auto pt-0 md:pt-[72px] z-10 transition-all duration-[600ms] smooth-scroll ${currentSong?.id ? 'pb-[140px] md:pb-[100px]' : 'pb-20 md:pb-8'}`}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
@@ -1526,16 +1521,16 @@ function MainApp() {
       </div>
 
       {/* MOBILE BOTTOM NAV */}
-      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-[#0a0a0a]/90 backdrop-blur-2xl flex justify-around items-center text-[10px] z-40 pb-1 border-t border-white/5 transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
+      <div className={`md:hidden fixed bottom-0 left-0 right-0 h-[60px] bg-[#0a0a0a]/90 backdrop-blur-lg flex justify-around items-center text-[10px] z-40 pb-1 border-t border-white/5 transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] ${isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
         <Link to="/" className={`flex flex-col items-center gap-1 ${location.pathname === '/' ? 'text-white' : 'text-zinc-400'}`}><HomeIcon size={24} /><span>Beranda</span></Link>
         <Link to="/search" className={`flex flex-col items-center gap-1 ${location.pathname === '/search' ? 'text-white' : 'text-zinc-400'}`}><SearchIcon size={24} /><span>Mencari</span></Link>
         <Link to="/library" className={`flex flex-col items-center gap-1 ${location.pathname === '/library' ? 'text-white' : 'text-zinc-400'}`}><Library size={24} /><span>Pustaka</span></Link>
         <Link to="/developer" className={`flex flex-col items-center gap-1 ${location.pathname === '/developer' ? 'text-white' : 'text-zinc-400'}`}><User size={24} /><span>Developer</span></Link>
       </div>
 
-      {/* 🔥 MINI PLAYER BAR (BENERAN NGUMPET SAMPAI KE BAWAH TANAH KALAU GAK ADA LAGU) 🔥 */}
+      {/* MINI PLAYER BAR */}
       <div 
-        className={`fixed left-0 right-0 h-[64px] md:h-[72px] bg-[#212121]/95 backdrop-blur-2xl border-t border-black flex flex-col justify-center px-4 md:px-6 z-[90] cursor-pointer hover:bg-[#2a2a2a]/95 transition-all duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
+        className={`fixed left-0 right-0 h-[64px] md:h-[72px] bg-[#212121]/95 backdrop-blur-lg border-t border-black flex flex-col justify-center px-4 md:px-6 z-[90] cursor-pointer hover:bg-[#2a2a2a]/95 transition-all duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
         ${!currentSong?.id ? 'translate-y-[150vh] opacity-0 pointer-events-none' 
         : isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto bottom-0' 
         : 'translate-y-0 opacity-100 bottom-[60px] md:bottom-0'}`}
@@ -1563,7 +1558,7 @@ function MainApp() {
         <div className="md:hidden flex items-center justify-between w-full h-full pt-1">
           <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 flex-shrink-0 bg-white/5 rounded overflow-hidden shadow-lg relative">
-              {currentSong?.image ? <img src={currentSong.image} className="w-full h-full object-cover" alt="cover" /> : <Music className="w-5 h-5 m-2.5 text-zinc-500" />}
+              {currentSong?.image ? <img loading="lazy" src={currentSong.image} className="w-full h-full object-cover" alt="cover" /> : <Music className="w-5 h-5 m-2.5 text-zinc-500" />}
               {isBuffering && (
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
                   <Loader2 className="w-5 h-5 text-white animate-spin" />
@@ -1607,7 +1602,7 @@ function MainApp() {
           <div className="flex items-center gap-4 flex-1 justify-center max-w-2xl mx-auto">
             <div className="w-[64px] h-[36px] flex-shrink-0 bg-black rounded-sm overflow-hidden relative shadow-md">
               {currentSong?.image ? (
-                <img src={currentSong.image} className="absolute inset-0 w-full h-full object-cover" alt="cover" />
+                <img loading="lazy" src={currentSong.image} className="absolute inset-0 w-full h-full object-cover" alt="cover" />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center text-zinc-600">
                   <Music size={16} />
@@ -1656,7 +1651,7 @@ function MainApp() {
         </div>
       </div>
 
-      {/* 🔥 FULLSCREEN PLAYER OVERLAY (BENERAN NGUMPET SAMPAI KE BAWAH TANAH KALAU GAK ADA LAGU) 🔥 */}
+      {/* FULLSCREEN PLAYER OVERLAY */}
       <div 
         className={`fixed top-0 left-0 right-0 bottom-0 md:bottom-[72px] bg-gradient-to-b from-[#1a1c29] to-[#0f0f0f] z-[80] flex flex-col transition-transform duration-[600ms] ease-[cubic-bezier(0.2,0.8,0.2,1)] 
         ${!currentSong?.id || !isExpanded ? 'translate-y-[150vh] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100 pointer-events-auto'}`}
@@ -1706,16 +1701,17 @@ function MainApp() {
                  <iframe
                    ref={iframeRef} onLoad={handleIframeLoad}
                    width="100%" height="100%"
-                   src={currentSong?.id ? `https://www.youtube.com/embed/${currentSong.id}?autoplay=1&mute=1&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&fs=0&playsinline=1&enablejsapi=1&origin=${window.location.origin}` : ''}
+                   src={currentSong?.id && mediaMode === 'video' ? `https://www.youtube.com/embed/${currentSong.id}?autoplay=1&mute=0&controls=0&disablekb=1&modestbranding=1&rel=0&iv_load_policy=3&fs=0&playsinline=1&enablejsapi=1&origin=${window.location.origin}` : ''}
                    title="YouTube Video" frameBorder="0"
                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen
                    className={`absolute inset-0 w-full h-full pointer-events-auto transition-opacity duration-300 z-10 ${mediaMode === 'video' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
                  ></iframe>
 
                  <div className={`absolute inset-0 bg-zinc-900 flex items-center justify-center z-20 transition-opacity duration-300 ${mediaMode === 'audio' ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
-                     {currentSong?.image && <img src={currentSong.image} className="w-full h-full object-cover opacity-60 blur-2xl absolute inset-0" alt="bg" />}
+                     {/* 🔥 JURUS OPTIMASI 2: Blur-2xl diubah ke Blur-lg dan opacity turunin dikit biar GPU ga kerja rodi 🔥 */}
+                     {currentSong?.image && <img loading="lazy" src={currentSong.image} className="w-full h-full object-cover opacity-30 blur-lg absolute inset-0" alt="bg" />}
                      {currentSong?.image ? (
-                       <img src={currentSong.image} className="w-full h-full object-cover shadow-2xl z-30" alt="cover" />
+                       <img loading="lazy" src={currentSong.image} className="w-full h-full object-cover shadow-2xl z-30" alt="cover" />
                      ) : (
                        <div className="w-full h-full shadow-2xl z-30 bg-white/5 flex items-center justify-center text-zinc-500 backdrop-blur-md">
                          <Music size={64} />
@@ -1861,7 +1857,7 @@ function MainApp() {
                                className="flex items-center gap-4 py-2 px-3 -mx-3 rounded-lg cursor-pointer group hover:bg-white/5 transition-colors" 
                                onClick={(e) => handlePlayClick(e, song, relatedSongs, idx)}
                             >
-                               <img src={song.image} className="w-12 h-12 rounded object-cover opacity-70 group-hover:opacity-100 shadow-md" alt="thumb" />
+                               <img loading="lazy" src={song.image} className="w-12 h-12 rounded object-cover opacity-70 group-hover:opacity-100 shadow-md" alt="thumb" />
                                <div className="flex-1 min-w-0">
                                   <p className="text-base font-bold text-white line-clamp-1">{song.title}</p>
                                   <p className="text-sm text-zinc-400 truncate">{song.artist}</p>
@@ -1912,7 +1908,7 @@ function MainApp() {
                           onClick={(e) => !isCurrent && handleQueuePlay(e, qSong, idx)}
                         >
                           <div className="relative w-12 h-12 md:w-14 md:h-14 flex-shrink-0">
-                            <img src={qSong.image} className={`w-full h-full rounded object-cover ${isCurrent ? '' : 'opacity-70 group-hover:opacity-100'}`} alt="thumb" />
+                            <img loading="lazy" src={qSong.image} className={`w-full h-full rounded object-cover ${isCurrent ? '' : 'opacity-70 group-hover:opacity-100'}`} alt="thumb" />
                             <div className={`absolute inset-0 bg-black/50 rounded flex items-center justify-center ${isCurrent ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'} transition-opacity`}>
                               {isCurrent && isPlaying ? <Pause fill="white" size={18} /> : <Play className="ml-0.5" fill="white" size={18} />}
                             </div>
@@ -1923,6 +1919,7 @@ function MainApp() {
                           </div>
                           
                           <div className="flex items-center">
+                              {/* 🔥 JURUS OPTIMASI 3: Matiin animasi EQ kalau lagu lagi di-pause biar hemat CPU 🔥 */}
                               {isCurrent && (
                                 <div className="flex gap-1 items-end h-4 mr-3">
                                   <div className={`eq-bar ${isPlaying ? 'eq-1' : 'h-1'}`}></div>
@@ -1949,7 +1946,7 @@ function MainApp() {
                {activeTab === 'lyrics' && (
                  <div className="flex flex-col min-h-full animate-in fade-in duration-300">
                     {lyrics.length > 0 && !isLoadingLyrics && (
-                      <div className="sticky top-0 z-20 bg-black/50 backdrop-blur-xl px-6 py-4 flex flex-col gap-4 border-b border-white/10 shadow-2xl">
+                      <div className="sticky top-0 z-20 bg-black/50 backdrop-blur-md px-6 py-4 flex flex-col gap-4 border-b border-white/10 shadow-2xl">
                         <div className="flex justify-between items-center">
                           <div className="flex bg-white/5 backdrop-blur-md rounded-full p-1 border border-white/10">
                             <button onClick={() => setLyricsMode('synced')} className={`px-4 py-1.5 rounded-full text-[11px] font-bold transition-all uppercase tracking-wider ${lyricsMode === 'synced' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}>Running</button>
@@ -2029,6 +2026,12 @@ function MainApp() {
         
         .hide-scrollbar::-webkit-scrollbar { display: none; } 
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; } 
+
+        /* 🔥 JURUS OPTIMASI 4: CSS SCROLL MULUS 🔥 */
+        .smooth-scroll {
+          scroll-behavior: smooth;
+          -webkit-overflow-scrolling: touch;
+        }
         
         @keyframes eq {
           0%, 100% { height: 4px; }
@@ -2057,21 +2060,16 @@ export default function App() {
   const handleLogin = (e) => {
     e.preventDefault();
     
-    // 🔥 TRIK 1: KODE HARIAN OTOMATIS GANTI TIAP JAM 12 MALAM 🔥
-    // Rumus: "rnc" + Tanggal + Bulan. 
-    // Contoh: Kalau hari ini tanggal 24 Juli, kodenya otomatis jadi "rnc247"
     const date = new Date();
     const dailyCode = `rnc${date.getDate()}${date.getMonth() + 1}`;
 
-    // 🔥 TRIK 2: DAFTAR KODE VOUCHER MANUAL (Bisa lu atur semaunya) 🔥
     const validCodes = [
-      dailyCode,         // Panggil kode harian di atas
-      'budi15k',         // Kode khusus Budi
-      'aseplunas',       // Kode khusus Asep
-      'tamuVVIP2024'     // Kode khusus bebas
+      dailyCode,         
+      'budi15k',         
+      'aseplunas',       
+      'tamuVVIP2024'     
     ];
 
-    // Cek apakah input dari user cocok sama salah satu kode di atas
     if (validCodes.includes(password.toLowerCase().trim())) {
       localStorage.setItem('rnc_vip_access', 'true');
       setIsAuthenticated(true);
@@ -2089,9 +2087,9 @@ export default function App() {
     <div className="h-screen bg-gradient-to-br from-[#13151f] via-[#0f0f0f] to-[#000000] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden font-sans">
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
       
-      <div className="bg-[#181818]/80 backdrop-blur-xl p-6 md:p-10 rounded-3xl shadow-2xl border border-white/10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500 text-center">
+      <div className="bg-[#181818]/80 backdrop-blur-md p-6 md:p-10 rounded-3xl shadow-2xl border border-white/10 w-full max-w-md relative z-10 animate-in fade-in zoom-in duration-500 text-center">
         <div className="w-20 h-20 mx-auto bg-black rounded-full mb-4 p-1 border-2 border-[#3ea6ff] shadow-[0_0_20px_rgba(62,166,255,0.4)]">
-          <img src="/rnctech.jpg" alt="Logo" className="w-full h-full rounded-full object-cover" />
+          <img loading="lazy" src="/rnctech.jpg" alt="Logo" className="w-full h-full rounded-full object-cover" />
         </div>
         
         <h1 className="text-3xl font-black text-white mb-2 tracking-tight">RnCmusic <span className="text-[#3ea6ff]">VIP</span></h1>
