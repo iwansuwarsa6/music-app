@@ -489,7 +489,7 @@ function MainApp() {
     }
   };
 
-  // 🔥 FUNGSI DOWNLOAD OTOMATIS MP3 KE HP 🔥
+  // 🔥 FUNGSI DOWNLOAD OTOMATIS MP3 KE HP + SIMPAN KE PUSTAKA 🔥
   const handleDownloadMp3 = async (songToDownload) => {
     try {
       showToast(`⏳ Mengunduh: ${songToDownload.title}... (Jangan ditutup)`);
@@ -517,6 +517,14 @@ function MainApp() {
       // Bersihkan jembatan
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
+
+      // 👇👇👇 BAGIAN PENTING: LAPORAN KE PUSTAKA 👇👇👇
+      const downloaded = JSON.parse(localStorage.getItem('ytm_downloaded_songs') || '[]');
+      if (!downloaded.some(s => s.id === songToDownload.id)) {
+          downloaded.unshift(songToDownload);
+          localStorage.setItem('ytm_downloaded_songs', JSON.stringify(downloaded));
+          window.dispatchEvent(new Event('downloadedSongsUpdated')); // Kasih tau Pustaka buat update
+      }
       
       showToast(`✅ Berhasil mendownload: ${songToDownload.title}`);
     } catch (error) {

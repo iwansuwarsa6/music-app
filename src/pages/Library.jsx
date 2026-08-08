@@ -10,6 +10,9 @@ export default function Library() {
 
   const [likedSongs, setLikedSongs] = useState([]);
   const [historySongs, setHistorySongs] = useState([]);
+  
+  // 🔥 STATE BARU UNTUK LAGU OFFLINE 🔥
+  const [downloadedSongs, setDownloadedSongs] = useState([]);
 
   // 🔥 STATE UNTUK FITUR IMPORT LINK 🔥
   const [showImportModal, setShowImportModal] = useState(false);
@@ -30,16 +33,20 @@ export default function Library() {
     const loadData = () => {
       setLikedSongs(JSON.parse(localStorage.getItem('ytm_liked_songs') || '[]'));
       setHistorySongs(JSON.parse(localStorage.getItem('ytm_play_history') || '[]'));
+      // 🔥 BACA DATA LAGU OFFLINE DARI MEMORI HP 🔥
+      setDownloadedSongs(JSON.parse(localStorage.getItem('ytm_downloaded_songs') || '[]'));
     };
     
     loadData();
     
     window.addEventListener('likedSongsUpdated', loadData);
     window.addEventListener('historyUpdated', loadData);
+    window.addEventListener('downloadedSongsUpdated', loadData); // 🔥 LISTENER BARU
     
     return () => {
       window.removeEventListener('likedSongsUpdated', loadData);
       window.removeEventListener('historyUpdated', loadData);
+      window.removeEventListener('downloadedSongsUpdated', loadData);
     }
   }, []);
 
@@ -53,10 +60,10 @@ export default function Library() {
     },
     { 
         id: 'diunduh', 
-        title: 'Diunduh', 
-        desc: '0 lagu', 
+        title: 'Tersimpan (Offline)', // 🔥 NAMA DIUBAH BIAR MAKIN PREMIUM
+        desc: `${downloadedSongs.length} lagu`, // 🔥 OTOMATIS NGITUNG LAGU
         icon: <Download size={28} className="text-white" />, 
-        data: [] 
+        data: downloadedSongs // 🔥 DATA DISAMBUNGIN
     },
     { 
         id: 'history', 
