@@ -341,6 +341,14 @@ function LibraryContent() {
                    extractedTitles = [...new Set(rawNames)];
                }
             }
+
+            if (extractedTitles.length === 0) {
+                const descMatch = html.match(/<meta name="description" content="([^"]+)"/i);
+                if (descMatch && descMatch[1]) {
+                    const rawDesc = descMatch[1].replace(/·/g, '').replace(/Playlist/gi, '').replace(/[0-9]+\s+songs/gi, '').replace(/[0-9]+\s+likes/gi, '');
+                    extractedTitles = rawDesc.split(',').map(s => s.trim()).filter(s => s.length > 3);
+                }
+            }
         } else {
             showToast("❌ Hanya mendukung link YouTube Playlist (ada '?list=') dan Spotify Playlist!");
             setIsImporting(false);
@@ -571,10 +579,11 @@ function LibraryContent() {
                 </div>
                 
                 <div className="flex items-center gap-1 md:gap-3">
+                  {/* 🔥 TOMBOL HAPUS WARNA PUTIH KALEM 🔥 */}
                   {pl.id === 'diunduh' && (
                     <button 
                       onClick={(e) => handleDeleteDownload(e, song.id)}
-                      className="p-3 text-red-400 hover:text-red-500 hover:bg-red-500/20 rounded-full transition-all"
+                      className="p-3 text-zinc-500 hover:text-white hover:bg-white/10 rounded-full transition-all"
                       title="Hapus dari HP"
                     >
                       <Trash2 size={20} />
@@ -650,9 +659,10 @@ function LibraryContent() {
                 <p className="text-sm text-zinc-400 font-medium leading-none">{pl.desc}</p>
               </div>
               
+              {/* 🔥 TOMBOL HAPUS WARNA PUTIH KALEM 🔥 */}
               <button 
                 onClick={(e) => handleDeleteCustomPlaylist(e, pl.id)} 
-                className="absolute right-4 p-2 text-zinc-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10 rounded-full"
+                className="absolute right-4 p-2 text-zinc-500 hover:text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-white/10 rounded-full"
                 title="Hapus Playlist"
               >
                 <Trash2 size={20} />
