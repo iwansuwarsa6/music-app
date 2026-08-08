@@ -1,8 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Play, Pause, MoreVertical, Heart, Download, TrendingUp, ArrowLeft, Shuffle, Disc3, Mic2, Users, Import, X, Loader2, ListPlus, Link as LinkIcon, Search } from 'lucide-react';
+import { Play, Pause, MoreVertical, Heart, Download, TrendingUp, ArrowLeft, Shuffle, Disc3, Mic2, Users, Import, X, Loader2, ListPlus, Link as LinkIcon, Search, ListMusic, Trash2, LogIn } from 'lucide-react';
 import { usePlayerStore } from '../store/usePlayerStore';
+import { GoogleOAuthProvider, useGoogleLogin } from '@react-oauth/google';
 
-export default function Library() {
+// 🔥 KUNCI PINTU MASUK GOOGLE LU 🔥
+const CLIENT_ID = "1062485226707-a0eqjr4d0j0hfinfiio1085d3k71vei6.apps.googleusercontent.com";
+
+function LibraryContent() {
   const { currentSong, isPlaying, playSong, togglePlay } = usePlayerStore();
   
   const [activeTab, setActiveTab] = useState('Daftar putar');
@@ -10,16 +14,17 @@ export default function Library() {
 
   const [likedSongs, setLikedSongs] = useState([]);
   const [historySongs, setHistorySongs] = useState([]);
-  
-  // 🔥 STATE BARU UNTUK LAGU OFFLINE 🔥
   const [downloadedSongs, setDownloadedSongs] = useState([]);
+  const [customPlaylists, setCustomPlaylists] = useState([]);
 
-  // 🔥 STATE UNTUK FITUR IMPORT LINK 🔥
   const [showImportModal, setShowImportModal] = useState(false);
   const [importUrl, setImportUrl] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
   const [toastMsg, setToastMsg] = useState("");
+  
+  // 🔥 STATE UNTUK LOADING SINKRONISASI GOOGLE 🔥
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const API_BASE = "https://music-app-production-278c.up.railway.app";
   const tabs = ['Daftar putar', 'Lagu', 'Album', 'Artis', 'Podcasts'];
@@ -33,15 +38,14 @@ export default function Library() {
     const loadData = () => {
       setLikedSongs(JSON.parse(localStorage.getItem('ytm_liked_songs') || '[]'));
       setHistorySongs(JSON.parse(localStorage.getItem('ytm_play_history') || '[]'));
-      // 🔥 BACA DATA LAGU OFFLINE DARI MEMORI HP 🔥
       setDownloadedSongs(JSON.parse(localStorage.getItem('ytm_downloaded_songs') || '[]'));
+      setCustomPlaylists(JSON.parse(localStorage.getItem('ytm_custom_playlists') || '[]'));
     };
     
     loadData();
-    
     window.addEventListener('likedSongsUpdated', loadData);
     window.addEventListener('historyUpdated', loadData);
-    window.addEventListener('downloadedSongsUpdated', loadData); // 🔥 LISTENER BARU
+    window.addEventListener('downloadedSongsUpdated', loadData); 
     
     return () => {
       window.removeEventListener('likedSongsUpdated', loadData);
@@ -60,10 +64,10 @@ export default function Library() {
     },
     { 
         id: 'diunduh', 
-        title: 'Tersimpan (Offline)', // 🔥 NAMA DIUBAH BIAR MAKIN PREMIUM
-        desc: `${downloadedSongs.length} lagu`, // 🔥 OTOMATIS NGITUNG LAGU
+        title: 'Tersimpan (Offline)', 
+        desc: `${downloadedSongs.length} lagu`, 
         icon: <Download size={28} className="text-white" />, 
-        data: downloadedSongs // 🔥 DATA DISAMBUNGIN
+        data: downloadedSongs 
     },
     { 
         id: 'history', 
@@ -82,7 +86,6 @@ export default function Library() {
 
   const handlePlaySong = (song, list, index) => {
     if (currentSong?.id === song.id) {
-      // 🔥 FIX BUG: Panggil Saklar Pusat di App.jsx biar audio & icon sinkron 🔥
       if (window.saklarPusat) {
           window.saklarPusat(null);
       } else {
@@ -101,15 +104,99 @@ export default function Library() {
     window.dispatchEvent(new CustomEvent('openSongMenu', { detail: { event: e, song: song } }));
   };
 
+  const handleDeleteCustomPlaylist = (e, id) => {
+      e.stopPropagation();
+      const confirmDelete = window.confirm("Yakin mau hapus playlist ini selamanya?");
+      if(confirmDelete) {
+          const updated = customPlaylists.filter(pl => pl.id !== id);
+          setCustomPlaylists(updated);
+          localStorage.setItem('ytm_custom_playlists', JSON.stringify(updated));
+          showToast("Playlist berhasil dihapus.");
+      }
+  };
+
   // ===========================================================================
-  // 🔥 ALGORITMA SCRAPING LINK SPOTIFY & YOUTUBE (JALUR API BAWAH TANAH) 🔥
+  // 🔥 ALGORITMA SINKRONISASI AKUN YOUTUBE LU SECARA GHAIB (OAUTH 2.0) 🔥
   // ===========================================================================
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setIsSyncing(true);
+      showToast("⏳ Berhasil masuk! Sedang menyedot isi YouTube lu...");
+      try {
+        const token = tokenResponse.access_token;
+        
+        // 1. Tarik Daftar Playlist lu
+        const res = await fetch(`https://youtube.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&maxResults=50&mine=true`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await res.json();
+        
+        if (data.items && data.items.length > 0) {
+          let newPlaylists = [];
+          
+          // 2. Tarik isi lagu dari masing-masing Playlist
+          for (let pl of data.items) {
+            const plRes = await fetch(`https://youtube.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${pl.id}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            const plData = await plRes.json();
+            
+            let tracks = [];
+            if (plData.items) {
+              tracks = plData.items.map(item => {
+                const snippet = item.snippet;
+                let cleanTitle = snippet.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+                if (cleanTitle.includes('-')) cleanTitle = cleanTitle.split('-')[1].trim();
+
+                return {
+                  id: snippet.resourceId.videoId,
+                  title: cleanTitle,
+                  artist: snippet.videoOwnerChannelTitle ? snippet.videoOwnerChannelTitle.replace(/ - Topic/gi, '') : 'YouTube',
+                  image: snippet.thumbnails?.high?.url || snippet.thumbnails?.default?.url
+                };
+              }).filter(t => t.title && t.title !== 'Private video' && t.title !== 'Deleted video');
+            }
+            
+            // Cuma masukin playlist yang ada isi lagunya
+            if(tracks.length > 0) {
+                newPlaylists.push({
+                  id: pl.id,
+                  title: pl.snippet.title,
+                  desc: `${tracks.length} lagu (Sinkronisasi YouTube)`,
+                  data: tracks
+                });
+            }
+          }
+
+          // 3. Gabungin playlist baru ke brankas memori lu
+          const updatedPlaylists = [...newPlaylists, ...customPlaylists];
+          // Buang duplikat ID kalau lu narik 2 kali
+          const uniquePlaylists = Array.from(new Map(updatedPlaylists.map(item => [item.id, item])).values());
+
+          setCustomPlaylists(uniquePlaylists);
+          localStorage.setItem('ytm_custom_playlists', JSON.stringify(uniquePlaylists));
+          showToast(`✅ Berhasil menyedot ${newPlaylists.length} Playlist dari akun lu!`);
+        } else {
+          showToast("❌ Lu belum punya satupun playlist di YouTube.");
+        }
+      } catch(e) {
+        console.error(e);
+        showToast("❌ Gagal terhubung ke server YouTube.");
+      } finally {
+        setIsSyncing(false);
+      }
+    },
+    onError: () => {
+       showToast("❌ Batal Login Google.");
+    },
+    scope: 'https://www.googleapis.com/auth/youtube.readonly',
+  });
+
   const handleImportLink = async (e) => {
     e.preventDefault();
     let url = importUrl.trim();
     if (!url) return;
 
-    // Deteksi kalau lagi offline nggak usah dilanjut
     if (!navigator.onLine) {
         showToast("🔴 Mode Offline aktif, ga bisa tarik lagu dari link!");
         return;
@@ -121,15 +208,12 @@ export default function Library() {
     try {
         let extractedTitles = [];
 
-        // 1. DETEKSI YOUTUBE PLAYLIST
         const ytMatch = url.match(/[?&]list=([a-zA-Z0-9_-]+)/);
         if (ytMatch) {
             const playlistId = ytMatch[1];
             setImportProgress("Menembus API Alternatif YouTube...");
-            
-            // 🔥 TRIK DEWA: Pakai Piped API yang lebih badak + Invidious sebagai cadangan
             const ytApis = [
-                `https://pipedapi.kavin.rocks/playlists/${playlistId}`, // API paling stabil
+                `https://pipedapi.kavin.rocks/playlists/${playlistId}`, 
                 `https://pipedapi.moomoo.me/playlists/${playlistId}`,
                 `https://vid.puffyan.us/api/v1/playlists/${playlistId}`,
                 `https://inv.tux.pizza/api/v1/playlists/${playlistId}`
@@ -138,36 +222,28 @@ export default function Library() {
             let successApi = false;
             for (let api of ytApis) {
                 try {
-                    // Pakai sistem timer 6 detik. Kalau server lemot, langsung putus dan ganti server!
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 6000);
-                    
                     const res = await fetch(api, { signal: controller.signal });
                     clearTimeout(timeoutId);
 
                     if (res.ok) {
                         const data = await res.json();
-                        // Format Piped API
                         if (data.relatedStreams && data.relatedStreams.length > 0) {
                             extractedTitles = data.relatedStreams.map(v => v.title);
                             successApi = true;
                             break;
                         } 
-                        // Format Invidious API
                         else if (data.videos && data.videos.length > 0) {
                             extractedTitles = data.videos.map(v => v.title);
                             successApi = true;
                             break;
                         }
                     }
-                } catch(e) { 
-                    console.warn(`API ${api} gagal/lemot, ganti server lain...`); 
-                }
+                } catch(e) { }
             }
-
             if (!successApi) throw new Error("Semua server API YouTube sedang sibuk atau Playlist Private.");
         } 
-        // 2. DETEKSI SPOTIFY PLAYLIST
         else if (url.includes('spotify.com/playlist/')) {
             setImportProgress("Membongkar brankas Spotify...");
             const spotMatch = url.match(/playlist\/([a-zA-Z0-9]+)/);
@@ -183,7 +259,6 @@ export default function Library() {
             
             if (!html) throw new Error("Gagal mengambil data Spotify");
 
-            // JURUS 1: Cari dari Script JSON Rahasia __NEXT_DATA__
             const jsonMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">({.*?})<\/script>/);
             if (jsonMatch && jsonMatch[1]) {
                 try {
@@ -193,17 +268,14 @@ export default function Library() {
                 } catch(e) {}
             }
 
-            // JURUS 2: Kalau format web Spotify ganti, kita hajar pake Brutal Regex
             if (extractedTitles.length === 0) {
                const trackMatches = html.match(/"name":"([^"]+)"/g);
                if (trackMatches) {
-                   // Ekstrak stringnya, buang keyword yang bukan judul lagu
                    const rawNames = trackMatches.map(m => m.split('":"')[1]).filter(n => n.length > 3 && !n.includes("Spotify") && !n.includes("Playlist"));
                    extractedTitles = [...new Set(rawNames)];
                }
             }
 
-            // JURUS 3: Fallback mentok dari Meta Description
             if (extractedTitles.length === 0) {
                 const descMatch = html.match(/<meta name="description" content="([^"]+)"/i);
                 if (descMatch && descMatch[1]) {
@@ -217,7 +289,6 @@ export default function Library() {
             return;
         }
 
-        // Filter judul sampah dan batasin 15 lagu biar API siputzx lu ngga jebol
         extractedTitles = [...new Set(extractedTitles)]
             .filter(t => t && t !== "Hapus" && t !== "Simpan" && t !== "Private video" && t !== "Deleted video")
             .slice(0, 15);
@@ -255,17 +326,26 @@ export default function Library() {
                         }
                     }
                 }
-            } catch (e) {
-                console.error("Gagal nyari lagu:", extractedTitles[i]);
-            }
-            // Tahan nafas bentar biar ga kena Limit API
+            } catch (e) { }
             await new Promise(resolve => setTimeout(resolve, 500));
         }
 
         if (newTracks.length > 0) {
-            const currentQueue = usePlayerStore.getState().queue || [];
-            usePlayerStore.setState({ queue: [...currentQueue, ...newTracks] });
-            showToast(`✅ Berhasil menarik ${successCount} lagu dari Link! Cek Antrean lu Bang.`);
+            let plName = window.prompt("Berhasil ditarik! Kasih nama buat Playlist ini Bang:", "Koleksi Baru");
+            if (!plName) plName = "Playlist Import";
+
+            const newPlaylist = {
+                id: 'custom_' + Date.now(),
+                title: plName,
+                desc: `${newTracks.length} lagu (Sumber External)`,
+                data: newTracks
+            };
+
+            const updatedPlaylists = [newPlaylist, ...customPlaylists];
+            setCustomPlaylists(updatedPlaylists);
+            localStorage.setItem('ytm_custom_playlists', JSON.stringify(updatedPlaylists));
+
+            showToast(`✅ Mantap! "${plName}" udah tersimpan permanen di Pustaka lu.`);
             setShowImportModal(false);
             setImportUrl("");
         } else {
@@ -280,21 +360,21 @@ export default function Library() {
   };
 
   if (selectedPlaylist) {
-    const pl = playlists.find(p => p.id === selectedPlaylist);
+    const pl = playlists.find(p => p.id === selectedPlaylist) || customPlaylists.find(p => p.id === selectedPlaylist);
+    
     return (
       <div className="pt-4 pb-24 px-4 md:px-8 animate-in fade-in slide-in-from-right-4 duration-300">
-        
         <button onClick={() => setSelectedPlaylist(null)} className="flex items-center gap-2 text-zinc-400 hover:text-white mb-8 transition-colors p-2 -ml-2 rounded-full hover:bg-white/10">
           <ArrowLeft size={24} /> <span className="font-bold hidden md:inline">Kembali</span>
         </button>
 
         <div className="flex flex-col md:flex-row gap-6 md:gap-10 mb-8 items-center md:items-start">
-          <div className="w-48 h-48 md:w-64 md:h-64 bg-zinc-800 rounded-xl flex items-center justify-center shadow-2xl flex-shrink-0">
-            {pl.icon}
+          <div className={`w-48 h-48 md:w-64 md:h-64 rounded-xl flex items-center justify-center shadow-2xl flex-shrink-0 ${pl.icon ? 'bg-zinc-800' : 'bg-gradient-to-br from-[#ff0000] to-red-900'}`}>
+            {pl.icon ? pl.icon : <ListMusic size={64} className="text-white opacity-80" />}
           </div>
           <div className="flex flex-col items-center md:items-start text-center md:text-left mt-4 md:mt-10">
             <h1 className="text-4xl md:text-6xl font-black text-white mb-4 tracking-tight">{pl.title}</h1>
-            <p className="text-zinc-400 text-sm md:text-base font-medium mb-8">{pl.desc} • Dibuat untuk Anda</p>
+            <p className="text-zinc-400 text-sm md:text-base font-medium mb-8">{pl.desc}</p>
             
             <div className="flex items-center gap-4">
               <button onClick={() => handlePlayAll(pl.data)} className="flex items-center gap-2 bg-white text-black px-8 py-3 rounded-full font-bold hover:scale-105 transition-transform shadow-xl">
@@ -320,7 +400,7 @@ export default function Library() {
                     {isPlaying && isCurrent ? <Pause size={16} fill="currentColor" className="text-white inline" /> : (isCurrent ? <Play size={16} fill="currentColor" className="text-white inline" /> : idx + 1)}
                 </div>
                 <div className="relative w-12 h-12 flex-shrink-0">
-                  <img src={song.image} className="w-full h-full object-cover rounded shadow-md" alt="cover" />
+                  <img loading="lazy" src={song.image} className="w-full h-full object-cover rounded shadow-md" alt="cover" />
                   <div className={`absolute inset-0 bg-black/50 rounded flex items-center justify-center transition-opacity ${isCurrent ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                       {isPlaying && isCurrent ? <Pause fill="white" size={16} /> : <Play fill="white" size={16} className="ml-0.5" />}
                   </div>
@@ -343,11 +423,9 @@ export default function Library() {
     )
   }
 
-  // 🔥 TAMPILAN AWAL PUSTAKA 🔥
   return (
     <div className="pt-4 pb-20 px-4 md:px-8 animate-in fade-in duration-300 max-w-5xl mx-auto relative">
       
-      {/* Pills Kategori */}
       <div className="flex overflow-x-auto gap-3 pb-4 pr-4 hide-scrollbar sticky top-0 bg-[#0f0f0f] z-30 pt-2">
         {tabs.map((tab, idx) => (
           <button 
@@ -360,24 +438,58 @@ export default function Library() {
         ))}
       </div>
 
-      <div className="flex items-center justify-between mt-6 mb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-6 mb-4 gap-4">
         <div className="text-sm font-bold text-zinc-400 tracking-wide">
-          Tanggal ditambahkan ↓
+          Pustaka Playlist Lu
         </div>
         
-        {/* 🔥 TOMBOL IMPORT DITAMBAHKAN DI SINI 🔥 */}
-        <button 
-          onClick={() => setShowImportModal(true)}
-          className="flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white px-4 py-1.5 rounded-full text-xs font-bold transition-colors border border-white/10"
-        >
-          <Import size={14} /> Import Link
-        </button>
-      </div>
+        <div className="flex items-center gap-3">
+          {/* 🔥 TOMBOL LOGIN GOOGLE SAKTI 🔥 */}
+          <button 
+            onClick={() => loginWithGoogle()}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 bg-[#ff0000]/10 hover:bg-[#ff0000]/20 text-[#ff4444] px-4 py-2 rounded-full text-xs font-black transition-colors border border-[#ff0000]/30 shadow-md disabled:opacity-50"
+          >
+            {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+            {isSyncing ? "Menyinkronkan..." : "Sync YouTube"}
+          </button>
 
-      {/* 🔥 KONTEN DINAMIS BERDASARKAN TAB YANG DIPILIH 🔥 */}
+          <button 
+            onClick={() => setShowImportModal(true)}
+            className="flex items-center gap-1.5 bg-[#3ea6ff]/10 hover:bg-[#3ea6ff]/20 text-[#3ea6ff] px-4 py-2 rounded-full text-xs font-black transition-colors border border-[#3ea6ff]/30 shadow-md"
+          >
+            <Import size={16} /> Import Link
+          </button>
+        </div>
+      </div>
       
       {activeTab === 'Daftar putar' && (
         <div className="flex flex-col gap-2 animate-in fade-in duration-300">
+          
+          {customPlaylists.map(pl => (
+            <div 
+               key={pl.id} 
+               onClick={() => setSelectedPlaylist(pl.id)} 
+               className="flex items-center gap-5 p-3 -mx-3 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group relative"
+            >
+              <div className="w-14 h-14 md:w-16 md:h-16 bg-gradient-to-br from-[#ff0000] to-red-900 rounded-lg flex items-center justify-center flex-shrink-0 shadow-md">
+                <ListMusic size={28} className="text-white opacity-80" />
+              </div>
+              <div className="flex flex-col justify-center flex-1 pr-10">
+                <h3 className="text-lg font-bold text-white leading-tight mb-1">{pl.title}</h3>
+                <p className="text-sm text-zinc-400 font-medium leading-none">{pl.desc}</p>
+              </div>
+              
+              <button 
+                onClick={(e) => handleDeleteCustomPlaylist(e, pl.id)} 
+                className="absolute right-4 p-2 text-zinc-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/10 rounded-full"
+                title="Hapus Playlist"
+              >
+                <Trash2 size={20} />
+              </button>
+            </div>
+          ))}
+
           {playlists.map(pl => (
             <div 
                key={pl.id} 
@@ -445,15 +557,12 @@ export default function Library() {
         </div>
       )}
       
-      {/* 🔥 MODAL IMPORT PLAYLIST MENGGUNAKAN LINK 🔥 */}
       {showImportModal && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center px-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-[#181818] w-full max-w-lg rounded-2xl border border-white/10 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            
             <div className="flex items-center justify-between p-6 border-b border-white/5 bg-white/5">
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <LinkIcon className="text-[#3ea6ff]" />
-                Tarik Playlist via Link
+                <LinkIcon className="text-[#3ea6ff]" /> Tarik Playlist (Permanen)
               </h2>
               <button onClick={() => !isImporting && setShowImportModal(false)} className="text-zinc-400 hover:text-white transition-colors bg-black/20 p-2 rounded-full">
                 <X size={20} />
@@ -462,7 +571,7 @@ export default function Library() {
 
             <div className="p-6">
               <p className="text-sm text-zinc-300 mb-6 leading-relaxed">
-                Nggak usah repot ngetik! Cukup *Paste* link (URL) dari Playlist <b>Spotify</b> atau <b>YouTube</b> favorit lu ke sini. Sisanya biar sistem yang kerja narik lagu-lagunya buat lu!
+                Males masukin lagu satu-satu? *Paste* link (URL) dari Playlist <b>Spotify</b> atau <b>YouTube</b> lu di mari. Sistem bakal nyedot otomatis dan nyimpen playlist-nya permanen di web lu!
               </p>
 
               <form onSubmit={handleImportLink} className="relative mb-6">
@@ -479,12 +588,8 @@ export default function Library() {
                   required
                 />
                 {!isImporting && (
-                  <button 
-                    type="submit"
-                    disabled={!importUrl.trim()}
-                    className="absolute inset-y-2 right-2 bg-[#3ea6ff] hover:bg-blue-500 text-black font-bold px-6 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50"
-                  >
-                    Tarik!
+                  <button type="submit" disabled={!importUrl.trim()} className="absolute inset-y-2 right-2 bg-[#3ea6ff] hover:bg-blue-500 text-black font-bold px-6 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50">
+                    Sedot!
                   </button>
                 )}
               </form>
@@ -493,16 +598,14 @@ export default function Library() {
                 <div className="flex flex-col items-center justify-center p-4 bg-[#3ea6ff]/10 rounded-xl border border-[#3ea6ff]/20">
                   <Loader2 className="animate-spin text-[#3ea6ff] mb-2" size={32} />
                   <p className="text-sm font-bold text-white text-center">{importProgress}</p>
-                  <p className="text-xs text-zinc-400 mt-1 text-center">Jangan tutup jendela ini ya Bang...</p>
+                  <p className="text-xs text-zinc-400 mt-1 text-center">Tahan napas bentar Bang...</p>
                 </div>
               )}
             </div>
-            
           </div>
         </div>
       )}
 
-      {/* TOAST KHUSUS LIBRARY */}
       {toastMsg && (
           <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#282828] text-white px-6 py-3 rounded-full text-sm font-semibold shadow-2xl z-[9999] animate-in slide-in-from-bottom-5 border border-white/10 whitespace-nowrap flex items-center gap-2">
               {toastMsg}
@@ -514,5 +617,14 @@ export default function Library() {
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
     </div>
+  );
+}
+
+// 🔥 BUNGKUS KOMPONEN UTAMA PAKE PROVIDER LOGIN GOOGLE 🔥
+export default function Library() {
+  return (
+    <GoogleOAuthProvider clientId={CLIENT_ID}>
+      <LibraryContent />
+    </GoogleOAuthProvider>
   );
 }
