@@ -27,7 +27,6 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
 
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
 
-// 🔥 JURUS FILTER KETAT ANTI RINGTONE & PODCAST 🔥
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
@@ -497,14 +496,17 @@ function MainApp() {
       setIsExpanded(true); 
   };
 
+  // 🔥 JURUS FIX SCROLL: SELALU UPDATE KEDUA MESIN WALAUPUN VIDEO LAGI JALAN 🔥
   const handleSeek = (e) => {
     dismissAdzanIfActive(); 
     const seekTime = parseFloat(e.target.value);
     setCurrentTime(seekTime);
     currentTimeRef.current = seekTime;
+    
     const active = getActiveAudio();
-    if (mediaMode === 'audio' && active) active.currentTime = seekTime;
-    if (mediaMode === 'video' && iframeRef.current && iframeRef.current.contentWindow) {
+    if (active) active.currentTime = seekTime; 
+    
+    if (iframeRef.current && iframeRef.current.contentWindow) {
       iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [seekTime, true] }), '*');
     }
   };
@@ -672,12 +674,10 @@ function MainApp() {
     window.dispatchEvent(new Event('likedSongsUpdated'));
   };
 
-  // 🔥 JURUS SMART RADIO MIX (ANTI LAGU ANEH/RINGTONE) 🔥
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
     let cleanArtist = (baseSong.artist || 'Official').split(/feat\.|ft\.| x |,|\||-/i)[0].replace(/vevo|official|topic|music|lyric|video/gi, '').trim();
     
-    // Ganti Cache Key biar ngereset mix lama yang udah nyangkut
     const cacheKey = `algomix_vip_v4_${cleanArtist}`;
     const cachedMix = sessionStorage.getItem(cacheKey);
     
@@ -698,7 +698,6 @@ function MainApp() {
     const isIndo = /mahalini|bernadya|hindia|tiara|sal|kunto|nadin|pamungkas|yura|maliq|feby|juicy|rizky|tulus|lyodra|ziva|keisya|nadhif|anggi|budi|ghea|batas|virgoun/i.test(cleanArtist);
     const isBarat = /taylor|weeknd|bruno|ariana|bieber|post malone|dua lipa|coldplay|ed sheeran|sabrina|billie|shawn|olivia|clairo|conan|charlie|benson/i.test(cleanArtist);
 
-    // Pakai kutip (") biar YouTube wajib nyari artis resminya, ga melenceng ke ringtone!
     let queryPool = [`"${cleanArtist}" official music video`, `"${cleanArtist}" official audio`]; 
 
     if (isIndo) {
@@ -907,9 +906,16 @@ function MainApp() {
     return t.trim() || currentSong.title;
   }, [currentSong, displayArtist]);
 
+  // 🔥 JURUS SYNC SAAT IFRAME BARU DIBUKA 🔥
   const handleIframeLoad = () => {
     if (iframeRef.current && iframeRef.current.contentWindow) {
       iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'listening' }), '*');
+      
+      const active = getActiveAudio();
+      if (active) {
+          iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [active.currentTime, true] }), '*');
+      }
+
       if (mediaMode === 'audio') {
           iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
           iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
@@ -932,13 +938,13 @@ function MainApp() {
           const active = getActiveAudio();
           if (mediaMode === 'audio') {
               if (active) active.muted = false;
-              iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
               iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
           } else {
               if (active) active.muted = true;
               if (active) {
                   iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'seekTo', args: [active.currentTime, true] }), '*');
               }
+              
               iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'unMute', args: [] }), '*');
               if (isPlaying) {
                   iframeRef.current.contentWindow.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
@@ -1229,9 +1235,10 @@ function MainApp() {
     }
   }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying]);
 
+  // 🔥 JURUS FIX PROGRESS BAR: SELALU UPDATE WALAUPUN LAGI NONTON VIDEO 🔥
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
-      if (!isDragging && mediaMode === 'audio') {
+      if (!isDragging) {
           const newTime = e.target.currentTime;
           if (Math.abs(currentTimeRef.current - newTime) >= 0.5) {
               setCurrentTime(newTime);
@@ -1242,26 +1249,30 @@ function MainApp() {
 
   const handleLoadedMetadata = (e) => {
       if (e.target !== getActiveAudio()) return;
-      if (mediaMode === 'audio') setDuration(e.target.duration);
+      setDuration(e.target.duration);
   };
+  
   const handleCanPlay = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
-      if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) e.target.play().catch(()=>{});
+      if (isPlaying && !isAdzanPlayingRef.current) e.target.play().catch(()=>{});
   };
+  
   const handleError = (e) => {
       if (e.target !== getActiveAudio()) return;
-      if (mediaMode === 'audio' && currentSong?.id && e.target.src) {
+      if (currentSong?.id && e.target.src) {
           setIsBuffering(false);
           usePlayerStore.setState({ isPlaying: false });
           showToast("❌ Audio diproteksi/gagal dimuat. Melompat ke lagu berikutnya...");
           setTimeout(() => { handleNextLocal(null); }, 2500);
       }
   };
+  
   const handleWaiting = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(true);
   };
+  
   const handlePlaying = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
@@ -1269,7 +1280,6 @@ function MainApp() {
   };
   
   const handleAudioEnded = (e) => {
-      if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
 
       if (usePlayerStore.getState().repeatMode === 'one') {
