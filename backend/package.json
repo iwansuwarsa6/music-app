@@ -10,13 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@distube/ytdl-core": "^4.16.12",
-    "axios": "^1.18.1",
     "cors": "^2.8.6",
-    "express": "^5.2.1",
-    "play-dl": "^1.9.7",
-    "youtubei.js": "^17.2.0",
-    "yt-dlp-exec": "^1.0.2",
-    "ytdl-core": "^4.11.5"
+    "express": "^5.2.1"
   }
 }
