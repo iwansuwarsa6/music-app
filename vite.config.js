@@ -10,7 +10,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg}']
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg}'],
+        cleanupOutdatedCaches: true // 🔥 TAMBAHIN BARIS INI BANG!
       },
       manifest: {
         name: 'RnCmusic Premium',
@@ -21,14 +22,14 @@ export default defineConfig({
         display: 'standalone',
         icons: [
           {
-            src: '/rnctech.jpg', // 👉 Udah diganti ke logo RNC Tech
+            src: '/rnctech.jpg',
             sizes: '192x192',
-            type: 'image/jpeg'     
+            type: 'image/jpeg'    
           },
           {
-            src: '/rnctech.jpg', // 👉 Udah diganti ke logo RNC Tech
+            src: '/rnctech.jpg',
             sizes: '512x512',
-            type: 'image/jpeg',    
+            type: 'image/jpeg',   
             purpose: 'any maskable'
           }
         ]

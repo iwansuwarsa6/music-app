@@ -4,5 +4,25 @@
       "source": "/api/lyrics/:match*",
       "destination": "https://lrclib.net/api/:match*"
     }
+  ],
+  "headers": [
+    {
+      "source": "/(.*\\.)?sw\\.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    },
+    {
+      "source": "/service-worker\\.js",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        }
+      ]
+    }
   ]
 }
