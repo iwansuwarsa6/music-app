@@ -27,20 +27,31 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
 
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
 
-// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE (LEVEL DEWA SADIS) 🔥
+// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE (VERSI PALING LENGKAP & AMAN) 🔥
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
+  
+  // 🚫 Kumpulan kata haram dari segala penjuru YouTube (Konten Kreator, Jualan, Ngobrol)
   const badWords = [
       'podcast', 'vlog', 'tutorial', 'review', 'unboxing', 'reaction', 'react to',
-      'trailer', 'movie', 'episode', 'berita', 'gameplay', 'how to', 'cara ',
+      'trailer', 'movie', 'episode', 'berita', 'gameplay', 'how to', 
       'ceramah', 'pengajian', 'talkshow', 'interview', 'parody', 'parodi',
       'ringtone', 'nada dering', 'sound effect', 'ngobrol', 'bincang', 'curhat',
-      'behind the scene', 'behind the scenes', 'making of', 'teaser', 'q&a', 'qna',
-      'dokumenter', 'documentary', 'bloopers', 'press conference', 'wawancara',
-      'story', 'cerita', 'prank', 'challenge', 'di balik layar', 'reaction video'
+      'behind the scene', 'making of', 'teaser', 'q&a', 'qna', 'dokumenter', 
+      'bloopers', 'press conference', 'wawancara', 'story', 'cerita', 'prank', 
+      'challenge', 'di balik layar', 'reaction video', 'fungsi', 'fitur', 
+      'demo ', 'overview', 'guide', 'belajar', 'cara main', 'kelebihan', 
+      'spesifikasi', 'perbandingan', 'midi controller', 'yamaha', 'roland', 
+      'korg', 'casio', 'kupas tuntas', 'setting', 'pengaturan', 'alasan', 
+      'kenapa', 'mengapa', ' vs ', 'versus', 'tips', 'trick', 'trik', 'harga'
   ];
-  return badWords.some(w => t.includes(w));
+  
+  // 🔥 Pengecualian pintar: Biar lagu kayak "Cara Lupakanmu" ga keblokir
+  if (t.includes('cara ') && !t.includes('bicara') && !t.includes('cara lupakan')) return true;
+
+  // Filter ekstra buat kata yang butuh spasi biar ga nabrak nama orang/lagu
+  return badWords.some(w => t.includes(w)) || t.match(/\b(tes|test|unbox)\b/);
 };
 
 const isBadMix = (title) => {
@@ -48,12 +59,13 @@ const isBadMix = (title) => {
   if (isNonMusic(title)) return true;
   const t = title.toLowerCase();
   const badMixWords = [
+      // 🚫 Blokir kompilasi, konser, dan versi aneh
       'full album', 'kompilasi', 'compilation', '1 jam', '2 jam', ' hours', ' hour',
       'karaoke', 'instrumental', 'tanpa vokal', 'live at', 'live in', 'live performance',
       'konser', 'concert', 'short', 'shorts', '8d', '8 d', 'sped up', 'slowed', 'reverb',
       'kumpulan', 'terbaik', 'pilihan', 'nonstop', 'non stop', '2023', '2024', '2025', '2026', '2027', 
       'hits tiktok', 'viral', 'dj ', 'remix', 'type beat', 'chords', 'lirik lagu', 'chord gitar',
-      'live session', 'live acoustic', 'cover', 'akustik'
+      'live session', 'live acoustic', 'cover', 'akustik', 'medley'
   ];
   return badMixWords.some(w => t.includes(w));
 };
