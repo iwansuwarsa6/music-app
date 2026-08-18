@@ -27,14 +27,18 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
 
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
 
+// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE (LEVEL DEWA SADIS) 🔥
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
   const badWords = [
-      'podcast', 'vlog', 'tutorial', 'review', 'unboxing', 'reaction',
+      'podcast', 'vlog', 'tutorial', 'review', 'unboxing', 'reaction', 'react to',
       'trailer', 'movie', 'episode', 'berita', 'gameplay', 'how to', 'cara ',
       'ceramah', 'pengajian', 'talkshow', 'interview', 'parody', 'parodi',
-      'ringtone', 'nada dering', 'sound effect'
+      'ringtone', 'nada dering', 'sound effect', 'ngobrol', 'bincang', 'curhat',
+      'behind the scene', 'behind the scenes', 'making of', 'teaser', 'q&a', 'qna',
+      'dokumenter', 'documentary', 'bloopers', 'press conference', 'wawancara',
+      'story', 'cerita', 'prank', 'challenge', 'di balik layar', 'reaction video'
   ];
   return badWords.some(w => t.includes(w));
 };
@@ -45,10 +49,11 @@ const isBadMix = (title) => {
   const t = title.toLowerCase();
   const badMixWords = [
       'full album', 'kompilasi', 'compilation', '1 jam', '2 jam', ' hours', ' hour',
-      'karaoke', 'instrumental', 'tanpa vokal', 'live at', 'live in', 
-      'konser', 'short', 'shorts', '8d', '8 d', 'sped up', 'slowed', 'reverb',
+      'karaoke', 'instrumental', 'tanpa vokal', 'live at', 'live in', 'live performance',
+      'konser', 'concert', 'short', 'shorts', '8d', '8 d', 'sped up', 'slowed', 'reverb',
       'kumpulan', 'terbaik', 'pilihan', 'nonstop', 'non stop', '2023', '2024', '2025', '2026', '2027', 
-      'hits tiktok', 'viral', 'dj ', 'remix', 'type beat', 'chords', 'lirik lagu'
+      'hits tiktok', 'viral', 'dj ', 'remix', 'type beat', 'chords', 'lirik lagu', 'chord gitar',
+      'live session', 'live acoustic', 'cover', 'akustik'
   ];
   return badMixWords.some(w => t.includes(w));
 };
@@ -685,12 +690,11 @@ function MainApp() {
   };
 
   // =========================================================================
-  // 🔥 JURUS RADIO MIX PREMIUM (ANTI BURUNG BEO & ANTI SPAM UPLOADER) 🔥
+  // 🔥 ALGORITMA RADIO MIX SUPER CERDAS (SISTEM KARANTINA GENRE KETAT) 🔥
   // =========================================================================
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
 
-    // 1. EKSTRAK ARTIS ASLI DARI JUDUL BIAR GAK NYASAR KE NAMA UPLOADER COVER
     let realTitle = baseSong.title || "";
     let realArtist = baseSong.artist || "Official";
 
@@ -705,7 +709,7 @@ function MainApp() {
     
     if (!cleanArtist || cleanArtist.toLowerCase() === 'youtube') cleanArtist = "Pop Hits";
 
-    const cacheKey = `algomix_smart_v3_${cleanTitle}_${cleanArtist}`;
+    const cacheKey = `algomix_smart_v5_${cleanTitle}_${cleanArtist}`;
     const cachedMix = sessionStorage.getItem(cacheKey);
     
     if (cachedMix) {
@@ -719,24 +723,39 @@ function MainApp() {
         return;
     }
 
-    const indoPopArr = ["Mahalini", "Bernadya", "Hindia", "Tiara Andini", "Sal Priadi", "Kunto Aji", "Nadin Amizah", "Pamungkas", "Yura Yunita", "Maliq & D'Essentials", "Juicy Luicy", "Rizky Febian", "Tulus", "Lyodra", "Ziva Magnolya", "Nadhif Basalamah", "Anggi Marito", "Budi Doremi", "Ghea Indrawari", "Virgoun", "Sheila On 7", "D'Masiv", "Noah"];
-    const baratPopArr = ["Taylor Swift", "The Weeknd", "Bruno Mars", "Ariana Grande", "Justin Bieber", "Post Malone", "Dua Lipa", "Coldplay", "Ed Sheeran", "Sabrina Carpenter", "Billie Eilish", "Shawn Mendes", "Olivia Rodrigo", "Clairo", "Conan Gray", "Charlie Puth", "Benson Boone"];
+    // 🔥 KELOMPOK GENRE 🔥
+    const dangdutArr = ["Rhoma Irama", "Meggy Z", "Evie Tamala", "Elvy Sukaesih", "Rita Sugiarto", "Mansyur S", "Caca Handika", "Asep Irama", "Imam S Arifin", "Dangdut", "Koplo", "Monata", "Pallapa"];
+    const indoPopArr = ["Mahalini", "Bernadya", "Hindia", "Tiara Andini", "Sal Priadi", "Kunto Aji", "Nadin Amizah", "Pamungkas", "Yura Yunita", "Maliq & D'Essentials", "Juicy Luicy", "Rizky Febian", "Tulus", "Lyodra", "Sheila On 7", "D'Masiv", "Noah"];
+    const baratPopArr = ["Taylor Swift", "The Weeknd", "Bruno Mars", "Ariana Grande", "Justin Bieber", "Post Malone", "Dua Lipa", "Coldplay", "Ed Sheeran", "Sabrina Carpenter", "Billie Eilish", "Charlie Puth", "Benson Boone"];
+    const rockArr = ["Linkin Park", "Nirvana", "Green Day", "Guns N' Roses", "Queen", "Muse", "Oasis", "Arctic Monkeys", "Bon Jovi"];
+
+    // 1. Deteksi Genre Lagu Utama (Lagu yang lagi lu putar)
+    const baseIsDangdut = dangdutArr.some(a => cleanArtist.toLowerCase().includes(a.toLowerCase()) || cleanTitle.toLowerCase().includes(a.toLowerCase()));
+    const baseIsBarat = baratPopArr.some(a => cleanArtist.toLowerCase().includes(a.toLowerCase()));
+    const baseIsRock = rockArr.some(a => cleanArtist.toLowerCase().includes(a.toLowerCase()));
 
     let queryPool = [
-        `"${cleanArtist}" ${cleanTitle} official audio`,
-        `${cleanArtist} lagu pop hits`,
+        `"${cleanArtist}" official audio`, 
+        `${cleanArtist} lagu terbaik official` 
     ]; 
-
-    const isBarat = baratPopArr.some(a => cleanArtist.toLowerCase().includes(a.toLowerCase()));
     
-    if (isBarat) {
+    // Sesuaikan sumber pencarian dengan genre
+    if (baseIsDangdut) {
+        const randomHits = dangdutArr.sort(() => 0.5 - Math.random()).slice(0, 2);
+        queryPool.push(`"${randomHits[0]}" official audio`);
+        queryPool.push(`"${randomHits[1]}" lagu original`);
+    } else if (baseIsBarat) {
         const randomHits = baratPopArr.sort(() => 0.5 - Math.random()).slice(0, 2);
-        queryPool.push(`"${randomHits[0]}" official music video`);
+        queryPool.push(`"${randomHits[0]}" official audio`);
+        queryPool.push(`"${randomHits[1]}" official audio`);
+    } else if (baseIsRock) {
+        const randomHits = rockArr.sort(() => 0.5 - Math.random()).slice(0, 2);
+        queryPool.push(`"${randomHits[0]}" official audio`);
         queryPool.push(`"${randomHits[1]}" official audio`);
     } else {
         const randomHits = indoPopArr.sort(() => 0.5 - Math.random()).slice(0, 2);
-        queryPool.push(`"${randomHits[0]}" official music video`);
-        queryPool.push(`"${randomHits[1]}" official audio`);
+        queryPool.push(`${cleanArtist} mix official`);
+        queryPool.push(`"${randomHits[0]}" official audio`);
     }
 
     try {
@@ -753,8 +772,6 @@ function MainApp() {
         let mix = [];
         let usedIds = new Set([baseSong.id]); 
         let usedTitles = new Set([cleanTitle.toLowerCase()]);
-        
-        // 🔥 2. JURUS ANTI MONOPOLI CHANNEL: MAKSIMAL 2 LAGU DARI UPLOADER SAMA 🔥
         let uploaderCount = {}; 
 
         combined.filter(t => t.type === 'video' && !isBadMix(t.title)).forEach(t => {
@@ -766,6 +783,17 @@ function MainApp() {
             tCleanT = tCleanT.trim();
 
             let titleCheck = tCleanT.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music|cover|remix|live)/gi, '').trim();
+            
+            // 🔥 EKSEKUSI KARANTINA GENRE 🔥
+            // Cek apakah lagu yang baru ditemuin ini adalah Dangdut
+            const isThisSongDangdut = dangdutArr.some(a => tCleanT.toLowerCase().includes(a.toLowerCase()) || (t.author?.name || '').toLowerCase().includes(a.toLowerCase()) || tCleanT.toLowerCase().includes('dangdut'));
+            
+            // ATURAN 1: Kalau lagu utamanya BUKAN Dangdut, tapi nemu lagu Dangdut -> BUANG/SKIP!
+            if (!baseIsDangdut && isThisSongDangdut) return;
+            
+            // ATURAN 2: Kalau lagu utamanya Dangdut, tapi nemu lagu Pop Barat -> BUANG/SKIP!
+            if (baseIsDangdut && baratPopArr.some(a => (t.author?.name || '').toLowerCase().includes(a.toLowerCase()))) return;
+
             if (titleCheck.length > 3) {
                 let isDup = Array.from(usedTitles).some(seen => seen.includes(titleCheck) || titleCheck.includes(seen));
                 if (isDup) return; 
@@ -775,10 +803,7 @@ function MainApp() {
             let uploaderName = t.author?.name || 'YouTube';
             let uploaderLow = uploaderName.toLowerCase();
             
-            // 3. Buang channel ringtone/dj dari peredaran
             if (uploaderLow.includes('ringtone') || uploaderLow.includes('dj ') || uploaderLow.includes('karaoke')) return;
-
-            // Batasi! (Contoh: Kalo ARFATIEZ udah nyumbang 2 lagu, sisanya diblokir!)
             if (uploaderCount[uploaderName] >= 2) return;
             uploaderCount[uploaderName] = (uploaderCount[uploaderName] || 0) + 1;
 
@@ -789,6 +814,13 @@ function MainApp() {
                 image: t.thumbnail
             });
             usedIds.add(validId);
+        });
+
+        // Sorting: Utamakan artis yang sama di urutan teratas
+        mix.sort((a, b) => {
+            let isASameArtist = a.artist.toLowerCase().includes(cleanArtist.toLowerCase()) ? -1 : 1;
+            let isBSameArtist = b.artist.toLowerCase().includes(cleanArtist.toLowerCase()) ? -1 : 1;
+            return isASameArtist - isBSameArtist;
         });
 
         mix = mix.slice(0, 25);
