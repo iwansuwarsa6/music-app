@@ -111,7 +111,7 @@ function MainApp() {
 
   const keepAliveAudioRef = useRef(null); 
   
-  const API_BASE = "https://music-app-production-278c.up.railway.app";
+  const API_BASE = "https://music-app-production-60db.up.railway.app";
 
   const [currentTime, setCurrentTime] = useState(0);
   const currentTimeRef = useRef(0);
