@@ -25,7 +25,7 @@ export default function Television() {
     }
   ];
 
-  // State untuk nyimpan ribuan channel hasil sedotan dari GitHub
+  // State untuk nyimpan ribuan channel hasil sedotan
   const [channels, setChannels] = useState([]);
   const [isLoadingChannels, setIsLoadingChannels] = useState(true);
   
@@ -33,45 +33,68 @@ export default function Television() {
   const [isLoadingStream, setIsLoadingStream] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 🔥 3. AUTO-PARSER M3U DARI GITHUB IPTV-ORG 🔥
+  // 🔥 3. AUTO-PARSER MULTI-SOURCE (TEKNIK STB MODDER) 🔥
   useEffect(() => {
     const fetchPlaylist = async () => {
+      setIsLoadingChannels(true);
       try {
-        // Nyedot dari server iptv-org (Khusus TV Indonesia biar enteng & stabil)
-        const response = await fetch('https://iptv-org.github.io/iptv/countries/id.m3u');
-        const text = await response.text();
-        
-        // Proses ngebelah teks jadi daftar channel
-        const lines = text.split('\n');
-        const parsedChannels = [];
-        let currentName = '';
+        // 3 Peluru Gudang M3U underground lokal & global
+        const sources = [
+          'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/id.m3u',
+          'https://raw.githubusercontent.com/linuxmint-id/iptv-indonesia/main/iptv.m3u',
+          'https://iptv-org.github.io/iptv/countries/id.m3u'
+        ];
 
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i].trim();
-          if (line.startsWith('#EXTINF:')) {
-            // Ambil nama channel setelah tanda koma terakhir
-            const parts = line.split(',');
-            currentName = parts[parts.length - 1].trim();
-          } else if (line.startsWith('http') && currentName) {
-            parsedChannels.push({
-              id: parsedChannels.length + 1,
-              name: currentName,
-              url: line,
-              type: 'tv'
-            });
-            currentName = ''; // Reset buat channel berikutnya
+        let allChannels = [];
+        let channelIdCounter = 1;
+
+        // Loop buat nyedot semua sumber satu per satu
+        for (const source of sources) {
+          try {
+            const response = await fetch(source);
+            if (!response.ok) continue;
+            
+            const text = await response.text();
+            const lines = text.split('\n');
+            let currentName = '';
+
+            for (let i = 0; i < lines.length; i++) {
+              const line = lines[i].trim();
+              if (line.startsWith('#EXTINF:')) {
+                // Ekstrak nama channel
+                const parts = line.split(',');
+                currentName = parts[parts.length - 1].trim();
+              } else if (line.startsWith('http') && currentName) {
+                // Filter biar nggak ada channel duplikat dengan nama yang sama persis
+                const isDuplicate = allChannels.some(ch => ch.name.toLowerCase() === currentName.toLowerCase());
+                
+                if (!isDuplicate) {
+                  allChannels.push({
+                    id: channelIdCounter++,
+                    name: currentName,
+                    url: line,
+                    type: 'tv'
+                  });
+                }
+                currentName = ''; 
+              }
+            }
+          } catch (err) {
+            console.log(`⚠️ Gagal nyedot dari source: ${source}`);
           }
         }
 
-        setChannels(parsedChannels);
+        // Urutkan nama channel sesuai abjad biar rapi di UI
+        allChannels.sort((a, b) => a.name.localeCompare(b.name));
         
-        // Langsung setel Mux Test atau channel pertama sebagai default pas web dibuka
-        if (parsedChannels.length > 0) {
+        setChannels(allChannels);
+        
+        if (allChannels.length > 0) {
           setActiveStream({ name: 'Siap Menonton', url: '', type: 'standby' });
         }
 
       } catch (error) {
-        console.error("Gagal nyedot playlist TV:", error);
+        console.error("❌ Gagal total nyedot playlist TV:", error);
       } finally {
         setIsLoadingChannels(false);
       }
@@ -88,31 +111,13 @@ export default function Television() {
   const handleSelectChannel = (ch) => {
     setIsLoadingStream(false);
     
-    const channelName = ch.name.toLowerCase();
-
-    // 🏴‍☠️ JALUR KHUSUS: Kalo SCTV / Indosiar, kita tembak ke Dailymotion resmi mereka (Anti-CORS)
-    if (channelName.includes('sctv')) {
-      setActiveStream({ name: ch.name, url: 'https://www.dailymotion.com/embed/video/x772mgb?autoplay=1', type: 'iframe' });
-      return;
-    }
-    if (channelName.includes('indosiar')) {
-      setActiveStream({ name: ch.name, url: 'https://www.dailymotion.com/embed/video/x772mgc?autoplay=1', type: 'iframe' });
-      return;
-    }
-    // 🏴‍☠️ JALUR KHUSUS: Kalo RCTI / MNC, kita tembak pakai web embed (Opsional)
-    if (channelName.includes('rcti')) {
-      // RCTI sering ganti link, kita siapin wadah iframe-nya
-      setActiveStream({ name: ch.name, url: 'https://www.rctiplus.com/tv/rcti', type: 'iframe' });
-      return;
-    }
-
-    // 🚀 JALUR NORMAL: Selain channel resek di atas, pakai Proxy Railway & Shaka Player
+    // 🚀 JALUR NORMAL KITA: Semua channel dipaksa lewat Proxy Railway lu
     const bypassedUrl = `https://music-app-production-60db.up.railway.app/api/bypass-cors?url=${encodeURIComponent(ch.url)}`;
 
     setActiveStream({ 
       name: ch.name, 
       url: bypassedUrl, 
-      type: 'shaka', // Kita tandain ini butuh Shaka
+      type: 'shaka', 
       clearKeyId: ch.clearKeyId || null,
       clearKeyValue: ch.clearKeyValue || null 
     });
@@ -131,7 +136,7 @@ export default function Television() {
         setActiveStream({ 
           name: match.title, 
           url: data.streamUrl, 
-          type: 'shaka', // Pertandingan bola kita play pakai Shaka
+          type: 'shaka', 
           clearKeyId: data.clearKeyId || null,
           clearKeyValue: data.clearKeyValue || null 
         });
@@ -173,24 +178,13 @@ export default function Television() {
               </div>
             )}
 
-            {/* 🔥 HYBRID PLAYER: BISA SHAKA, BISA IFRAME 🔥 */}
+            {/* 🔥 PANGGIL SHAKA PLAYER KITA 🔥 */}
             {activeStream && activeStream.url ? (
-              activeStream.type === 'iframe' ? (
-                // Kalau tipe iframe (kayak SCTV/Indosiar), munculin iframe murni
-                <iframe 
-                  src={activeStream.url}
-                  className="w-full h-full absolute inset-0 z-10 border-0"
-                  allow="autoplay; fullscreen; encrypted-media"
-                  allowFullScreen
-                ></iframe>
-              ) : (
-                // Kalau tipe shaka/match, panggil Shaka Player
                 <ShakaPlayer 
                   url={activeStream.url} 
                   clearKeyId={activeStream.clearKeyId} 
                   clearKeyValue={activeStream.clearKeyValue} 
                 />
-              )
             ) : (
               // Layar pas baru buka web / Standby
               <div className="flex flex-col items-center justify-center text-zinc-600 z-10">
@@ -219,7 +213,7 @@ export default function Television() {
         {/* KOLOM KANAN: DAFTAR CHANNEL & JADWAL */}
         <div className="flex flex-col gap-6">
           
-          {/* DAFTAR SIARAN (SEKARANG DINAMIS) */}
+          {/* DAFTAR SIARAN */}
           <div className="bg-[#181818] rounded-2xl border border-white/5 p-5 flex flex-col h-[350px]">
             <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2 border-b border-white/10 pb-3">
               <Radio size={20} className="text-[#3ea6ff]" /> Daftar Siaran (IPTV)
