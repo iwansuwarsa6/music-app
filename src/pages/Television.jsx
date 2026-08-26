@@ -33,12 +33,12 @@ export default function Television() {
   const [isLoadingStream, setIsLoadingStream] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // 🔥 3. AUTO-PARSER M3U DARI GITHUB DHANYTV 🔥
+  // 🔥 3. AUTO-PARSER M3U DARI GITHUB IPTV-ORG 🔥
   useEffect(() => {
     const fetchPlaylist = async () => {
       try {
-        // Nyedot raw file M3U OTT dari repo Dhani
-        const response = await fetch('https://raw.githubusercontent.com/dhasap/dhanytv/main/dhanytv-ott.m3u');
+        // Nyedot dari server iptv-org (Khusus TV Indonesia biar enteng & stabil)
+        const response = await fetch('https://iptv-org.github.io/iptv/countries/id.m3u');
         const text = await response.text();
         
         // Proses ngebelah teks jadi daftar channel
@@ -208,7 +208,7 @@ export default function Television() {
               {isLoadingChannels ? (
                 <div className="flex flex-col items-center justify-center h-full text-zinc-500 gap-2">
                   <Loader2 className="w-6 h-6 animate-spin" />
-                  <span className="text-xs">Mengunduh 700+ Channel...</span>
+                  <span className="text-xs">Mengunduh Channel...</span>
                 </div>
               ) : filteredChannels.length > 0 ? (
                 filteredChannels.map((ch) => (
