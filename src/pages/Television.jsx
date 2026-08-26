@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Tv, Calendar, Radio, Info } from 'lucide-react';
+import { useState } from 'react';
+// 🔥 Tadi PlaySquare-nya kelupaan di-import Bang! Sekarang udah aman 🔥
+import { Tv, Calendar, Radio, Info, PlaySquare } from 'lucide-react';
 
 export default function Television() {
   const [activeChannel, setActiveChannel] = useState(null);
