@@ -256,6 +256,67 @@ app.get('/api/bypass-cors', async (req, res) => {
     }
 });
 
+// =====================================================================
+// 🏴‍☠️ ENDPOINT 5: AUTO-SCRAPER TOKEN THE BIG 6 (SCTV, RCTI, DLL)
+// =====================================================================
+app.get('/api/get-premium-channel', async (req, res) => {
+    const { channel } = req.query;
+
+    if (!channel) return res.status(400).send('Nama channel belum dimasukin Bang!');
+
+    try {
+        let streamUrl = '';
+
+        // 🟢 JALUR MNC GROUP (RCTI, GTV, MNCTV, iNews)
+        // Nembak langsung ke API internal RCTI+ Android
+        if (['rcti', 'gtv', 'mnctv', 'inews'].includes(channel)) {
+            const rctiResponse = await axios.get(`https://api.rctiplus.com/api/v1/live/tv/${channel}`, {
+                headers: {
+                    'User-Agent': 'okhttp/4.9.0', // Nyamar jadi aplikasi Android
+                    'Platform': 'android'
+                }
+            });
+
+            const videoData = rctiResponse.data?.data;
+            if (videoData && videoData.length > 0) {
+                streamUrl = videoData[0].url; 
+            }
+        } 
+        
+        // 🔵 JALUR EMTEK GROUP (SCTV, Indosiar)
+        // Jalur API Vidio 
+        else if (['sctv', 'indosiar'].includes(channel)) {
+            const vidioId = channel === 'sctv' ? '204' : '205'; 
+            const vidioResponse = await axios.post(`https://www.vidio.com/live/${vidioId}/tokens`, {}, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/116.0.0.0',
+                    'Origin': 'https://www.vidio.com',
+                    'Referer': `https://www.vidio.com/live/${vidioId}`,
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            if (vidioResponse.data?.token_url) {
+                streamUrl = vidioResponse.data.token_url;
+            }
+        }
+
+        // Kalau sukses dapet link ber-token, sikat!
+        if (streamUrl) {
+            console.log(`✅ Berhasil nyolong token ${channel.toUpperCase()}!`);
+            // Bypass CORS lagi pakai rute God Mode di atas
+            const bypassedPremiumUrl = `https://music-app-production-60db.up.railway.app/api/bypass-cors?url=${encodeURIComponent(streamUrl)}`;
+            return res.json({ success: true, url: bypassedPremiumUrl });
+        } else {
+            return res.status(404).json({ success: false, message: 'API lagi dijaga ketat, token gagal diambil.' });
+        }
+
+    } catch (error) {
+        console.error(`❌ Gagal meretas API ${channel}:`, error.message);
+        return res.status(500).json({ success: false, message: 'Server target menolak koneksi (403/DRM).' });
+    }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🔥 SERVER ${apiKeys.length} NYAWA ROTASI JALAN DI PORT ${PORT} 🔥`);
     console.log(`📺 PROXY TV STREAMING ACTIVE`);
