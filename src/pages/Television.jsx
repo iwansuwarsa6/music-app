@@ -1,46 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Tv, Calendar, Radio, Info, PlaySquare, Loader2, Search } from 'lucide-react';
-import Hls from 'hls.js'; 
-
-// 🔥 1. CUSTOM HLS PLAYER (MESIN ANTI-GAGAL)
-const CustomHlsPlayer = ({ url }) => {
-  const videoRef = useRef(null);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !url) return;
-
-    let hls;
-
-    if (Hls.isSupported()) {
-      hls = new Hls();
-      hls.loadSource(url);
-      hls.attachMedia(video);
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch((err) => console.log("Autoplay ditahan browser:", err));
-      });
-    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url;
-      video.addEventListener('loadedmetadata', () => {
-        video.play().catch((err) => console.log("Autoplay ditahan browser:", err));
-      });
-    }
-
-    return () => {
-      if (hls) hls.destroy(); 
-    };
-  }, [url]);
-
-  return (
-    <video
-      ref={videoRef}
-      controls
-      muted
-      autoPlay
-      className="absolute inset-0 w-full h-full bg-black z-10"
-    />
-  );
-};
+// 🔥 IMPORT MESIN BARU KITA
+import ShakaPlayer from './ShakaPlayer';
 
 export default function Television() {
   
@@ -126,7 +87,14 @@ export default function Television() {
 
   const handleSelectChannel = (ch) => {
     setIsLoadingStream(false);
-    setActiveStream({ name: ch.name, url: ch.url, type: 'channel' });
+    // Tambahin clearKey config biar aman kalau suatu saat API ngasih DRM key
+    setActiveStream({ 
+      name: ch.name, 
+      url: ch.url, 
+      type: 'channel',
+      clearKeyId: ch.clearKeyId || null,
+      clearKeyValue: ch.clearKeyValue || null 
+    });
   };
 
   const handleSelectMatch = async (match) => {
@@ -138,7 +106,14 @@ export default function Television() {
       const data = await response.json();
 
       if (data.success && data.streamUrl) {
-        setActiveStream({ name: match.title, url: data.streamUrl, type: 'match' });
+        // Udah siap nangkep DRM Key dari server.js kalau lu masukin kuncinya
+        setActiveStream({ 
+          name: match.title, 
+          url: data.streamUrl, 
+          type: 'match',
+          clearKeyId: data.clearKeyId || null,
+          clearKeyValue: data.clearKeyValue || null 
+        });
       } else {
         alert("Gagal memuat siaran untuk pertandingan ini.");
       }
@@ -177,8 +152,13 @@ export default function Television() {
               </div>
             )}
 
+            {/* 🔥 PANGGIL SHAKA PLAYER DI SINI 🔥 */}
             {activeStream && activeStream.url ? (
-              <CustomHlsPlayer url={activeStream.url} />
+              <ShakaPlayer 
+                url={activeStream.url} 
+                clearKeyId={activeStream.clearKeyId} 
+                clearKeyValue={activeStream.clearKeyValue} 
+              />
             ) : (
               <div className="flex flex-col items-center justify-center text-zinc-600 z-10">
                 <Tv size={64} className="mb-4 opacity-50" />
