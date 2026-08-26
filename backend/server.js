@@ -178,43 +178,81 @@ app.get('/api/get-match-stream', (req, res) => {
 });
 
 // =====================================================================
-// 🏴‍☠️ ENDPOINT 3: REVERSE PROXY BRUTAL (BYPASS SEMUA BLOKIRAN TV)
+// 🏴‍☠️ ENDPOINT 3: ULTIMATE M3U8 REWRITER PROXY (GOD MODE)
 // =====================================================================
 app.get('/api/bypass-cors', async (req, res) => {
     const targetUrl = req.query.url;
     
-    if (!targetUrl) return res.status(400).send('URL TV kosong Bang!');
-
-    console.log(`[🏴‍☠️] MENJEBOL SERVER TV: ${targetUrl}`);
+    if (!targetUrl) return res.status(400).send('URL kosong Bang!');
 
     try {
-        // Nyedot data langsung pakai Axios biar dikira bukan dari Browser
-        const response = await axios({
-            method: 'get',
-            url: targetUrl,
-            responseType: 'stream', // Ambil wujud aslinya (video/teks)
-            headers: {
-                // Nyamar jadi HP atau VLC biar nggak ditendang satpam MNC/DensTV
-                'User-Agent': 'VLC/3.0.16 LibVLC/3.0.16', 
-                'Accept': '*/*'
-            }
-        });
-
-        // Buka paksa semua gembok keamanan buat web frontend lu
+        // Buka gembok keamanan web lu
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        
-        // Oper semua tipe file (m3u8, ts, dll) sama persis kayak aslinya
-        if (response.headers['content-type']) {
-            res.setHeader('Content-Type', response.headers['content-type']);
+
+        const isM3u8 = targetUrl.includes('.m3u8') || targetUrl.includes('.m3u');
+
+        if (isM3u8) {
+            // 1. Sedot Peta M3U8 aslinya ngerubah nyamar jadi VLC
+            const response = await axios.get(targetUrl, {
+                headers: { 'User-Agent': 'VLC/3.0.16 LibVLC/3.0.16' }
+            });
+            
+            // 2. Bedah dan ubah semua link di dalamnya
+            let lines = response.data.split('\n');
+            let rewrittenM3u8 = lines.map(line => {
+                line = line.trim();
+                if (!line) return line;
+
+                // Trik ngebongkar Kunci rahasia (AES/DRM) di dalem m3u8
+                if (line.startsWith('#EXT-X-KEY:') && line.includes('URI=')) {
+                    return line.replace(/URI="([^"]+)"/, (match, uri) => {
+                        try {
+                            const absoluteKeyUrl = new URL(uri, targetUrl).href;
+                            const proxyKeyUrl = `https://music-app-production-60db.up.railway.app/api/bypass-cors?url=${encodeURIComponent(absoluteKeyUrl)}`;
+                            return `URI="${proxyKeyUrl}"`;
+                        } catch(e) {
+                            return match; // Kalo error biarin link aslinya
+                        }
+                    });
+                }
+                
+                // Kalo ini cuma teks komentar/konfigurasi, biarin aja
+                if (line.startsWith('#')) return line;
+                
+                // 3. Paksa semua link video anak (.ts) lewat proxy Railway lu
+                try {
+                    const absoluteUrl = new URL(line, targetUrl).href;
+                    return `https://music-app-production-60db.up.railway.app/api/bypass-cors?url=${encodeURIComponent(absoluteUrl)}`;
+                } catch(e) {
+                    return line;
+                }
+            }).join('\n');
+
+            // Kirim balik "Peta" palsu hasil editan kita ke Shaka Player
+            res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+            return res.send(rewrittenM3u8);
+
+        } else {
+            // 4. Kalo ini wujud video aslinya (.ts), langsung oper mentahannya
+            const response = await axios({
+                method: 'get',
+                url: targetUrl,
+                responseType: 'stream',
+                headers: { 
+                    'User-Agent': 'VLC/3.0.16 LibVLC/3.0.16', 
+                    'Accept': '*/*' 
+                }
+            });
+            
+            if (response.headers['content-type']) {
+                res.setHeader('Content-Type', response.headers['content-type']);
+            }
+            return response.data.pipe(res);
         }
-
-        // Tembakin langsung ke layar web lu
-        response.data.pipe(res);
-
     } catch (error) {
-        console.error(`❌ Gagal ngejebol: ${targetUrl}`);
-        res.status(500).send('Server TV-nya emang mati/diblokir dari pusat.');
+        console.error('❌ Gagal nembus blokiran:', targetUrl);
+        res.status(500).send('Server TV aslinya nolak / mati.');
     }
 });
 
