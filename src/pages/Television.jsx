@@ -130,10 +130,12 @@ export default function Television() {
               </div>
             )}
 
+            {/* 🔥 INI DIA TAMBAHAN MUTED=TRUE NYA 🔥 */}
             {activeStream && activeStream.url ? (
               <ReactPlayer 
                 url={activeStream.url}
                 playing={true}
+                muted={true}  // <-- KUNCI ANTI DIBLOKIR CHROME
                 controls={true}
                 width="100%"
                 height="100%"
