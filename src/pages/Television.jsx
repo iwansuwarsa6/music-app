@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Tv, Calendar, Radio, Info, PlaySquare } from 'lucide-react';
+// 🔥 INI MESIN TV ASLINYA BANG 🔥
+import ReactPlayer from 'react-player';
 
 export default function Television() {
   
@@ -31,26 +33,25 @@ export default function Television() {
     }
   ];
 
-  // 📺 2. DATA CHANNEL TV (GANTI URL PAKE LINK EMBED LU)
-  // Catatan: Kalo link lu dari YouTube, pastikan formatnya https://www.youtube.com/embed/...
+  // 📺 2. DATA CHANNEL TV (Format M3U8 / IPTV ASLI)
   const channels = [
     { 
       id: 1, 
-      name: 'Timnas Indonesia Live', 
-      type: 'sports', 
-      url: 'https://www.youtube.com/embed/live_stream?channel=UCjI8vIq_iUjNqRofAXXTvwQ&autoplay=1' // Contoh link live
+      name: 'TVRI Nasional Live', 
+      type: 'tv', 
+      url: 'https://tvri-id.akamaized.net/hls/live/2026859/TVRI-Nasional/master.m3u8' 
     },
     { 
       id: 2, 
-      name: 'PERSIB Match', 
-      type: 'sports', 
-      url: 'https://www.youtube.com/embed/5qap5aO4i9A?autoplay=1' 
+      name: 'BeritaSatu Live', 
+      type: 'tv', 
+      url: 'https://b1-live.secureswiftcontent.com/b1_ch01/chunklist.m3u8' 
     },
     { 
       id: 3, 
-      name: 'RnC Music TV', 
-      type: 'music', 
-      url: 'https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1' 
+      name: 'Mux Test Server (Tes Jaringan)', 
+      type: 'tv', 
+      url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8' 
     }
   ];
 
@@ -77,15 +78,21 @@ export default function Television() {
         <div className="lg:col-span-2 space-y-4">
           <div className="w-full aspect-video bg-black rounded-2xl border border-white/10 shadow-2xl overflow-hidden relative flex items-center justify-center group">
             
-            {/* INI MESIN PEMUTAR TV-NYA BANG! */}
+            {/* INI MESIN PEMUTAR TV-NYA MENGGUNAKAN REACT-PLAYER */}
             {activeChannel && activeChannel.url ? (
-              <iframe 
-                src={activeChannel.url} 
-                className="absolute inset-0 w-full h-full border-0 pointer-events-auto"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                allowFullScreen
-                title={activeChannel.name}
-              ></iframe>
+              <ReactPlayer 
+                url={activeChannel.url}
+                playing={true}
+                controls={true}
+                width="100%"
+                height="100%"
+                className="absolute inset-0 z-10"
+                config={{
+                  file: {
+                    forceHLS: true, // Ini yang maksa browser bisa baca file TV m3u8
+                  }
+                }}
+              />
             ) : (
               <div className="flex flex-col items-center justify-center text-zinc-600 z-10">
                 <Tv size={64} className="mb-4 opacity-50" />
@@ -118,7 +125,7 @@ export default function Television() {
           {/* Daftar Channel */}
           <div className="bg-[#181818] rounded-2xl border border-white/5 p-5">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-white/10 pb-3">
-              <Radio size={20} className="text-[#3ea6ff]" /> Daftar Siaran
+              <Radio size={20} className="text-[#3ea6ff]" /> Daftar Siaran (IPTV)
             </h3>
             <div className="flex flex-col gap-3 max-h-[250px] overflow-y-auto hide-scrollbar">
               {channels.map((ch) => (
