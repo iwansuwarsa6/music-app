@@ -108,10 +108,54 @@ export default function Television() {
     ch.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSelectChannel = (ch) => {
-    setIsLoadingStream(false);
+  // 🔥 4. JANTUNG UTAMA: KENDALI LOGIKA CHANNEL (NORMAL VS PREMIUM) 🔥
+  const handleSelectChannel = async (ch) => {
+    setIsLoadingStream(true); // Putar loading pas tombol diklik
     
-    // 🚀 JALUR NORMAL KITA: Semua channel dipaksa lewat Proxy Railway lu
+    const channelName = ch.name.toLowerCase();
+    
+    // Daftar The Big 6 (Target Meretas Token)
+    const premiumChannels = ['sctv', 'indosiar', 'rcti', 'gtv', 'mnctv', 'inews'];
+    const isPremium = premiumChannels.some(c => channelName.includes(c));
+
+    // 🏴‍☠️ JALUR PREMIUM: Tembak Endpoint Auto-Scraper Backend Lu
+    if (isPremium) {
+        let targetId = '';
+        if (channelName.includes('sctv')) targetId = 'sctv';
+        else if (channelName.includes('indosiar')) targetId = 'indosiar';
+        else if (channelName.includes('rcti')) targetId = 'rcti';
+        else if (channelName.includes('gtv')) targetId = 'gtv';
+        else if (channelName.includes('mnctv')) targetId = 'mnctv';
+        else if (channelName.includes('inews')) targetId = 'inews';
+
+        try {
+            console.log(`[📡] Mengambil token fresh untuk: ${targetId.toUpperCase()}`);
+            const response = await fetch(`https://music-app-production-60db.up.railway.app/api/get-premium-channel?channel=${targetId}`);
+            const data = await response.json();
+
+            if (data.success && data.url) {
+                // Sukses dapet link token dari backend
+                setActiveStream({ 
+                    name: ch.name, 
+                    url: data.url, 
+                    type: 'shaka', 
+                    clearKeyId: null,
+                    clearKeyValue: null 
+                });
+            } else {
+                alert(`Waduh, pertahanan server ${ch.name} lagi tebel Bang. Backend gagal ngambil token!`);
+                setActiveStream({ name: ch.name, url: '', type: 'error' });
+            }
+        } catch (err) {
+            console.error("Gagal nyambung ke API Premium Backend:", err);
+            alert("Koneksi ke server backend (Railway) terputus.");
+        } finally {
+            setIsLoadingStream(false);
+        }
+        return; // Selesai buat jalur premium, biar nggak lanjut ke jalur normal bawah
+    }
+
+    // 🚀 JALUR NORMAL: Semua channel biasa dipaksa lewat Proxy Bypass CORS
     const bypassedUrl = `https://music-app-production-60db.up.railway.app/api/bypass-cors?url=${encodeURIComponent(ch.url)}`;
 
     setActiveStream({ 
@@ -121,6 +165,8 @@ export default function Television() {
       clearKeyId: ch.clearKeyId || null,
       clearKeyValue: ch.clearKeyValue || null 
     });
+    
+    setIsLoadingStream(false);
   };
 
   const handleSelectMatch = async (match) => {
