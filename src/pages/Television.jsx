@@ -87,10 +87,13 @@ export default function Television() {
 
   const handleSelectChannel = (ch) => {
     setIsLoadingStream(false);
-    // Tambahin clearKey config biar aman kalau suatu saat API ngasih DRM key
+    
+    // 🏴‍☠️ BYPASS BRUTAL: BUNGKUS LINK ASLI PAKAI PROXY BACKEND LU 🏴‍☠️
+    const bypassedUrl = `https://music-app-production-60db.up.railway.app/api/bypass-cors?url=${encodeURIComponent(ch.url)}`;
+
     setActiveStream({ 
       name: ch.name, 
-      url: ch.url, 
+      url: bypassedUrl, // Sekarang muternya lewat jalur belakang!
       type: 'channel',
       clearKeyId: ch.clearKeyId || null,
       clearKeyValue: ch.clearKeyValue || null 
