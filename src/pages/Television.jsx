@@ -1,18 +1,18 @@
 import { useState } from 'react';
 import { Tv, Calendar, Radio, Info, PlaySquare, Loader2 } from 'lucide-react';
-// 🔥 MESIN PEMUTAR TV REACT-PLAYER 🔥
 import ReactPlayer from 'react-player';
+import Hls from 'hls.js'; // 🔥 INI KUNCI UTAMA SUPAYA M3U8 BISA MUTER DI CHROME/EDGE 🔥
 
 export default function Television() {
   
-  // 🗓️ 1. DATA JADWAL MATCH (Bisa diklik buat narik stream dari backend proxy)
+  // 🗓️ 1. DATA JADWAL MATCH
   const matchSchedule = [
     {
       id: 'timnas-live',
       date: "HARI INI • 19:00 WIB",
       title: "Timnas Indonesia vs Arab Saudi",
       league: "Kualifikasi Piala Dunia 2026",
-      colorTag: "border-l-[#3ea6ff]", // Warna garis pinggir (Biru RnC)
+      colorTag: "border-l-[#3ea6ff]",
       dateColor: "text-[#3ea6ff]"
     },
     {
@@ -20,7 +20,7 @@ export default function Television() {
       date: "BESOK • 15:30 WIB",
       title: "PERSIB vs Persija",
       league: "Liga 1 Indonesia",
-      colorTag: "border-l-blue-600", // Warna garis pinggir (Biru Persib)
+      colorTag: "border-l-blue-600",
       dateColor: "text-zinc-500"
     },
     {
@@ -33,7 +33,7 @@ export default function Television() {
     }
   ];
 
-  // 📺 2. DATA CHANNEL TV (Format M3U8 / IPTV ASLI Langsung)
+  // 📺 2. DATA CHANNEL TV (Format M3U8 / IPTV ASLI)
   const channels = [
     { 
       id: 1, 
@@ -55,7 +55,6 @@ export default function Television() {
     }
   ];
 
-  // State untuk melacak siaran/match apa yang sedang aktif diputar
   const [activeStream, setActiveStream] = useState({
     name: channels[0].name,
     url: channels[0].url,
@@ -84,7 +83,6 @@ export default function Television() {
     });
 
     try {
-      // Nembak ke backend server.js lu yang ada di Railway
       const response = await fetch(`https://music-app-production-60db.up.railway.app/api/get-match-stream?matchId=${match.id}`);
       const data = await response.json();
 
@@ -125,7 +123,6 @@ export default function Television() {
         <div className="lg:col-span-2 space-y-4">
           <div className="w-full aspect-video bg-black rounded-2xl border border-white/10 shadow-2xl overflow-hidden relative flex items-center justify-center group">
             
-            {/* Loading Animation pas Backend lagi nyari link stream */}
             {isLoadingStream && (
               <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-30">
                 <Loader2 className="w-10 h-10 text-[#3ea6ff] animate-spin mb-2" />
@@ -133,7 +130,6 @@ export default function Television() {
               </div>
             )}
 
-            {/* MESIN PEMUTAR REACT-PLAYER */}
             {activeStream && activeStream.url ? (
               <ReactPlayer 
                 url={activeStream.url}
@@ -144,7 +140,8 @@ export default function Television() {
                 className="absolute inset-0 z-10"
                 config={{
                   file: {
-                    forceHLS: true, // Maksa browser baca format .m3u8
+                    forceHLS: true,
+                    hlsVersion: '1.4.12', // Memastikan versi hls.js terikat rapi
                   }
                 }}
               />
@@ -155,7 +152,6 @@ export default function Television() {
               </div>
             )}
 
-            {/* Indikator Live */}
             {activeStream && activeStream.url && !isLoadingStream && (
               <div className="absolute top-4 left-4 bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-sm uppercase tracking-widest flex items-center gap-2 shadow-lg z-20 pointer-events-none">
                 <span className="w-2 h-2 bg-white rounded-full animate-ping"></span> LIVE
@@ -163,7 +159,6 @@ export default function Television() {
             )}
           </div>
 
-          {/* Info Channel */}
           <div className="bg-[#181818] p-5 rounded-2xl border border-white/5">
             <h2 className="text-xl font-bold text-white flex items-center gap-2 mb-2">
               <Info size={20} className="text-[#3ea6ff]" /> Status Siaran
@@ -177,7 +172,6 @@ export default function Television() {
         {/* 🔥 KOTAK PILIHAN CHANNEL & JADWAL 🔥 */}
         <div className="flex flex-col gap-6">
           
-          {/* Daftar Channel IPTV */}
           <div className="bg-[#181818] rounded-2xl border border-white/5 p-5">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-white/10 pb-3">
               <Radio size={20} className="text-[#3ea6ff]" /> Daftar Siaran (IPTV)
@@ -196,7 +190,6 @@ export default function Television() {
             </div>
           </div>
 
-          {/* Jadwal Match (Interaktif - Nembak Backend Proxy) */}
           <div className="bg-[#181818] rounded-2xl border border-white/5 p-5 flex-1">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-white/10 pb-3">
               <Calendar size={20} className="text-[#3ea6ff]" /> Jadwal Match (Live Proxy)
@@ -224,7 +217,6 @@ export default function Television() {
         </div>
       </div>
 
-      {/* Biar scrollbar ilang tapi tetep bisa discroll */}
       <style>{`
         .hide-scrollbar::-webkit-scrollbar { display: none; } 
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
