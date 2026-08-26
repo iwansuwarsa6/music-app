@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const axios = require('axios'); // 🔥 Mesin penyedot brutal kita
 
 const app = express();
 app.use(cors());
@@ -174,6 +175,47 @@ app.get('/api/get-match-stream', (req, res) => {
         console.log(`✅ BERHASIL MENGIRIM DATA STREAM: ${streamData.streamUrl}`);
         res.json(streamData);
     }, 800);
+});
+
+// =====================================================================
+// 🏴‍☠️ ENDPOINT 3: REVERSE PROXY BRUTAL (BYPASS SEMUA BLOKIRAN TV)
+// =====================================================================
+app.get('/api/bypass-cors', async (req, res) => {
+    const targetUrl = req.query.url;
+    
+    if (!targetUrl) return res.status(400).send('URL TV kosong Bang!');
+
+    console.log(`[🏴‍☠️] MENJEBOL SERVER TV: ${targetUrl}`);
+
+    try {
+        // Nyedot data langsung pakai Axios biar dikira bukan dari Browser
+        const response = await axios({
+            method: 'get',
+            url: targetUrl,
+            responseType: 'stream', // Ambil wujud aslinya (video/teks)
+            headers: {
+                // Nyamar jadi HP atau VLC biar nggak ditendang satpam MNC/DensTV
+                'User-Agent': 'VLC/3.0.16 LibVLC/3.0.16', 
+                'Accept': '*/*'
+            }
+        });
+
+        // Buka paksa semua gembok keamanan buat web frontend lu
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        
+        // Oper semua tipe file (m3u8, ts, dll) sama persis kayak aslinya
+        if (response.headers['content-type']) {
+            res.setHeader('Content-Type', response.headers['content-type']);
+        }
+
+        // Tembakin langsung ke layar web lu
+        response.data.pipe(res);
+
+    } catch (error) {
+        console.error(`❌ Gagal ngejebol: ${targetUrl}`);
+        res.status(500).send('Server TV-nya emang mati/diblokir dari pusat.');
+    }
 });
 
 app.listen(PORT, '0.0.0.0', () => {
