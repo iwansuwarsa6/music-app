@@ -88,13 +88,31 @@ export default function Television() {
   const handleSelectChannel = (ch) => {
     setIsLoadingStream(false);
     
-    // 🏴‍☠️ BYPASS BRUTAL: BUNGKUS LINK ASLI PAKAI PROXY BACKEND LU 🏴‍☠️
+    const channelName = ch.name.toLowerCase();
+
+    // 🏴‍☠️ JALUR KHUSUS: Kalo SCTV / Indosiar, kita tembak ke Dailymotion resmi mereka (Anti-CORS)
+    if (channelName.includes('sctv')) {
+      setActiveStream({ name: ch.name, url: 'https://www.dailymotion.com/embed/video/x772mgb?autoplay=1', type: 'iframe' });
+      return;
+    }
+    if (channelName.includes('indosiar')) {
+      setActiveStream({ name: ch.name, url: 'https://www.dailymotion.com/embed/video/x772mgc?autoplay=1', type: 'iframe' });
+      return;
+    }
+    // 🏴‍☠️ JALUR KHUSUS: Kalo RCTI / MNC, kita tembak pakai web embed (Opsional)
+    if (channelName.includes('rcti')) {
+      // RCTI sering ganti link, kita siapin wadah iframe-nya
+      setActiveStream({ name: ch.name, url: 'https://www.rctiplus.com/tv/rcti', type: 'iframe' });
+      return;
+    }
+
+    // 🚀 JALUR NORMAL: Selain channel resek di atas, pakai Proxy Railway & Shaka Player
     const bypassedUrl = `https://music-app-production-60db.up.railway.app/api/bypass-cors?url=${encodeURIComponent(ch.url)}`;
 
     setActiveStream({ 
       name: ch.name, 
-      url: bypassedUrl, // Sekarang muternya lewat jalur belakang!
-      type: 'channel',
+      url: bypassedUrl, 
+      type: 'shaka', // Kita tandain ini butuh Shaka
       clearKeyId: ch.clearKeyId || null,
       clearKeyValue: ch.clearKeyValue || null 
     });
@@ -113,7 +131,7 @@ export default function Television() {
         setActiveStream({ 
           name: match.title, 
           url: data.streamUrl, 
-          type: 'match',
+          type: 'shaka', // Pertandingan bola kita play pakai Shaka
           clearKeyId: data.clearKeyId || null,
           clearKeyValue: data.clearKeyValue || null 
         });
@@ -155,14 +173,26 @@ export default function Television() {
               </div>
             )}
 
-            {/* 🔥 PANGGIL SHAKA PLAYER DI SINI 🔥 */}
+            {/* 🔥 HYBRID PLAYER: BISA SHAKA, BISA IFRAME 🔥 */}
             {activeStream && activeStream.url ? (
-              <ShakaPlayer 
-                url={activeStream.url} 
-                clearKeyId={activeStream.clearKeyId} 
-                clearKeyValue={activeStream.clearKeyValue} 
-              />
+              activeStream.type === 'iframe' ? (
+                // Kalau tipe iframe (kayak SCTV/Indosiar), munculin iframe murni
+                <iframe 
+                  src={activeStream.url}
+                  className="w-full h-full absolute inset-0 z-10 border-0"
+                  allow="autoplay; fullscreen; encrypted-media"
+                  allowFullScreen
+                ></iframe>
+              ) : (
+                // Kalau tipe shaka/match, panggil Shaka Player
+                <ShakaPlayer 
+                  url={activeStream.url} 
+                  clearKeyId={activeStream.clearKeyId} 
+                  clearKeyValue={activeStream.clearKeyValue} 
+                />
+              )
             ) : (
+              // Layar pas baru buka web / Standby
               <div className="flex flex-col items-center justify-center text-zinc-600 z-10">
                 <Tv size={64} className="mb-4 opacity-50" />
                 <p className="font-bold tracking-widest uppercase text-sm">Pilih Siaran Untuk Menonton</p>
