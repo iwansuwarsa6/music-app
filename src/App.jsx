@@ -4,7 +4,7 @@ import {
   Home as HomeIcon, Search as SearchIcon, Library, User, 
   Play, SkipBack, SkipForward, Heart, Pause, 
   ChevronDown, Cast, MoreVertical, ListPlus, Shuffle, Repeat, Repeat1, Mic2, Music, Film, Target,
-  History, Trash2, X, Loader2, Minus, Plus, Radio, ListVideo, Bookmark, ThumbsUp, Download
+  History, Trash2, X, Loader2, Minus, Plus, Radio, ListVideo, Bookmark, ThumbsUp, Download, Tv
 } from 'lucide-react';
 import { usePlayerStore } from './store/usePlayerStore';
 
@@ -13,6 +13,7 @@ import Search from './pages/Search';
 import Artist from './pages/Artist';
 import LibraryPage from './pages/Library';
 import Developer from './pages/Developer';
+import Television from './pages/Television';
 
 // 🔥 LOGO MASJID ESTETIK 🔥
 const MosqueIcon = ({ size = 24, className = "" }) => (
@@ -1485,6 +1486,10 @@ function MainApp() {
           <div className="flex items-center gap-8 ml-10">
             <Link to="/" className={`text-base font-bold transition-colors ${location.pathname === '/' ? 'text-white' : 'text-zinc-400 hover:text-white'}`}>Beranda</Link>
             <Link to="/library" className={`text-base font-bold transition-colors ${location.pathname === '/library' ? 'text-white' : 'text-zinc-400 hover:text-white'}`}>Pustaka</Link>
+            
+            {/* 🔥 MENU TV BARU LU 🔥 */}
+            <Link to="/tv" className={`text-base font-bold transition-colors ${location.pathname === '/tv' ? 'text-white' : 'text-zinc-400 hover:text-white'}`}>Siaran TV</Link>
+            
             <Link to="/developer" className={`text-base font-bold transition-colors ${location.pathname === '/developer' ? 'text-white' : 'text-zinc-400 hover:text-white'}`}>Developer</Link>
           </div>
         </div>
@@ -1633,6 +1638,10 @@ function MainApp() {
           <Route path="/search" element={<Search />} />
           <Route path="/artist/:name" element={<Artist />} />
           <Route path="/library" element={<LibraryPage />} />
+          
+          {/* 🔥 ROUTE TV BARU LU 🔥 */}
+          <Route path="/tv" element={<Television />} />
+          
           <Route path="/developer" element={<Developer />} />
         </Routes>
       </div>
@@ -1642,6 +1651,10 @@ function MainApp() {
         <Link to="/" className={`flex flex-col items-center gap-1 ${location.pathname === '/' ? 'text-white' : 'text-zinc-400'}`}><HomeIcon size={24} /><span>Beranda</span></Link>
         <Link to="/search" className={`flex flex-col items-center gap-1 ${location.pathname === '/search' ? 'text-white' : 'text-zinc-400'}`}><SearchIcon size={24} /><span>Mencari</span></Link>
         <Link to="/library" className={`flex flex-col items-center gap-1 ${location.pathname === '/library' ? 'text-white' : 'text-zinc-400'}`}><Library size={24} /><span>Pustaka</span></Link>
+        
+        {/* 🔥 MENU TV MOBILE LU 🔥 */}
+        <Link to="/tv" className={`flex flex-col items-center gap-1 ${location.pathname === '/tv' ? 'text-white' : 'text-zinc-400'}`}><Tv size={24} /><span>TV</span></Link>
+        
         <Link to="/developer" className={`flex flex-col items-center gap-1 ${location.pathname === '/developer' ? 'text-white' : 'text-zinc-400'}`}><User size={24} /><span>Developer</span></Link>
       </div>
 
