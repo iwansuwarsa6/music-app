@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { Tv, Calendar, Radio, Info, PlaySquare } from 'lucide-react';
-// 🔥 INI MESIN TV ASLINYA BANG 🔥
+import { Tv, Calendar, Radio, Info, PlaySquare, Loader2 } from 'lucide-react';
+// 🔥 MESIN PEMUTAR TV REACT-PLAYER 🔥
 import ReactPlayer from 'react-player';
 
 export default function Television() {
   
-  // 🗓️ 1. DATA JADWAL MATCH (Tinggal ganti teksnya di sini Bang)
+  // 🗓️ 1. DATA JADWAL MATCH (Bisa diklik buat narik stream dari backend proxy)
   const matchSchedule = [
     {
-      id: 1,
+      id: 'timnas-live',
       date: "HARI INI • 19:00 WIB",
       title: "Timnas Indonesia vs Arab Saudi",
       league: "Kualifikasi Piala Dunia 2026",
@@ -16,7 +16,7 @@ export default function Television() {
       dateColor: "text-[#3ea6ff]"
     },
     {
-      id: 2,
+      id: 'persib-live',
       date: "BESOK • 15:30 WIB",
       title: "PERSIB vs Persija",
       league: "Liga 1 Indonesia",
@@ -33,7 +33,7 @@ export default function Television() {
     }
   ];
 
-  // 📺 2. DATA CHANNEL TV (Format M3U8 / IPTV ASLI)
+  // 📺 2. DATA CHANNEL TV (Format M3U8 / IPTV ASLI Langsung)
   const channels = [
     { 
       id: 1, 
@@ -55,8 +55,55 @@ export default function Television() {
     }
   ];
 
-  // Set channel default pas pertama kali dibuka (otomatis milih channel urutan pertama)
-  const [activeChannel, setActiveChannel] = useState(channels[0]);
+  // State untuk melacak siaran/match apa yang sedang aktif diputar
+  const [activeStream, setActiveStream] = useState({
+    name: channels[0].name,
+    url: channels[0].url,
+    type: 'channel'
+  });
+  
+  const [isLoadingStream, setIsLoadingStream] = useState(false);
+
+  // Handler saat user klik Channel IPTV biasa
+  const handleSelectChannel = (ch) => {
+    setIsLoadingStream(false);
+    setActiveStream({
+      name: ch.name,
+      url: ch.url,
+      type: 'channel'
+    });
+  };
+
+  // Handler saat user klik Jadwal Match (Nembak Backend Proxy Node.js)
+  const handleSelectMatch = async (match) => {
+    setIsLoadingStream(true);
+    setActiveStream({
+      name: match.title,
+      url: '',
+      type: 'match'
+    });
+
+    try {
+      // Nembak ke backend server.js lu yang ada di Railway
+      const response = await fetch(`https://music-app-production-60db.up.railway.app/api/get-match-stream?matchId=${match.id}`);
+      const data = await response.json();
+
+      if (data.success && data.streamUrl) {
+        setActiveStream({
+          name: match.title,
+          url: data.streamUrl,
+          type: 'match'
+        });
+      } else {
+        alert("Gagal memuat siaran untuk pertandingan ini.");
+      }
+    } catch (error) {
+      console.error("Gagal nyambung ke server proxy TV:", error);
+      alert("Koneksi ke server backend terputus.");
+    } finally {
+      setIsLoadingStream(false);
+    }
+  };
 
   return (
     <div className="min-h-full p-6 md:p-10 animate-in fade-in duration-500">
@@ -78,10 +125,18 @@ export default function Television() {
         <div className="lg:col-span-2 space-y-4">
           <div className="w-full aspect-video bg-black rounded-2xl border border-white/10 shadow-2xl overflow-hidden relative flex items-center justify-center group">
             
-            {/* INI MESIN PEMUTAR TV-NYA MENGGUNAKAN REACT-PLAYER */}
-            {activeChannel && activeChannel.url ? (
+            {/* Loading Animation pas Backend lagi nyari link stream */}
+            {isLoadingStream && (
+              <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-30">
+                <Loader2 className="w-10 h-10 text-[#3ea6ff] animate-spin mb-2" />
+                <p className="text-xs font-bold text-white tracking-widest uppercase">Menghubungkan ke Server Siaran...</p>
+              </div>
+            )}
+
+            {/* MESIN PEMUTAR REACT-PLAYER */}
+            {activeStream && activeStream.url ? (
               <ReactPlayer 
-                url={activeChannel.url}
+                url={activeStream.url}
                 playing={true}
                 controls={true}
                 width="100%"
@@ -89,19 +144,19 @@ export default function Television() {
                 className="absolute inset-0 z-10"
                 config={{
                   file: {
-                    forceHLS: true, // Ini yang maksa browser bisa baca file TV m3u8
+                    forceHLS: true, // Maksa browser baca format .m3u8
                   }
                 }}
               />
             ) : (
               <div className="flex flex-col items-center justify-center text-zinc-600 z-10">
                 <Tv size={64} className="mb-4 opacity-50" />
-                <p className="font-bold tracking-widest uppercase text-sm">Pilih Siaran Untuk Mulai Menonton</p>
+                <p className="font-bold tracking-widest uppercase text-sm">Pilih Siaran Atau Jadwal Untuk Menonton</p>
               </div>
             )}
 
-            {/* Indikator Live Melayang di Pojok Kiri Atas */}
-            {activeChannel && (
+            {/* Indikator Live */}
+            {activeStream && activeStream.url && !isLoadingStream && (
               <div className="absolute top-4 left-4 bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-sm uppercase tracking-widest flex items-center gap-2 shadow-lg z-20 pointer-events-none">
                 <span className="w-2 h-2 bg-white rounded-full animate-ping"></span> LIVE
               </div>
@@ -114,7 +169,7 @@ export default function Television() {
               <Info size={20} className="text-[#3ea6ff]" /> Status Siaran
             </h2>
             <p className="text-sm text-zinc-400">
-              {activeChannel ? `Terhubung ke server stream: ${activeChannel.name}. Pastikan koneksi internet stabil untuk kualitas HD.` : 'Standby. Menunggu perintah stream...'}
+              {activeStream ? `Menayangkan: ${activeStream.name}. Pastikan koneksi internet stabil untuk kualitas HD.` : 'Standby. Menunggu perintah stream...'}
             </p>
           </div>
         </div>
@@ -122,36 +177,43 @@ export default function Television() {
         {/* 🔥 KOTAK PILIHAN CHANNEL & JADWAL 🔥 */}
         <div className="flex flex-col gap-6">
           
-          {/* Daftar Channel */}
+          {/* Daftar Channel IPTV */}
           <div className="bg-[#181818] rounded-2xl border border-white/5 p-5">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-white/10 pb-3">
               <Radio size={20} className="text-[#3ea6ff]" /> Daftar Siaran (IPTV)
             </h3>
-            <div className="flex flex-col gap-3 max-h-[250px] overflow-y-auto hide-scrollbar">
+            <div className="flex flex-col gap-3 max-h-[200px] overflow-y-auto hide-scrollbar">
               {channels.map((ch) => (
                 <button 
                   key={ch.id}
-                  onClick={() => setActiveChannel(ch)}
-                  className={`flex items-center justify-between p-3 rounded-xl transition-all border ${activeChannel?.id === ch.id ? 'bg-[#3ea6ff]/10 border-[#3ea6ff]/50' : 'bg-black/50 border-white/5 hover:bg-white/5'}`}
+                  onClick={() => handleSelectChannel(ch)}
+                  className={`flex items-center justify-between p-3 rounded-xl transition-all border ${activeStream?.name === ch.name ? 'bg-[#3ea6ff]/10 border-[#3ea6ff]/50' : 'bg-black/50 border-white/5 hover:bg-white/5'}`}
                 >
-                  <span className={`font-bold text-sm ${activeChannel?.id === ch.id ? 'text-[#3ea6ff]' : 'text-zinc-300'}`}>{ch.name}</span>
-                  <PlaySquare size={18} className={activeChannel?.id === ch.id ? 'text-[#3ea6ff]' : 'text-zinc-600'} />
+                  <span className={`font-bold text-sm ${activeStream?.name === ch.name ? 'text-[#3ea6ff]' : 'text-zinc-300'}`}>{ch.name}</span>
+                  <PlaySquare size={18} className={activeStream?.name === ch.name ? 'text-[#3ea6ff]' : 'text-zinc-600'} />
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Jadwal Match (Otomatis ke-Generate dari Array di atas) */}
+          {/* Jadwal Match (Interaktif - Nembak Backend Proxy) */}
           <div className="bg-[#181818] rounded-2xl border border-white/5 p-5 flex-1">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2 border-b border-white/10 pb-3">
-              <Calendar size={20} className="text-[#3ea6ff]" /> Jadwal Match
+              <Calendar size={20} className="text-[#3ea6ff]" /> Jadwal Match (Live Proxy)
             </h3>
-            <div className="flex flex-col gap-4 max-h-[300px] overflow-y-auto hide-scrollbar">
+            <div className="flex flex-col gap-4 max-h-[280px] overflow-y-auto hide-scrollbar">
               
               {matchSchedule.map((match) => (
-                <div key={match.id} className={`bg-black/50 p-3 rounded-xl border border-white/5 border-l-4 ${match.colorTag}`}>
-                  <p className={`text-[10px] ${match.dateColor} font-bold tracking-widest mb-1 uppercase`}>{match.date}</p>
-                  <p className={`text-sm font-bold ${match.id === 1 ? 'text-white' : 'text-zinc-300'}`}>{match.title}</p>
+                <div 
+                  key={match.id} 
+                  onClick={() => handleSelectMatch(match)}
+                  className={`bg-black/50 p-3 rounded-xl border transition-all cursor-pointer group hover:border-[#3ea6ff]/50 border-l-4 ${match.colorTag} ${activeStream?.name === match.title ? 'bg-[#3ea6ff]/10 border-[#3ea6ff]' : 'border-white/5'}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className={`text-[10px] ${match.dateColor} font-bold tracking-widest mb-1 uppercase`}>{match.date}</p>
+                    <PlaySquare size={18} className={activeStream?.name === match.title ? 'text-[#3ea6ff]' : 'text-zinc-600 group-hover:text-white'} />
+                  </div>
+                  <p className="text-sm font-bold text-white">{match.title}</p>
                   <p className="text-xs text-zinc-500 mt-1">{match.league}</p>
                 </div>
               ))}
