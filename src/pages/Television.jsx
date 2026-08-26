@@ -1,11 +1,55 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Tv, Calendar, Radio, Info, PlaySquare, Loader2 } from 'lucide-react';
-import ReactPlayer from 'react-player';
-import Hls from 'hls.js'; // 🔥 INI KUNCI UTAMA SUPAYA M3U8 BISA MUTER DI CHROME/EDGE 🔥
+import Hls from 'hls.js'; // Kita pakai mesin intinya langsung!
+
+// 🔥 1. KITA BIKIN CUSTOM PLAYER SENDIRI (ANTI-NGELAG & ANTI-BLANK) 🔥
+const CustomHlsPlayer = ({ url }) => {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !url) return;
+
+    let hls;
+
+    // Kalau browser butuh hls.js (Chrome, Edge, Firefox, Android)
+    if (Hls.isSupported()) {
+      hls = new Hls();
+      hls.loadSource(url);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        // Otomatis play pas data video berhasil dibaca
+        video.play().catch((err) => console.log("Autoplay ditahan browser:", err));
+      });
+    } 
+    // Fallback buat browser sultan (Safari/iPhone) yang udah support M3U8 dari sananya
+    else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = url;
+      video.addEventListener('loadedmetadata', () => {
+        video.play().catch((err) => console.log("Autoplay ditahan browser:", err));
+      });
+    }
+
+    return () => {
+      if (hls) {
+        hls.destroy(); // Bersihin memori pas pindah channel
+      }
+    };
+  }, [url]);
+
+  return (
+    <video
+      ref={videoRef}
+      controls
+      muted // Wajib di-mute di awal biar diizinin autoplay sama Chrome
+      className="absolute inset-0 w-full h-full bg-black z-10"
+    />
+  );
+};
 
 export default function Television() {
   
-  // 🗓️ 1. DATA JADWAL MATCH
+  // 🗓️ 2. DATA JADWAL MATCH
   const matchSchedule = [
     {
       id: 'timnas-live',
@@ -33,7 +77,7 @@ export default function Television() {
     }
   ];
 
-  // 📺 2. DATA CHANNEL TV (Format M3U8 / IPTV ASLI)
+  // 📺 3. DATA CHANNEL TV (Format M3U8 / IPTV ASLI)
   const channels = [
     { 
       id: 1, 
@@ -63,35 +107,21 @@ export default function Television() {
   
   const [isLoadingStream, setIsLoadingStream] = useState(false);
 
-  // Handler saat user klik Channel IPTV biasa
   const handleSelectChannel = (ch) => {
     setIsLoadingStream(false);
-    setActiveStream({
-      name: ch.name,
-      url: ch.url,
-      type: 'channel'
-    });
+    setActiveStream({ name: ch.name, url: ch.url, type: 'channel' });
   };
 
-  // Handler saat user klik Jadwal Match (Nembak Backend Proxy Node.js)
   const handleSelectMatch = async (match) => {
     setIsLoadingStream(true);
-    setActiveStream({
-      name: match.title,
-      url: '',
-      type: 'match'
-    });
+    setActiveStream({ name: match.title, url: '', type: 'match' });
 
     try {
       const response = await fetch(`https://music-app-production-60db.up.railway.app/api/get-match-stream?matchId=${match.id}`);
       const data = await response.json();
 
       if (data.success && data.streamUrl) {
-        setActiveStream({
-          name: match.title,
-          url: data.streamUrl,
-          type: 'match'
-        });
+        setActiveStream({ name: match.title, url: data.streamUrl, type: 'match' });
       } else {
         alert("Gagal memuat siaran untuk pertandingan ini.");
       }
@@ -130,23 +160,9 @@ export default function Television() {
               </div>
             )}
 
-            {/* 🔥 INI DIA TAMBAHAN MUTED=TRUE NYA 🔥 */}
+            {/* 🔥 PANGGIL CUSTOM PLAYER KITA DI SINI 🔥 */}
             {activeStream && activeStream.url ? (
-              <ReactPlayer 
-                url={activeStream.url}
-                playing={true}
-                muted={true}  // <-- KUNCI ANTI DIBLOKIR CHROME
-                controls={true}
-                width="100%"
-                height="100%"
-                className="absolute inset-0 z-10"
-                config={{
-                  file: {
-                    forceHLS: true,
-                    hlsVersion: '1.4.12', // Memastikan versi hls.js terikat rapi
-                  }
-                }}
-              />
+              <CustomHlsPlayer url={activeStream.url} />
             ) : (
               <div className="flex flex-col items-center justify-center text-zinc-600 z-10">
                 <Tv size={64} className="mb-4 opacity-50" />
@@ -166,7 +182,7 @@ export default function Television() {
               <Info size={20} className="text-[#3ea6ff]" /> Status Siaran
             </h2>
             <p className="text-sm text-zinc-400">
-              {activeStream ? `Menayangkan: ${activeStream.name}. Pastikan koneksi internet stabil untuk kualitas HD.` : 'Standby. Menunggu perintah stream...'}
+              {activeStream ? `Menayangkan: ${activeStream.name}. Pastikan koneksi internet stabil.` : 'Standby.'}
             </p>
           </div>
         </div>
