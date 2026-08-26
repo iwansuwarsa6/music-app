@@ -54,6 +54,9 @@ const apiKeys = [
 // Memory untuk nginget sistem lagi pakai akun nomor berapa
 let currentKeyIndex = 0; 
 
+// =====================================================================
+// 🎵 ENDPOINT 1: PROXY AUDIO (YT ke MP3)
+// =====================================================================
 app.get('/api/audio', async (req, res) => {
     const videoId = req.query.id;
     if (!videoId) return res.status(400).send('ID kosong');
@@ -66,7 +69,6 @@ app.get('/api/audio', async (req, res) => {
     let audioUrl = null;
     let attempts = 0;
 
-    // Mesin bakal nyoba terus maksimal sesuai jumlah total akun (34 kali)
     while (attempts < apiKeys.length) {
         const activeKey = apiKeys[currentKeyIndex];
         console.log(`Mengetuk API menggunakan Akun ke-${currentKeyIndex + 1}...`);
@@ -80,16 +82,13 @@ app.get('/api/audio', async (req, res) => {
                 }
             });
 
-            // SENSOR OTOMATIS: Kalau dapet error 429 (Kuota Habis)
             if (response.status === 429) {
                 console.log(`⚠️ KUOTA AKUN KE-${currentKeyIndex + 1} HABIS! Otomatis geser ke akun cadangan...`);
-                // Oper gigi ke akun selanjutnya
                 currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
                 attempts++;
                 continue; 
             }
 
-            // Kalau error dari servernya mati atau down
             if (!response.ok) {
                 console.log(`❌ Error Server (Status: ${response.status}), coba pakai kunci lain...`);
                 currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
@@ -99,12 +98,10 @@ app.get('/api/audio', async (req, res) => {
 
             const data = await response.json();
             
-            // Kalau berhasil dapet link MP3-nya
             if (data && data.link) {
                 audioUrl = data.link;
-                break; // Lagu dapet! Hentikan perputaran
+                break; 
             } else {
-                // Berjaga-jaga kalau respon API-nya berubah bentuk
                 console.log(`⚠️ Link nggak ketemu di akun ke-${currentKeyIndex + 1}, geser lagi...`);
                 currentKeyIndex = (currentKeyIndex + 1) % apiKeys.length;
                 attempts++;
@@ -125,6 +122,44 @@ app.get('/api/audio', async (req, res) => {
     }
 });
 
+// =====================================================================
+// 📺 ENDPOINT 2: PROXY TV & MATCH STREAMING
+// =====================================================================
+app.get('/api/get-match-stream', async (req, res) => {
+    const matchId = req.query.matchId;
+    
+    console.log(`[📡] REQUEST STREAM TV DITERIMA UNTUK MATCH ID: ${matchId}`);
+
+    try {
+        let streamUrl = "";
+
+        // Logika sederhana: Balikin link M3U8 berdasarkan ID yang diklik di Frontend
+        if (matchId === 'timnas-live') {
+            // TVRI Nasional Live (Anti Mati) - Buat nge-test stream lancar
+            streamUrl = "https://tvri-id.akamaized.net/hls/live/2026859/TVRI-Nasional/master.m3u8";
+        } 
+        else if (matchId === 'persib-live') {
+            // BeritaSatu Live (Anti Mati) - Buat nge-test stream lancar
+            streamUrl = "https://b1-live.secureswiftcontent.com/b1_ch01/chunklist.m3u8";
+        } 
+        else {
+            // Channel Fallback kalau ID ga ngerespon
+            streamUrl = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
+        }
+
+        // Simulasi delay seolah-olah server lu lagi nge-scrape / bypass DRM (biar keliatan real pro 🤣)
+        setTimeout(() => {
+            console.log(`✅ BERHASIL MENDAPATKAN LINK M3U8: ${streamUrl}`);
+            res.json({ success: true, streamUrl: streamUrl });
+        }, 800);
+
+    } catch (error) {
+        console.error("Gagal nyedot data TV:", error);
+        res.status(500).json({ success: false, message: 'Gagal nge-grab stream TV' });
+    }
+});
+
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🔥 SERVER ${apiKeys.length} NYAWA ROTASI JALAN DI PORT ${PORT} 🔥`);
+    console.log(`📺 PROXY TV STREAMING ACTIVE`);
 });
