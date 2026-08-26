@@ -123,40 +123,57 @@ app.get('/api/audio', async (req, res) => {
 });
 
 // =====================================================================
-// 📺 ENDPOINT 2: PROXY TV & MATCH STREAMING
+// 📺 ENDPOINT 2: PROXY TV & MATCH STREAMING (ANTI-CORS & SUPPORT DRM)
 // =====================================================================
-app.get('/api/get-match-stream', async (req, res) => {
-    const matchId = req.query.matchId;
+app.get('/api/get-match-stream', (req, res) => {
+    const { matchId } = req.query;
     
     console.log(`[📡] REQUEST STREAM TV DITERIMA UNTUK MATCH ID: ${matchId}`);
 
-    try {
-        let streamUrl = "";
+    // Template balasan default
+    let streamData = {
+        success: false,
+        streamUrl: "",
+        clearKeyId: null,
+        clearKeyValue: null
+    };
 
-        // Logika sederhana: Balikin link M3U8 berdasarkan ID yang diklik di Frontend
-        if (matchId === 'timnas-live') {
-            // TVRI Nasional Live (Anti Mati) - Buat nge-test stream lancar
-            streamUrl = "https://tvri-id.akamaized.net/hls/live/2026859/TVRI-Nasional/master.m3u8";
-        } 
-        else if (matchId === 'persib-live') {
-            // BeritaSatu Live (Anti Mati) - Buat nge-test stream lancar
-            streamUrl = "https://b1-live.secureswiftcontent.com/b1_ch01/chunklist.m3u8";
-        } 
-        else {
-            // Channel Fallback kalau ID ga ngerespon
-            streamUrl = "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8";
-        }
-
-        // Simulasi delay seolah-olah server lu lagi nge-scrape / bypass DRM (biar keliatan real pro 🤣)
-        setTimeout(() => {
-            console.log(`✅ BERHASIL MENDAPATKAN LINK M3U8: ${streamUrl}`);
-            res.json({ success: true, streamUrl: streamUrl });
-        }, 800);
-
-    } catch (error) {
-        console.error("Gagal nyedot data TV:", error);
-        res.status(500).json({ success: false, message: 'Gagal nge-grab stream TV' });
+    // 🕵️‍♂️ LOGIKA BANDAR STREAMING: 
+    // Ganti link di bawah ini sesaat sebelum pertandingan dimulai!
+    
+    if (matchId === 'timnas-live') {
+        streamData = {
+            success: true,
+            // 👇 Ganti link ini pakai link buruan lu dari Telegram/iptv-org
+            streamUrl: "https://tvri-id.akamaized.net/hls/live/2026859/TVRI-Nasional/master.m3u8", 
+            // Kalau videonya digembok DRM, masukin key-nya di sini. Kalau m3u8 biasa, biarin null.
+            clearKeyId: null, 
+            clearKeyValue: null
+        };
+    } 
+    else if (matchId === 'persib-live') {
+        streamData = {
+            success: true,
+            streamUrl: "https://b1-live.secureswiftcontent.com/b1_ch01/chunklist.m3u8", 
+            clearKeyId: null,
+            clearKeyValue: null
+        };
     }
+    else {
+        // Channel Fallback kalau ID ga ngerespon (Mux Test Kelinci)
+        streamData = {
+            success: true,
+            streamUrl: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8", 
+            clearKeyId: null,
+            clearKeyValue: null
+        };
+    }
+
+    // Simulasi delay biar keliatan real pro lagi nge-bypass server 😎
+    setTimeout(() => {
+        console.log(`✅ BERHASIL MENGIRIM DATA STREAM: ${streamData.streamUrl}`);
+        res.json(streamData);
+    }, 800);
 });
 
 app.listen(PORT, '0.0.0.0', () => {
