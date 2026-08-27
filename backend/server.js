@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios'); // 🔥 Mesin penyedot brutal kita
+const { HttpsProxyAgent } = require('https-proxy-agent'); // 🛡️ Topeng IP Indonesia kita
 
 const app = express();
 app.use(cors());
@@ -257,22 +258,27 @@ app.get('/api/bypass-cors', async (req, res) => {
 });
 
 // =====================================================================
-// 🏴‍☠️ ENDPOINT 5: AUTO-SCRAPER TOKEN THE BIG 6 (SCTV, RCTI, DLL)
+// 🏴‍☠️ ENDPOINT 5: AUTO-SCRAPER TOKEN THE BIG 6 DENGAN TOPENG IP INDO
 // =====================================================================
 app.get('/api/get-premium-channel', async (req, res) => {
     const { channel } = req.query;
 
     if (!channel) return res.status(400).send('Nama channel belum dimasukin Bang!');
 
+    // ⚠️ INI KUNCINYA: IP Proxy Indonesia Gratisan
+    // Kalau suatu hari API error 500 lagi, berarti IP ini udah mati.
+    // Lu tinggal cari di Google: "Free Proxy List Indonesia", trus ganti IP & Port-nya di bawah ini!
+    const indoProxy = new HttpsProxyAgent('http://103.105.104.57:8080'); 
+
     try {
         let streamUrl = '';
 
         // 🟢 JALUR MNC GROUP (RCTI, GTV, MNCTV, iNews)
-        // Nembak langsung ke API internal RCTI+ Android
         if (['rcti', 'gtv', 'mnctv', 'inews'].includes(channel)) {
             const rctiResponse = await axios.get(`https://api.rctiplus.com/api/v1/live/tv/${channel}`, {
+                httpsAgent: indoProxy, // <== Paksa Axios pakai KTP Indonesia!
                 headers: {
-                    'User-Agent': 'okhttp/4.9.0', // Nyamar jadi aplikasi Android
+                    'User-Agent': 'okhttp/4.9.0', 
                     'Platform': 'android'
                 }
             });
@@ -284,10 +290,10 @@ app.get('/api/get-premium-channel', async (req, res) => {
         } 
         
         // 🔵 JALUR EMTEK GROUP (SCTV, Indosiar)
-        // Jalur API Vidio 
         else if (['sctv', 'indosiar'].includes(channel)) {
             const vidioId = channel === 'sctv' ? '204' : '205'; 
             const vidioResponse = await axios.post(`https://www.vidio.com/live/${vidioId}/tokens`, {}, {
+                httpsAgent: indoProxy, // <== Paksa Axios pakai KTP Indonesia!
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/116.0.0.0',
                     'Origin': 'https://www.vidio.com',
@@ -303,8 +309,7 @@ app.get('/api/get-premium-channel', async (req, res) => {
 
         // Kalau sukses dapet link ber-token, sikat!
         if (streamUrl) {
-            console.log(`✅ Berhasil nyolong token ${channel.toUpperCase()}!`);
-            // Bypass CORS lagi pakai rute God Mode di atas
+            console.log(`✅ Berhasil nyolong token ${channel.toUpperCase()} pakai Proxy Indo!`);
             const bypassedPremiumUrl = `https://music-app-production-60db.up.railway.app/api/bypass-cors?url=${encodeURIComponent(streamUrl)}`;
             return res.json({ success: true, url: bypassedPremiumUrl });
         } else {
@@ -312,8 +317,8 @@ app.get('/api/get-premium-channel', async (req, res) => {
         }
 
     } catch (error) {
-        console.error(`❌ Gagal meretas API ${channel}:`, error.message);
-        return res.status(500).json({ success: false, message: 'Server target menolak koneksi (403/DRM).' });
+        console.error(`❌ Gagal meretas API ${channel} (Mungkin Proxy Gratisannya Mati):`, error.message);
+        return res.status(500).json({ success: false, message: 'Server target menolak koneksi atau Proxy mati.' });
     }
 });
 
