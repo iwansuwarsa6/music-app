@@ -382,25 +382,34 @@ function MainApp() {
     }
   };
 
+  // 🔥 1. JURUS AUTOPLAY AMAN: PAKSA PLAY SETELAH STATE NEXT 🔥
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
+      
       if (e && keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       
-      if (e) {
-          const nextSong = queue[currentIndex + 1];
-          const ghost = getGhostAudio();
-          if (nextSong && ghost && ghost.src.includes(nextSong.id)) {
-              getActiveAudio()?.pause();
-              activeEngine.current = activeEngine.current === 1 ? 2 : 1;
-              const newActive = getActiveAudio();
-              newActive.currentTime = 0;
-              newActive.play().catch(()=>{});
-          } else {
-              getActiveAudio()?.pause();
-          }
-      }
+      // Update state queue
       usePlayerStore.getState().playNext(isShuffle);
+
+      // Timeout kecil biar state kerender, lalu tembak audio langsung!
+      setTimeout(() => {
+        const active = getActiveAudio();
+        const curSong = usePlayerStore.getState().currentSong;
+        
+        if (active && curSong) {
+            const expectedUrl = `${API_BASE}/api/audio?id=${curSong.id}`;
+            active.src = expectedUrl; // Langsung hajar masukin link
+            
+            active.play().then(() => {
+                usePlayerStore.setState({ isPlaying: true });
+            }).catch((err) => {
+                console.log("Kena Razia Autoplay HP!", err);
+                usePlayerStore.setState({ isPlaying: false });
+                showToast("⚠️ HP memblokir pemutaran otomatis. Ketuk Play manual.");
+            });
+        }
+      }, 50); 
   };
 
   const handlePrevLocal = (e) => {
@@ -566,30 +575,35 @@ function MainApp() {
     }
   }, [queue, currentIndex, API_BASE, currentSong]);
 
+  // 🔥 2. JURUS UNLOCK AUDIO: HAPUS DEPENDENCY BIAR GA RE-RENDER TERUS 🔥
   useEffect(() => {
     const unlockAudioContext = () => {
       const a1 = audio1Ref.current;
       const a2 = audio2Ref.current;
-      if (a1 && a1.paused && !currentSong?.id) {
+      
+      if (a1 && a1.paused) {
          a1.src = SILENT_MP3; a1.play().then(() => { a1.pause(); a1.src = ''; }).catch(() => {});
       }
-      if (a2 && a2.paused && !currentSong?.id) {
+      if (a2 && a2.paused) {
          a2.src = SILENT_MP3; a2.play().then(() => { a2.pause(); a2.src = ''; }).catch(() => {});
       }
       if (keepAliveAudioRef.current && keepAliveAudioRef.current.paused) {
           keepAliveAudioRef.current.play().then(() => keepAliveAudioRef.current.pause()).catch(()=>{});
       }
       
+      // Begitu kebangun, lepasin pendeteksinya
       document.removeEventListener('click', unlockAudioContext);
       document.removeEventListener('touchstart', unlockAudioContext);
     };
+    
     document.addEventListener('click', unlockAudioContext);
     document.addEventListener('touchstart', unlockAudioContext);
+    
     return () => {
       document.removeEventListener('click', unlockAudioContext);
       document.removeEventListener('touchstart', unlockAudioContext);
     };
-  }, [currentSong]);
+  }, []); // <== KOSONGIN BIAR DIA CUMA JALAN 1x PAS BUKA WEB!
 
   useEffect(() => {
     const handleOpenMenu = (e) => {
@@ -631,7 +645,6 @@ function MainApp() {
           showToast("Lagu akan diputar selanjutnya");
       }
       
-      // 🔥 FIX BUG: MATIKAN REPEAT 1X BIAR LAGU SELANJUTNYA BISA JALAN 🔥
       if (st.repeatMode === 'one') {
           usePlayerStore.setState({ repeatMode: 'all' });
           showToast("Mode putar ulang 1x dimatikan");
@@ -645,7 +658,6 @@ function MainApp() {
       usePlayerStore.setState({ queue: [...st.queue, contextMenu.song] });
       showToast("Ditambahkan ke antrean");
       
-      // 🔥 FIX BUG: MATIKAN REPEAT 1X BIAR LAGU SELANJUTNYA BISA JALAN 🔥
       if (st.repeatMode === 'one') {
           usePlayerStore.setState({ repeatMode: 'all' });
       }
@@ -1358,6 +1370,7 @@ function MainApp() {
       if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause(); 
   };
   
+  // 🔥 3. JURUS AUTO-NEXT AMAN: LANGSUNG PANGGIL NEXT TANPA PING-PONG 🔥
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
@@ -1366,16 +1379,8 @@ function MainApp() {
           e.target.currentTime = 0;
           e.target.play();
       } else {
-          if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
-          
-          const nextAudio = getGhostAudio();
-          activeEngine.current = activeEngine.current === 1 ? 2 : 1;
-          
-          if (nextAudio && nextAudio.src) {
-              nextAudio.play().catch(err => console.log("PingPong Play Blocked:", err));
-          }
-          
-          usePlayerStore.getState().playNext(isShuffle);
+          // Gak usah bolak-balik audio, HP bingung! Langsung eksekusi next!
+          handleNextLocal(null);
       }
   };
 
@@ -1981,23 +1986,23 @@ function MainApp() {
                           </div>
                        ) : relatedSongs.length > 0 ? (
                           relatedSongs.map((song, idx) => (
-                            <div 
-                               key={idx} 
-                               className="flex items-center gap-4 py-2 px-3 -mx-3 rounded-lg cursor-pointer group hover:bg-white/5 transition-colors" 
-                               onClick={(e) => handlePlayClick(e, song, relatedSongs, idx)}
-                            >
-                               <img loading="lazy" src={song.image} className="w-12 h-12 rounded object-cover opacity-70 group-hover:opacity-100 shadow-md" alt="thumb" />
-                               <div className="flex-1 min-w-0">
-                                  <p className="text-base font-bold text-white line-clamp-1">{song.title}</p>
-                                  <p className="text-sm text-zinc-400 truncate">{song.artist}</p>
-                               </div>
-                               <button onClick={(e) => {
-                                  e.stopPropagation(); e.preventDefault();
-                                  window.dispatchEvent(new CustomEvent('openSongMenu', { detail: { event: e, song: song } }));
-                               }} className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-zinc-400 hover:text-white transition-opacity p-2">
-                                  <MoreVertical size={20} />
-                               </button>
-                            </div>
+                             <div 
+                                key={idx} 
+                                className="flex items-center gap-4 py-2 px-3 -mx-3 rounded-lg cursor-pointer group hover:bg-white/5 transition-colors" 
+                                onClick={(e) => handlePlayClick(e, song, relatedSongs, idx)}
+                             >
+                                <img loading="lazy" src={song.image} className="w-12 h-12 rounded object-cover opacity-70 group-hover:opacity-100 shadow-md" alt="thumb" />
+                                <div className="flex-1 min-w-0">
+                                   <p className="text-base font-bold text-white line-clamp-1">{song.title}</p>
+                                   <p className="text-sm text-zinc-400 truncate">{song.artist}</p>
+                                </div>
+                                <button onClick={(e) => {
+                                   e.stopPropagation(); e.preventDefault();
+                                   window.dispatchEvent(new CustomEvent('openSongMenu', { detail: { event: e, song: song } }));
+                                }} className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-zinc-400 hover:text-white transition-opacity p-2">
+                                   <MoreVertical size={20} />
+                                </button>
+                             </div>
                           ))
                        ) : (
                           <p className="text-zinc-500 text-sm italic mt-4">Belum ada lagu terkait yang ditemukan.</p>
