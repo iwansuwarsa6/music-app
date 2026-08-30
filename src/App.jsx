@@ -382,34 +382,15 @@ function MainApp() {
     }
   };
 
-  // 🔥 1. JURUS AUTOPLAY AMAN: PAKSA PLAY SETELAH STATE NEXT 🔥
+  // 🔥 1. JURUS NEXT CLEAN: Hapus timeout yang bikin balapan (Race Condition) 🔥
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
       
       if (e && keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       
-      // Update state queue
+      // Biarkan state React yang kerja natural, JANGAN paksa set .src manual di sini!
       usePlayerStore.getState().playNext(isShuffle);
-
-      // Timeout kecil biar state kerender, lalu tembak audio langsung!
-      setTimeout(() => {
-        const active = getActiveAudio();
-        const curSong = usePlayerStore.getState().currentSong;
-        
-        if (active && curSong) {
-            const expectedUrl = `${API_BASE}/api/audio?id=${curSong.id}`;
-            active.src = expectedUrl; // Langsung hajar masukin link
-            
-            active.play().then(() => {
-                usePlayerStore.setState({ isPlaying: true });
-            }).catch((err) => {
-                console.log("Kena Razia Autoplay HP!", err);
-                usePlayerStore.setState({ isPlaying: false });
-                showToast("⚠️ HP memblokir pemutaran otomatis. Ketuk Play manual.");
-            });
-        }
-      }, 50); 
   };
 
   const handlePrevLocal = (e) => {
@@ -575,7 +556,6 @@ function MainApp() {
     }
   }, [queue, currentIndex, API_BASE, currentSong]);
 
-  // 🔥 2. JURUS UNLOCK AUDIO: HAPUS DEPENDENCY BIAR GA RE-RENDER TERUS 🔥
   useEffect(() => {
     const unlockAudioContext = () => {
       const a1 = audio1Ref.current;
@@ -591,7 +571,6 @@ function MainApp() {
           keepAliveAudioRef.current.play().then(() => keepAliveAudioRef.current.pause()).catch(()=>{});
       }
       
-      // Begitu kebangun, lepasin pendeteksinya
       document.removeEventListener('click', unlockAudioContext);
       document.removeEventListener('touchstart', unlockAudioContext);
     };
@@ -603,7 +582,7 @@ function MainApp() {
       document.removeEventListener('click', unlockAudioContext);
       document.removeEventListener('touchstart', unlockAudioContext);
     };
-  }, []); // <== KOSONGIN BIAR DIA CUMA JALAN 1x PAS BUKA WEB!
+  }, []); 
 
   useEffect(() => {
     const handleOpenMenu = (e) => {
@@ -1349,8 +1328,17 @@ function MainApp() {
       if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) e.target.play().catch(()=>{});
   };
   
+  // 🔥 2. JURUS SATPAM ERROR: Jangan baperan kalau loading ditabrak 🔥
   const handleError = (e) => {
       if (e.target !== getActiveAudio()) return;
+      
+      // CEGAH ERROR PALSU: Kode 1 (Abort) wajar terjadi kalau transisi lagu terlalu cepet
+      const err = e.target.error;
+      if (err && (err.code === 1 || err.code === 20 || err.message?.includes('aborted'))) {
+          console.log("Loading audio di-cancel (Aman, ini efek ganti lagu)");
+          return; // 🛑 JANGAN LANJUT SKIP! Biarin aja.
+      }
+      
       if (mediaMode === 'audio' && currentSong?.id && e.target.src) {
           setIsBuffering(false);
           usePlayerStore.setState({ isPlaying: false });
@@ -1370,7 +1358,6 @@ function MainApp() {
       if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause(); 
   };
   
-  // 🔥 3. JURUS AUTO-NEXT AMAN: LANGSUNG PANGGIL NEXT TANPA PING-PONG 🔥
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
