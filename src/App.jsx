@@ -75,7 +75,6 @@ function MainApp() {
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
-  // 🔥 FITUR BARU: PWA Update Detector & Hard Refresh 🔥
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
   useEffect(() => {
@@ -152,11 +151,11 @@ function MainApp() {
 
   const iframeRef = useRef(null);
   
-  // 🔥 PONDASI BARU: HANYA 1 AUDIO TUNGGAL (ANTI-SKIPPING HP) 🔥
   const audioRef = useRef(null);
   const getActiveAudio = () => audioRef.current;
 
-  // 🔥 Penyimpanan Waktu Adzan (Jam Native) 🔥
+  // 🔥 VARIABLE SISTEM ADZAN & SILUMAN 🔥
+  const keepAliveAudioRef = useRef(null);
   const adzanPausedTimeRef = useRef(0);
   const adzanEndTimeRef = useRef(0);
   const workerRef = useRef(null); 
@@ -213,6 +212,11 @@ function MainApp() {
       isAdzanPlayingRef.current = false;
       setActivePrayerName(null);
       adzanEndTimeRef.current = 0;
+
+      // Matikan audio siluman
+      if (keepAliveAudioRef.current) {
+          keepAliveAudioRef.current.pause();
+      }
       
       if (wasPlayingBeforeAdzan.current) {
           if (mediaModeRef.current === 'video') {
@@ -222,17 +226,14 @@ function MainApp() {
           } else {
               const active = getActiveAudio();
               if (active) {
-                  active.muted = false;
                   active.currentTime = adzanPausedTimeRef.current; 
                   usePlayerStore.setState({ isPlaying: true });
                   showToast('▶️ Gas lagi! Waktu Adzan selesai.');
                   
-                  if (active.paused) {
-                      active.play().catch(() => {
-                          usePlayerStore.setState({ isPlaying: false });
-                          showToast('⚠️ Ketuk Play manual untuk melanjutkan.');
-                      });
-                  }
+                  active.play().catch(() => {
+                      usePlayerStore.setState({ isPlaying: false });
+                      showToast('⚠️ Ketuk Play manual untuk melanjutkan.');
+                  });
               }
           }
       } else {
@@ -257,13 +258,17 @@ function MainApp() {
               const active = getActiveAudio();
               if (active) {
                   adzanPausedTimeRef.current = active.currentTime;
-                  active.muted = true;
+                  active.pause(); 
+
+                  // 🔥 JURUS SILUMAN: Nyalakan mp3 kosong biar HP gak tidur 🔥
+                  if (keepAliveAudioRef.current) {
+                      keepAliveAudioRef.current.play().catch(()=>{});
+                  }
               }
           }
       }
       
       showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 5 menit.`);
-      
       adzanEndTimeRef.current = Date.now() + (isTest ? 10000 : 300000);
   };
 
@@ -288,7 +293,6 @@ function MainApp() {
       fireAdzanPause("Zuhur (Test)", true);
   };
 
-  // 🔥 5. JURUS GPS LOKASI: Jadwal Adzan 100% Akurat Sesuai Lokasi Asli 🔥
   useEffect(() => {
     localStorage.setItem('ytm_adzan_mode', JSON.stringify(adzanMode));
     if (adzanMode) {
@@ -1277,22 +1281,19 @@ function MainApp() {
     }
   }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying]);
 
+  // 🔥 6. JURUS NATIVE TIME UPDATE ADZAN SILUMAN 🔥
+  const handleKeepAliveTimeUpdate = () => {
+      if (isAdzanPlayingRef.current && adzanEndTimeRef.current > 0) {
+          if (Date.now() >= adzanEndTimeRef.current) {
+              dismissAdzanPause();
+          }
+      }
+  };
+
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
       
-      if (isAdzanPlayingRef.current) {
-          if (Date.now() >= adzanEndTimeRef.current) {
-              dismissAdzanPause();
-              return;
-          }
-
-          if (e.target.currentTime > adzanPausedTimeRef.current + 0.3) {
-              e.target.currentTime = adzanPausedTimeRef.current;
-          }
-          return; 
-      }
-
-      if (!isDragging && mediaMode === 'audio') {
+      if (!isDragging && mediaMode === 'audio' && !isAdzanPlayingRef.current) {
           const newTime = e.target.currentTime;
           if (Math.abs(currentTimeRef.current - newTime) >= 0.5) {
               setCurrentTime(newTime);
@@ -1325,10 +1326,8 @@ function MainApp() {
       console.error("Audio Error Murni:", err);
       if (mediaMode === 'audio' && currentSong?.id && e.target.src) {
           setIsBuffering(false);
-          showToast("❌ Audio gagal dimuat. Melewati lagu...");
-          setTimeout(() => { 
-              usePlayerStore.getState().playNext(isShuffle); 
-          }, 3000);
+          usePlayerStore.setState({ isPlaying: false });
+          showToast("❌ Sinyal audio terputus. Ketuk Play untuk mengulang.");
       }
   };
   
@@ -1375,6 +1374,16 @@ function MainApp() {
               Versi Baru Tersedia! Klik untuk Update Web
           </div>
       )}
+
+      {/* 🔥 AUDIO SILUMAN BUAT NGE-HACK BACKGROUND OS 🔥 */}
+      <audio 
+         ref={keepAliveAudioRef} 
+         src={SILENT_MP3} 
+         loop 
+         playsInline 
+         className="hidden" 
+         onTimeUpdate={handleKeepAliveTimeUpdate}
+      />
 
       {/* ⚠️ HANYA ADA 1 AUDIO SEKARANG ⚠️ */}
       <audio
