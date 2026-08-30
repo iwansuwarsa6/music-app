@@ -207,6 +207,7 @@ function MainApp() {
   const dismissAdzanPauseRef = useRef(dismissAdzanPause);
   useEffect(() => { dismissAdzanPauseRef.current = dismissAdzanPause; }, [dismissAdzanPause]);
 
+  // 🔥 UPDATE JURUS MUTE ADZAN + BACKUP TIMER 🔥
   const fireAdzanPause = (prayerName, isTest = false) => {
       wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
       isAdzanPlayingRef.current = true;
@@ -228,8 +229,13 @@ function MainApp() {
       
       showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 5 menit.`);
 
+      // JURUS BACKUP ANTI-NYANGKUT: Kalau worker mati, pakai timer manual!
       if (workerRef.current) {
           workerRef.current.postMessage({ cmd: isTest ? 'start_test_adzan' : 'start_adzan' });
+      } else {
+          setTimeout(() => {
+              if (dismissAdzanPauseRef.current) dismissAdzanPauseRef.current();
+          }, isTest ? 10000 : 300000);
       }
   };
 
@@ -245,7 +251,12 @@ function MainApp() {
       return false;
   };
 
+  // 🔥 UPDATE JURUS TEST ADZAN 🔥
   const triggerTestAdzan = () => {
+      if (!adzanMode) {
+          showToast("⚠️ Klik 1x ikon Masjid dulu untuk menyalakan Mode Adzan!");
+          return;
+      }
       if (isAdzanPlayingRef.current) return;
       fireAdzanPause("Zuhur (Test)", true);
   };
@@ -369,7 +380,6 @@ function MainApp() {
     audioEl.load();
     if (autoPlay && !isAdzanPlayingRef.current) {
         audioEl.play().then(() => {
-            // SINKRONISASI PAS LOAD BARU
             usePlayerStore.setState({ isPlaying: true });
         }).catch(()=>{});
     }
@@ -379,10 +389,8 @@ function MainApp() {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
       
-      // Update state queue
       usePlayerStore.getState().playNext(isShuffle);
 
-      // TANPA JEDA WAKTU! Langsung tarik referensi lagu terbaru dari state manager
       const active = getActiveAudio();
       const curSong = usePlayerStore.getState().currentSong;
       
@@ -1339,11 +1347,9 @@ function MainApp() {
   const handlePlaying = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
-      // 🔥 JURUS SINKRONISASI MUTLAK: Pastikan UI sadar kalau musik lagi jalan! 🔥
       usePlayerStore.setState({ isPlaying: true });
   };
   
-  // 🔥 JURUS SINKRONISASI MUTLAK: Biar pause dari Lockscreen / Headset HP juga ngubah UI 🔥
   const handlePause = (e) => {
       if (e.target !== getActiveAudio()) return;
       usePlayerStore.setState({ isPlaying: false });
