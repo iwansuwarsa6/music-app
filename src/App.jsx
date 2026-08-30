@@ -4,7 +4,7 @@ import {
   Home as HomeIcon, Search as SearchIcon, Library, User, 
   Play, SkipBack, SkipForward, Heart, Pause, 
   ChevronDown, Cast, MoreVertical, ListPlus, Shuffle, Repeat, Repeat1, Mic2, Music, Film, Target,
-  History, Trash2, X, Loader2, Minus, Plus, Radio, ListVideo, Bookmark, ThumbsUp, Download, Tv
+  History, Trash2, X, Loader2, Minus, Plus, Radio, ListVideo, Bookmark, ThumbsUp, Download, Tv, RefreshCw
 } from 'lucide-react';
 import { usePlayerStore } from './store/usePlayerStore';
 
@@ -74,6 +74,50 @@ function MainApp() {
   const [lyricsMode, setLyricsMode] = useState('synced'); 
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  // 🔥 FITUR BARU: PWA Update Detector & Hard Refresh 🔥
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  useEffect(() => {
+      // Nguping kalau ada file baru dari server (PWA Update)
+      if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.ready.then(registration => {
+              registration.addEventListener('updatefound', () => {
+                  setUpdateAvailable(true);
+              });
+          });
+      }
+  }, []);
+
+  const forceHardRefresh = async (e) => {
+      if (e) e.preventDefault();
+      showToast("🔄 Mengunduh versi terbaru...");
+      
+      try {
+          // 1. Bumihanguskan Cache Web (Kecuali Lagu Offline lu!)
+          if ('caches' in window) {
+              const cacheNames = await caches.keys();
+              await Promise.all(cacheNames.map(name => {
+                  if (name !== 'rncmusic-offline-audio') {
+                      return caches.delete(name);
+                  }
+              }));
+          }
+          
+          // 2. Pecat satpam PWA lama
+          if ('serviceWorker' in navigator) {
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              for (let reg of registrations) {
+                  await reg.unregister();
+              }
+          }
+          
+          // 3. Paksa muat ulang dari nol!
+          window.location.reload(true);
+      } catch (err) {
+          window.location.reload(); // Fallback kalo error
+      }
+  };
 
   useEffect(() => {
     usePlayerStore.setState({ isPlaying: false });
@@ -1004,7 +1048,6 @@ function MainApp() {
       }
   }, [activeTab, displayArtist, isOffline]);
 
-  // 🔥 RESTORASI: State Sinkronisasi Kapan Lagu Play/Bisa Dimainkan 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -1326,6 +1369,18 @@ function MainApp() {
   return (
     <div className="h-screen bg-[#0f0f0f] text-white flex flex-col font-sans overflow-hidden relative">
       
+      {/* 🚀 BANNER AUTO-UPDATE PWA 🚀 */}
+      {updateAvailable && (
+          <div 
+             onClick={forceHardRefresh}
+             className="fixed top-6 left-1/2 -translate-x-1/2 bg-[#3ea6ff] text-black px-6 py-3 rounded-full text-sm font-black shadow-[0_0_30px_rgba(62,166,255,0.6)] z-[999999] flex items-center gap-3 cursor-pointer animate-in slide-in-from-top-10 hover:scale-105 transition-transform"
+          >
+              <Download size={18} className="animate-bounce" />
+              Versi Baru Tersedia! Klik untuk Update Web
+          </div>
+      )}
+
+      {/* ⚠️ HANYA ADA 1 AUDIO SEKARANG ⚠️ */}
       <audio
         ref={audioRef} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
@@ -1545,6 +1600,11 @@ function MainApp() {
         </div>
 
         <div className="flex items-center justify-end gap-5 w-[160px]">
+          {/* TOMBOL HARD REFRESH MANUAL BUAT LU */}
+          <button onClick={forceHardRefresh} title="Hard Refresh Web" className="text-zinc-500 hover:text-[#3ea6ff] transition-colors hidden md:block">
+            <RefreshCw size={22} />
+          </button>
+
           <button 
              onClick={(e) => {
                  const newMode = !adzanMode;
