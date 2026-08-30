@@ -28,11 +28,9 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
 
 const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
 
-// 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE (VERSI PALING LENGKAP & AMAN) 🔥
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
-  
   const badWords = [
       'podcast', 'vlog', 'tutorial', 'review', 'unboxing', 'reaction', 'react to',
       'trailer', 'movie', 'episode', 'berita', 'gameplay', 'how to', 
@@ -46,7 +44,6 @@ const isNonMusic = (title) => {
       'korg', 'casio', 'kupas tuntas', 'setting', 'pengaturan', 'alasan', 
       'kenapa', 'mengapa', ' vs ', 'versus', 'tips', 'trick', 'trik', 'harga'
   ];
-  
   if (t.includes('cara ') && !t.includes('bicara') && !t.includes('cara lupakan')) return true;
   return badWords.some(w => t.includes(w)) || t.match(/\b(tes|test|unbox)\b/);
 };
@@ -114,18 +111,15 @@ function MainApp() {
   });
 
   const iframeRef = useRef(null);
-  const audio1Ref = useRef(null);
-  const audio2Ref = useRef(null);
-  const activeEngine = useRef(1);
-  const workerRef = useRef(null); 
   
-  const getActiveAudio = () => activeEngine.current === 1 ? audio1Ref.current : audio2Ref.current;
-  const getGhostAudio = () => activeEngine.current === 1 ? audio2Ref.current : audio1Ref.current;
+  // 🔥 PONDASI BARU: HANYA 1 AUDIO TUNGGAL (ANTI-SKIPPING HP) 🔥
+  const audioRef = useRef(null);
+  const getActiveAudio = () => audioRef.current;
 
-  // 🔥 Penyimpanan Detik Buat Treadmill Adzan & Timer 🔥
+  // 🔥 Penyimpanan Waktu Adzan (Jam Native) 🔥
   const adzanPausedTimeRef = useRef(0);
-  const adzanTimeoutRef = useRef(null);
-  const keepAliveAudioRef = useRef(null); 
+  const adzanEndTimeRef = useRef(0);
+  const workerRef = useRef(null); 
   
   const API_BASE = "https://music-app-production-60db.up.railway.app";
 
@@ -178,7 +172,7 @@ function MainApp() {
       
       isAdzanPlayingRef.current = false;
       setActivePrayerName(null);
-      if (adzanTimeoutRef.current) clearTimeout(adzanTimeoutRef.current);
+      adzanEndTimeRef.current = 0;
       
       if (wasPlayingBeforeAdzan.current) {
           if (mediaModeRef.current === 'video') {
@@ -229,12 +223,9 @@ function MainApp() {
       }
       
       showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 5 menit.`);
-
-      // 🔥 TIMER 1000% ANTI NYANGKUT: Pakai React Asli! 🔥
-      if (adzanTimeoutRef.current) clearTimeout(adzanTimeoutRef.current);
-      adzanTimeoutRef.current = setTimeout(() => {
-          if (dismissAdzanPauseRef.current) dismissAdzanPauseRef.current();
-      }, isTest ? 10000 : 300000);
+      
+      // 🔥 JURUS NATIVE CLOCK: Setting Waktu Target Asli 🔥
+      adzanEndTimeRef.current = Date.now() + (isTest ? 10000 : 300000);
   };
 
   const fireAdzanPauseRef = useRef(fireAdzanPause);
@@ -258,15 +249,14 @@ function MainApp() {
       fireAdzanPause("Zuhur (Test)", true);
   };
 
+  // 🔥 5. JURUS GPS LOKASI: Jadwal Adzan 100% Akurat Sesuai Lokasi Asli 🔥
   useEffect(() => {
     localStorage.setItem('ytm_adzan_mode', JSON.stringify(adzanMode));
     if (adzanMode) {
-        showToast("⏳ Sinkronisasi jadwal Adzan...");
-        fetch('https://get.geojs.io/v1/ip/geo.json')
-        .then(res => res.json())
-        .then(locationData => {
-            const userCity = locationData.city || 'Jakarta'; 
-            return fetch(`https://api.aladhan.com/v1/timingsByCity?city=${userCity}&country=Indonesia&method=11`)
+        showToast("⏳ Meminta akses lokasi akurat...");
+
+        const fetchByCity = (city) => {
+            fetch(`https://api.aladhan.com/v1/timingsByCity?city=${city}&country=Indonesia&method=11`)
                 .then(res => res.json())
                 .then(data => {
                     const timings = data.data.timings;
@@ -277,29 +267,51 @@ function MainApp() {
                         { name: 'Maghrib', time: timings.Maghrib },
                         { name: 'Isya', time: timings.Isha }
                     ]);
-                    showToast(`✅ Jadwal Adzan ${userCity} Aktif!`);
+                    showToast(`✅ Jadwal Adzan ${city} Aktif!`);
                 });
-        }).catch(e => {
-            fetch('https://api.aladhan.com/v1/timingsByCity?city=Jakarta&country=Indonesia&method=11')
-            .then(res => res.json())
-            .then(data => {
-                const timings = data.data.timings;
-                setPrayerTimes([
-                    { name: 'Subuh', time: timings.Fajr },
-                    { name: 'Zuhur', time: timings.Dhuhr },
-                    { name: 'Ashar', time: timings.Asr },
-                    { name: 'Maghrib', time: timings.Maghrib },
-                    { name: 'Isya', time: timings.Isha }
-                ]);
-                showToast(`✅ Jadwal Adzan Jakarta Aktif! (Fallback)`);
-            });
-        });
+        };
+
+        const fetchByCoords = (lat, lng) => {
+            fetch(`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lng}&method=11`)
+                .then(res => res.json())
+                .then(data => {
+                    const timings = data.data.timings;
+                    setPrayerTimes([
+                        { name: 'Subuh', time: timings.Fajr },
+                        { name: 'Zuhur', time: timings.Dhuhr },
+                        { name: 'Ashar', time: timings.Asr },
+                        { name: 'Maghrib', time: timings.Maghrib },
+                        { name: 'Isya', time: timings.Isha }
+                    ]);
+                    showToast(`✅ Jadwal Adzan GPS Akurat Aktif!`);
+                });
+        };
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    fetchByCoords(position.coords.latitude, position.coords.longitude);
+                },
+                (error) => {
+                    console.log("GPS ditolak/gagal, pakai IP (Backup)");
+                    fetch('https://get.geojs.io/v1/ip/geo.json')
+                        .then(res => res.json())
+                        .then(locationData => fetchByCity(locationData.city || 'Jakarta'))
+                        .catch(() => fetchByCity('Jakarta'));
+                },
+                { timeout: 10000 }
+            );
+        } else {
+            fetch('https://get.geojs.io/v1/ip/geo.json')
+                .then(res => res.json())
+                .then(locationData => fetchByCity(locationData.city || 'Jakarta'))
+                .catch(() => fetchByCity('Jakarta'));
+        }
     } else {
         setPrayerTimes([]);
     }
   }, [adzanMode]);
 
-  // 🔥 WORKER SEKARANG CUMA TUGAS JAM DINDING! 🔥
   useEffect(() => {
     if (!adzanMode || prayerTimes.length === 0) return;
 
@@ -361,30 +373,16 @@ function MainApp() {
     
     audioEl.load();
     if (autoPlay && !isAdzanPlayingRef.current) {
-        audioEl.play().catch(()=>{});
+        audioEl.play().then(() => {
+            usePlayerStore.setState({ isPlaying: true });
+        }).catch(()=>{});
     }
   };
 
-  // 🔥 RESTORASI KEJAYAAN: SISTEM PING PONG LU YANG ASLI! 🔥
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
       
-      if (e && keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
-      
-      if (e) {
-          const nextSong = queue[currentIndex + 1];
-          const ghost = getGhostAudio();
-          if (nextSong && ghost && ghost.src.includes(nextSong.id)) {
-              getActiveAudio()?.pause();
-              activeEngine.current = activeEngine.current === 1 ? 2 : 1;
-              const newActive = getActiveAudio();
-              newActive.currentTime = 0;
-              newActive.play().catch(()=>{});
-          } else {
-              getActiveAudio()?.pause();
-          }
-      }
       usePlayerStore.getState().playNext(isShuffle);
   };
 
@@ -395,8 +393,6 @@ function MainApp() {
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
       } else {
-          if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
-          getActiveAudio()?.pause();
           usePlayerStore.getState().playPrev();
       }
   };
@@ -414,7 +410,9 @@ function MainApp() {
           if (active && currentSong && !active.src.includes(currentSong.id)) {
               loadAudioSource(active, currentSong.id, true);
           } else {
-              active?.play().catch(()=>{});
+              active?.play().then(() => {
+                  usePlayerStore.setState({ isPlaying: true });
+              }).catch(()=>{});
           }
           if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
           togglePlay();
@@ -424,17 +422,11 @@ function MainApp() {
   const handleQueuePlay = (e, qSong, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
-      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       
       if (currentSong && currentSong.id === qSong.id) {
           handleTogglePlayLocal(null);
           setIsExpanded(true); 
           return; 
-      }
-      
-      const active = getActiveAudio();
-      if (active) {
-          loadAudioSource(active, qSong.id, true);
       }
       
       usePlayerStore.getState().playSong(qSong, queue, idx);
@@ -444,7 +436,6 @@ function MainApp() {
   const handlePlayClick = (e, song, list, idx) => {
       if (e) { e.preventDefault(); e.stopPropagation(); }
       dismissAdzanIfActive(); 
-      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       
       if (currentSong && currentSong.id === song.id) {
           handleTogglePlayLocal(null);
@@ -452,11 +443,6 @@ function MainApp() {
           return; 
       }
       
-      const active = getActiveAudio();
-      if (active) {
-          loadAudioSource(active, song.id, true);
-      }
-
       let cleanQueue = [];
       let usedTitles = new Set();
       
@@ -540,17 +526,6 @@ function MainApp() {
       showToast("❌ Gagal menyimpan lagu. Pastikan koneksi stabil.");
     }
   };
-
-  // 🔥 RESTORASI: Preload Ghost Audio Lu yang Super Sakti 🔥
-  useEffect(() => {
-    const nextSong = queue[currentIndex + 1];
-    if (nextSong && nextSong.id) {
-        const ghost = getGhostAudio();
-        if (ghost && !ghost.src.includes(nextSong.id)) {
-            loadAudioSource(ghost, nextSong.id, false);
-        }
-    }
-  }, [queue, currentIndex, API_BASE, currentSong]);
 
   useEffect(() => {
     const handleOpenMenu = (e) => {
@@ -661,9 +636,6 @@ function MainApp() {
     window.dispatchEvent(new Event('likedSongsUpdated'));
   };
 
-  // =========================================================================
-  // 🔥 ALGORITMA RADIO MIX SUPER CERDAS (SISTEM KARANTINA GENRE KETAT) 🔥
-  // =========================================================================
   const generateRadioMix = async (baseSong) => {
     if(!baseSong) return;
 
@@ -695,13 +667,11 @@ function MainApp() {
         return;
     }
 
-    // 🔥 KELOMPOK GENRE 🔥
     const dangdutArr = ["Rhoma Irama", "Meggy Z", "Evie Tamala", "Elvy Sukaesih", "Rita Sugiarto", "Mansyur S", "Caca Handika", "Asep Irama", "Imam S Arifin", "Dangdut", "Koplo", "Monata", "Pallapa"];
     const indoPopArr = ["Mahalini", "Bernadya", "Hindia", "Tiara Andini", "Sal Priadi", "Kunto Aji", "Nadin Amizah", "Pamungkas", "Yura Yunita", "Maliq & D'Essentials", "Juicy Luicy", "Rizky Febian", "Tulus", "Lyodra", "Sheila On 7", "D'Masiv", "Noah"];
     const baratPopArr = ["Taylor Swift", "The Weeknd", "Bruno Mars", "Ariana Grande", "Justin Bieber", "Post Malone", "Dua Lipa", "Coldplay", "Ed Sheeran", "Sabrina Carpenter", "Billie Eilish", "Charlie Puth", "Benson Boone"];
     const rockArr = ["Linkin Park", "Nirvana", "Green Day", "Guns N' Roses", "Queen", "Muse", "Oasis", "Arctic Monkeys", "Bon Jovi"];
 
-    // 1. Deteksi Genre Lagu Utama (Lagu yang lagi lu putar)
     const baseIsDangdut = dangdutArr.some(a => cleanArtist.toLowerCase().includes(a.toLowerCase()) || cleanTitle.toLowerCase().includes(a.toLowerCase()));
     const baseIsBarat = baratPopArr.some(a => cleanArtist.toLowerCase().includes(a.toLowerCase()));
     const baseIsRock = rockArr.some(a => cleanArtist.toLowerCase().includes(a.toLowerCase()));
@@ -711,7 +681,6 @@ function MainApp() {
         `${cleanArtist} lagu terbaik official` 
     ]; 
     
-    // Sesuaikan sumber pencarian dengan genre
     if (baseIsDangdut) {
         const randomHits = dangdutArr.sort(() => 0.5 - Math.random()).slice(0, 2);
         queryPool.push(`"${randomHits[0]}" official audio`);
@@ -756,14 +725,9 @@ function MainApp() {
 
             let titleCheck = tCleanT.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music|cover|remix|live)/gi, '').trim();
             
-            // 🔥 EKSEKUSI KARANTINA GENRE 🔥
-            // Cek apakah lagu yang baru ditemuin ini adalah Dangdut
             const isThisSongDangdut = dangdutArr.some(a => tCleanT.toLowerCase().includes(a.toLowerCase()) || (t.author?.name || '').toLowerCase().includes(a.toLowerCase()) || tCleanT.toLowerCase().includes('dangdut'));
             
-            // ATURAN 1: Kalau lagu utamanya BUKAN Dangdut, tapi nemu lagu Dangdut -> BUANG/SKIP!
             if (!baseIsDangdut && isThisSongDangdut) return;
-            
-            // ATURAN 2: Kalau lagu utamanya Dangdut, tapi nemu lagu Pop Barat -> BUANG/SKIP!
             if (baseIsDangdut && baratPopArr.some(a => (t.author?.name || '').toLowerCase().includes(a.toLowerCase()))) return;
 
             if (titleCheck.length > 3) {
@@ -788,7 +752,6 @@ function MainApp() {
             usedIds.add(validId);
         });
 
-        // Sorting: Utamakan artis yang sama di urutan teratas
         mix.sort((a, b) => {
             let isASameArtist = a.artist.toLowerCase().includes(cleanArtist.toLowerCase()) ? -1 : 1;
             let isBSameArtist = b.artist.toLowerCase().includes(cleanArtist.toLowerCase()) ? -1 : 1;
@@ -1041,6 +1004,7 @@ function MainApp() {
       }
   }, [activeTab, displayArtist, isOffline]);
 
+  // 🔥 RESTORASI: State Sinkronisasi Kapan Lagu Play/Bisa Dimainkan 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -1278,6 +1242,11 @@ function MainApp() {
       if (e.target !== getActiveAudio()) return;
       
       if (isAdzanPlayingRef.current) {
+          if (Date.now() >= adzanEndTimeRef.current) {
+              dismissAdzanPause();
+              return;
+          }
+
           if (e.target.currentTime > adzanPausedTimeRef.current + 0.3) {
               e.target.currentTime = adzanPausedTimeRef.current;
           }
@@ -1301,24 +1270,26 @@ function MainApp() {
   const handleCanPlay = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
-      if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) e.target.play().catch(()=>{});
+      if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) {
+          e.target.play().catch(()=>{});
+      }
   };
   
-  // 🔥 RESTORASI: Satpam Error yang Gak Gampang Panik 🔥
   const handleError = (e) => {
       if (e.target !== getActiveAudio()) return;
       
       const err = e.target.error;
-      if (err && (err.code === 1 || err.code === 20 || err.message?.includes('aborted'))) {
-          console.log("Loading audio di-cancel (Aman, ini efek ganti lagu/ping-pong)");
-          return; 
-      }
+      if (!err) return;
       
+      if (err.code === 1 || err.code === 20 || err.message?.includes('aborted')) return; 
+      
+      console.error("Audio Error Murni:", err);
       if (mediaMode === 'audio' && currentSong?.id && e.target.src) {
           setIsBuffering(false);
-          usePlayerStore.setState({ isPlaying: false });
-          showToast("❌ Audio diproteksi/gagal dimuat. Melompat ke lagu berikutnya...");
-          setTimeout(() => { handleNextLocal(null); }, 2500);
+          showToast("❌ Audio gagal dimuat. Melewati lagu...");
+          setTimeout(() => { 
+              usePlayerStore.getState().playNext(isShuffle); 
+          }, 3000);
       }
   };
   
@@ -1330,19 +1301,14 @@ function MainApp() {
   const handlePlaying = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
-      if (!isAdzanPlayingRef.current) {
-          usePlayerStore.setState({ isPlaying: true });
-      }
+      if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: true });
   };
   
   const handlePause = (e) => {
       if (e.target !== getActiveAudio()) return;
-      if (!isAdzanPlayingRef.current) {
-          usePlayerStore.setState({ isPlaying: false });
-      }
+      if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: false });
   };
   
-  // 🔥 RESTORASI: Ping Pong Balik Lagi! 🔥
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
@@ -1351,15 +1317,6 @@ function MainApp() {
           e.target.currentTime = 0;
           e.target.play();
       } else {
-          if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
-          
-          const nextAudio = getGhostAudio();
-          activeEngine.current = activeEngine.current === 1 ? 2 : 1;
-          
-          if (nextAudio && nextAudio.src) {
-              nextAudio.play().catch(err => console.log("PingPong Play Blocked:", err));
-          }
-          
           usePlayerStore.getState().playNext(isShuffle);
       }
   };
@@ -1369,16 +1326,8 @@ function MainApp() {
   return (
     <div className="h-screen bg-[#0f0f0f] text-white flex flex-col font-sans overflow-hidden relative">
       
-      <audio ref={keepAliveAudioRef} src={SILENT_MP3} loop playsInline className="hidden" />
-
       <audio
-        ref={audio1Ref} playsInline preload="auto"
-        onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
-        onCanPlay={handleCanPlay} onEnded={handleAudioEnded} onError={handleError}
-        onWaiting={handleWaiting} onPlaying={handlePlaying} onPause={handlePause} className="hidden"
-      />
-      <audio
-        ref={audio2Ref} playsInline preload="auto"
+        ref={audioRef} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
         onCanPlay={handleCanPlay} onEnded={handleAudioEnded} onError={handleError}
         onWaiting={handleWaiting} onPlaying={handlePlaying} onPause={handlePause} className="hidden"
