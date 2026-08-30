@@ -79,7 +79,6 @@ function MainApp() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
   useEffect(() => {
-      // Nguping kalau ada file baru dari server (PWA Update)
       if ('serviceWorker' in navigator) {
           navigator.serviceWorker.ready.then(registration => {
               registration.addEventListener('updatefound', () => {
@@ -94,7 +93,6 @@ function MainApp() {
       showToast("🔄 Mengunduh versi terbaru...");
       
       try {
-          // 1. Bumihanguskan Cache Web (Kecuali Lagu Offline lu!)
           if ('caches' in window) {
               const cacheNames = await caches.keys();
               await Promise.all(cacheNames.map(name => {
@@ -104,7 +102,6 @@ function MainApp() {
               }));
           }
           
-          // 2. Pecat satpam PWA lama
           if ('serviceWorker' in navigator) {
               const registrations = await navigator.serviceWorker.getRegistrations();
               for (let reg of registrations) {
@@ -112,10 +109,9 @@ function MainApp() {
               }
           }
           
-          // 3. Paksa muat ulang dari nol!
           window.location.reload(true);
       } catch (err) {
-          window.location.reload(); // Fallback kalo error
+          window.location.reload(); 
       }
   };
 
@@ -268,7 +264,6 @@ function MainApp() {
       
       showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 5 menit.`);
       
-      // 🔥 JURUS NATIVE CLOCK: Setting Waktu Target Asli 🔥
       adzanEndTimeRef.current = Date.now() + (isTest ? 10000 : 300000);
   };
 
@@ -1231,6 +1226,7 @@ function MainApp() {
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentTime, lyrics, activeLyricIndex, lyricOffset, isSyncMode, lyricsMode, isExpanded, activeTab]);
 
   const toggleRepeat = () => {
@@ -1791,6 +1787,12 @@ function MainApp() {
           </div>
           
           <div className="flex gap-2 md:gap-4 text-white px-2">
+            
+            {/* 🔥 TOMBOL HARD REFRESH KHUSUS HP MUNCUL DI SINI 🔥 */}
+            <button onClick={forceHardRefresh} className="p-2 rounded-full hover:bg-white/10 md:hidden text-zinc-400 hover:text-white transition-colors" title="Hard Refresh Web">
+               <RefreshCw size={24} />
+            </button>
+
             <button 
                onClick={(e) => {
                    const newMode = !adzanMode;
