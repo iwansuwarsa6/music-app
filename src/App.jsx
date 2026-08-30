@@ -368,11 +368,13 @@ function MainApp() {
     
     audioEl.load();
     if (autoPlay && !isAdzanPlayingRef.current) {
-        audioEl.play().catch(()=>{});
+        audioEl.play().then(() => {
+            // SINKRONISASI PAS LOAD BARU
+            usePlayerStore.setState({ isPlaying: true });
+        }).catch(()=>{});
     }
   };
 
-  // 🔥 1. JURUS NEXT INSTAN (ANTI-BLOKIR): Hapus setTimeout, langsung tembak! 🔥
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
@@ -423,7 +425,9 @@ function MainApp() {
           if (active && currentSong && !active.src.includes(currentSong.id)) {
               loadAudioSource(active, currentSong.id, true);
           } else {
-              active?.play().catch(()=>{});
+              active?.play().then(() => {
+                  usePlayerStore.setState({ isPlaying: true });
+              }).catch(()=>{});
           }
           if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
           togglePlay();
@@ -1335,6 +1339,14 @@ function MainApp() {
   const handlePlaying = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
+      // 🔥 JURUS SINKRONISASI MUTLAK: Pastikan UI sadar kalau musik lagi jalan! 🔥
+      usePlayerStore.setState({ isPlaying: true });
+  };
+  
+  // 🔥 JURUS SINKRONISASI MUTLAK: Biar pause dari Lockscreen / Headset HP juga ngubah UI 🔥
+  const handlePause = (e) => {
+      if (e.target !== getActiveAudio()) return;
+      usePlayerStore.setState({ isPlaying: false });
   };
   
   const handleAudioEnded = (e) => {
@@ -1358,13 +1370,13 @@ function MainApp() {
         ref={audio1Ref} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
         onCanPlay={handleCanPlay} onEnded={handleAudioEnded} onError={handleError}
-        onWaiting={handleWaiting} onPlaying={handlePlaying} className="hidden"
+        onWaiting={handleWaiting} onPlaying={handlePlaying} onPause={handlePause} className="hidden"
       />
       <audio
         ref={audio2Ref} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
         onCanPlay={handleCanPlay} onEnded={handleAudioEnded} onError={handleError}
-        onWaiting={handleWaiting} onPlaying={handlePlaying} className="hidden"
+        onWaiting={handleWaiting} onPlaying={handlePlaying} onPause={handlePause} className="hidden"
       />
 
       {/* OVERLAY POP UP ADZAN PAUSE */}
