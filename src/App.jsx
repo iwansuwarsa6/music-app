@@ -26,6 +26,8 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
   </svg>
 );
 
+const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+
 // 🔥 ALGORITMA FILTER ANTI-SAMPAH YOUTUBE (VERSI PALING LENGKAP & AMAN) 🔥
 const isNonMusic = (title) => {
   if (!title) return false;
@@ -120,7 +122,7 @@ function MainApp() {
   const getActiveAudio = () => activeEngine.current === 1 ? audio1Ref.current : audio2Ref.current;
   const getGhostAudio = () => activeEngine.current === 1 ? audio2Ref.current : audio1Ref.current;
 
-  // 🔥 1. JURUS BARU: Penyimpanan Detik Buat Treadmill 🔥
+  // 🔥 Penyimpanan Detik Buat Treadmill Adzan 🔥
   const adzanPausedTimeRef = useRef(0);
   
   const API_BASE = "https://music-app-production-60db.up.railway.app";
@@ -169,7 +171,6 @@ function MainApp() {
       setTimeout(() => setToastMsg(""), 3500);
   };
 
-  // 🔥 2. JURUS UNMUTE ADZAN: Bangunin lagu tanpa minta izin HP 🔥
   const dismissAdzanPause = () => {
       if (!isAdzanPlayingRef.current) return;
       
@@ -185,13 +186,11 @@ function MainApp() {
           } else {
               const active = getActiveAudio();
               if (active) {
-                  // NYALAIN LAGI SUARANYA!
                   active.muted = false;
-                  active.currentTime = adzanPausedTimeRef.current; // Balikin ke detik sebelum Adzan
+                  active.currentTime = adzanPausedTimeRef.current; 
                   usePlayerStore.setState({ isPlaying: true });
                   showToast('▶️ Gas lagi! Waktu Adzan selesai.');
                   
-                  // Jaga-jaga kalau HP ternyata beneran nendang pause, kita paksa play lagi
                   if (active.paused) {
                       active.play().catch(() => {
                           usePlayerStore.setState({ isPlaying: false });
@@ -208,21 +207,19 @@ function MainApp() {
   const dismissAdzanPauseRef = useRef(dismissAdzanPause);
   useEffect(() => { dismissAdzanPauseRef.current = dismissAdzanPause; }, [dismissAdzanPause]);
 
-  // 🔥 3. JURUS MUTE ADZAN: Jangan di-pause, cuma dibisukan biar HP ketipu 🔥
   const fireAdzanPause = (prayerName, isTest = false) => {
       wasPlayingBeforeAdzan.current = usePlayerStore.getState().isPlaying;
       isAdzanPlayingRef.current = true;
       setActivePrayerName(prayerName);
 
       if (wasPlayingBeforeAdzan.current) {
-          usePlayerStore.setState({ isPlaying: false }); // UI berubah jadi tombol Pause
+          usePlayerStore.setState({ isPlaying: false }); 
           
           if (mediaModeRef.current === 'video') {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
           } else {
               const active = getActiveAudio();
               if (active) {
-                  // KITA MUTE, BUKAN DI PAUSE!
                   adzanPausedTimeRef.current = active.currentTime;
                   active.muted = true;
               }
@@ -375,29 +372,30 @@ function MainApp() {
     }
   };
 
+  // 🔥 1. JURUS NEXT INSTAN (ANTI-BLOKIR): Hapus setTimeout, langsung tembak! 🔥
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
       
+      // Update state queue
       usePlayerStore.getState().playNext(isShuffle);
 
-      setTimeout(() => {
-        const active = getActiveAudio();
-        const curSong = usePlayerStore.getState().currentSong;
-        
-        if (active && curSong) {
-            const expectedUrl = `${API_BASE}/api/audio?id=${curSong.id}`;
-            active.src = expectedUrl; 
-            
-            active.play().then(() => {
-                usePlayerStore.setState({ isPlaying: true });
-            }).catch((err) => {
-                console.log("Kena Razia Autoplay HP!", err);
-                usePlayerStore.setState({ isPlaying: false });
-                showToast("⚠️ HP memblokir pemutaran otomatis. Ketuk Play manual.");
-            });
-        }
-      }, 50); 
+      // TANPA JEDA WAKTU! Langsung tarik referensi lagu terbaru dari state manager
+      const active = getActiveAudio();
+      const curSong = usePlayerStore.getState().currentSong;
+      
+      if (active && curSong) {
+          const expectedUrl = `${API_BASE}/api/audio?id=${curSong.id}`;
+          active.src = expectedUrl; 
+          
+          active.play().then(() => {
+              usePlayerStore.setState({ isPlaying: true });
+          }).catch((err) => {
+              console.log("Kena Razia Autoplay HP!", err);
+              usePlayerStore.setState({ isPlaying: false });
+              showToast("⚠️ HP memblokir pemutaran otomatis. Ketuk Play manual.");
+          });
+      }
   };
 
   const handlePrevLocal = (e) => {
@@ -1282,12 +1280,10 @@ function MainApp() {
     }
   }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying]);
 
-  // 🔥 4. JURUS TREADMILL: Nahan lagu pas Adzan biar nggak mati 🔥
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
       
       if (isAdzanPlayingRef.current) {
-          // Bikin lagu stuck muter-muter di frame yang sama selama Adzan
           if (e.target.currentTime > adzanPausedTimeRef.current + 0.3) {
               e.target.currentTime = adzanPausedTimeRef.current;
           }
