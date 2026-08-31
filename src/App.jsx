@@ -139,15 +139,12 @@ function MainApp() {
   }, []);
 
   // 🔥 JURUS UNLOCK AUDIO iOS / ANDROID 🔥
-  // Memancing izin OS agar MP3 Siluman legal diputar kapan saja di background
   useEffect(() => {
       const unlockAudio = () => {
-          if (keepAliveAudioRef.current && keepAliveAudioRef.current.paused) {
-              keepAliveAudioRef.current.play().then(() => {
-                  keepAliveAudioRef.current.pause();
-              }).catch(() => {});
+          const active = getActiveAudio();
+          if (active && active.paused && !currentSong?.id) {
+              active.play().then(() => active.pause()).catch(() => {});
           }
-          // Copot event listener setelah izin didapat untuk hemat RAM
           document.removeEventListener('click', unlockAudio);
           document.removeEventListener('touchstart', unlockAudio);
       };
@@ -159,7 +156,7 @@ function MainApp() {
           document.removeEventListener('click', unlockAudio);
           document.removeEventListener('touchstart', unlockAudio);
       };
-  }, []);
+  }, [currentSong]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchHistory, setShowSearchHistory] = useState(false);
@@ -173,14 +170,13 @@ function MainApp() {
   });
 
   const iframeRef = useRef(null);
-  
   const audioRef = useRef(null);
   const getActiveAudio = () => audioRef.current;
 
-  // 🔥 VARIABLE SISTEM ADZAN & SILUMAN 🔥
-  const keepAliveAudioRef = useRef(null);
+  // 🔥 VARIABLE SISTEM ADZAN 🔥
   const adzanPausedTimeRef = useRef(0);
   const adzanEndTimeRef = useRef(0);
+  const isRestoringAdzanRef = useRef(false); // Flag untuk balikin waktu lagu
   const workerRef = useRef(null); 
   
   const API_BASE = "https://music-app-production-60db.up.railway.app";
@@ -237,32 +233,27 @@ function MainApp() {
       adzanEndTimeRef.current = 0;
       
       if (wasPlayingBeforeAdzan.current) {
+          const active = getActiveAudio();
+          
           if (mediaModeRef.current === 'video') {
-              if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
+              if (active) { active.pause(); active.src = ''; }
               usePlayerStore.setState({ isPlaying: true });
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
               showToast('▶️ Waktu Adzan selesai. Melanjutkan video...');
           } else {
-              const active = getActiveAudio();
               if (active) {
-                  active.currentTime = adzanPausedTimeRef.current; 
+                  active.loop = false;
+                  isRestoringAdzanRef.current = true; // Tandai minta kembalikan waktu
                   
-                  // 🔥 JURUS OVERLAP: Play main audio DULU, baru matikan MP3 Siluman 🔥
-                  active.play().then(() => {
-                      if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
-                      usePlayerStore.setState({ isPlaying: true });
-                      showToast('▶️ Gas lagi! Waktu Adzan selesai.');
-                  }).catch(() => {
-                      if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
-                      usePlayerStore.setState({ isPlaying: false });
-                      showToast('⚠️ Ketuk Play manual untuk melanjutkan.');
-                  });
-              } else {
-                  if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
+                  // Load ulang audio aslinya ke dalam elemen yang sama
+                  loadAudioSource(active, currentSong.id, true);
+                  usePlayerStore.setState({ isPlaying: true });
+                  showToast('▶️ Gas lagi! Waktu Adzan selesai.');
               }
           }
       } else {
-          if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
+          const active = getActiveAudio();
+          if (active) { active.pause(); active.src = ''; }
           showToast('▶️ Waktu Adzan selesai.');
       }
   };
@@ -278,18 +269,23 @@ function MainApp() {
       if (wasPlayingBeforeAdzan.current) {
           usePlayerStore.setState({ isPlaying: false }); 
           
+          const active = getActiveAudio();
           if (mediaModeRef.current === 'video') {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
-          } else {
-              const active = getActiveAudio();
               if (active) {
+                  active.src = SILENT_MP3;
+                  active.loop = true;
+                  active.play().catch(()=>{});
+              }
+          } else {
+              if (active) {
+                  // Simpan waktu terakhir lagu
                   adzanPausedTimeRef.current = active.currentTime;
-                  active.pause(); 
-
-                  // 🔥 JURUS SILUMAN: Nyalakan mp3 kosong biar HP gak tidur 🔥
-                  if (keepAliveAudioRef.current) {
-                      keepAliveAudioRef.current.play().catch(()=>{});
-                  }
+                  // 🔥 JURUS HIJACK AUDIO UTAMA 🔥
+                  // Timpa langsung dengan MP3 kosong tanpa di-pause! OS akan mengira lagu masih jalan.
+                  active.src = SILENT_MP3;
+                  active.loop = true;
+                  active.play().catch(()=>{});
               }
           }
       }
@@ -1307,18 +1303,17 @@ function MainApp() {
     }
   }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying]);
 
-  // 🔥 6. JURUS NATIVE TIME UPDATE ADZAN SILUMAN 🔥
-  const handleKeepAliveTimeUpdate = () => {
-      if (isAdzanPlayingRef.current && adzanEndTimeRef.current > 0) {
-          if (Date.now() >= adzanEndTimeRef.current) {
-              dismissAdzanPause();
-          }
-      }
-  };
-
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
       
+      // Kalo adzan lagi jalan, pantau terus timernya dari pergerakan mp3 kosong
+      if (isAdzanPlayingRef.current && adzanEndTimeRef.current > 0) {
+          if (Date.now() >= adzanEndTimeRef.current) {
+              dismissAdzanPause();
+              return; 
+          }
+      }
+
       if (!isDragging && mediaMode === 'audio' && !isAdzanPlayingRef.current) {
           const newTime = e.target.currentTime;
           if (Math.abs(currentTimeRef.current - newTime) >= 0.5) {
@@ -1326,7 +1321,7 @@ function MainApp() {
               currentTimeRef.current = newTime;
           }
 
-          // 🔥 FIX 2: NUMPANG CEK AZAN DI AUDIO THREAD 🔥
+          // Cek jadwal Adzan Real-time
           if (adzanMode && prayerTimes.length > 0) {
               const now = new Date();
               const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
@@ -1350,6 +1345,13 @@ function MainApp() {
   const handleCanPlay = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
+      
+      // 🔥 Balikin posisi menit lagu sehabis adzan selesai 🔥
+      if (isRestoringAdzanRef.current && !e.target.src.includes('data:audio')) {
+          e.target.currentTime = adzanPausedTimeRef.current;
+          isRestoringAdzanRef.current = false;
+      }
+
       if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) {
           e.target.play().catch(()=>{});
       }
@@ -1390,11 +1392,9 @@ function MainApp() {
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
-
-      // 🔥 FIX 1: JURUS ANTI-TIDUR SAAT TRANSISI LAGU 🔥
-      if (keepAliveAudioRef.current) {
-          keepAliveAudioRef.current.play().catch(()=>{});
-      }
+      
+      // Abaikan MP3 siluman yang habis (walaupun sudah diset loop)
+      if (e.target.src.includes('data:audio')) return;
 
       if (usePlayerStore.getState().repeatMode === 'one') {
           e.target.currentTime = 0;
@@ -1420,17 +1420,7 @@ function MainApp() {
           </div>
       )}
 
-      {/* 🔥 AUDIO SILUMAN BUAT NGE-HACK BACKGROUND OS 🔥 */}
-      <audio 
-         ref={keepAliveAudioRef} 
-         src={SILENT_MP3} 
-         loop 
-         playsInline 
-         className="hidden" 
-         onTimeUpdate={handleKeepAliveTimeUpdate}
-      />
-
-      {/* ⚠️ HANYA ADA 1 AUDIO SEKARANG ⚠️ */}
+      {/* ⚠️ KINI HANYA ADA 1 AUDIO UTAMA (SILUMAN DIMASUKKAN KE SINI SAAT ADZAN) ⚠️ */}
       <audio
         ref={audioRef} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
