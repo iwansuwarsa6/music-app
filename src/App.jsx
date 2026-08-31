@@ -1299,6 +1299,20 @@ function MainApp() {
               setCurrentTime(newTime);
               currentTimeRef.current = newTime;
           }
+
+          // 🔥 FIX 2: NUMPANG CEK AZAN DI AUDIO THREAD 🔥
+          if (adzanMode && prayerTimes.length > 0) {
+              const now = new Date();
+              const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
+              
+              if (lastAdzanTriggered.current !== timeStr) {
+                  const matchedPrayer = prayerTimes.find(p => p.time === timeStr);
+                  if (matchedPrayer) {
+                      lastAdzanTriggered.current = timeStr;
+                      fireAdzanPauseRef.current(matchedPrayer.name, false);
+                  }
+              }
+          }
       }
   };
 
@@ -1350,6 +1364,11 @@ function MainApp() {
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
+
+      // 🔥 FIX 1: JURUS ANTI-TIDUR SAAT TRANSISI LAGU 🔥
+      if (keepAliveAudioRef.current) {
+          keepAliveAudioRef.current.play().catch(()=>{});
+      }
 
       if (usePlayerStore.getState().repeatMode === 'one') {
           e.target.currentTime = 0;
