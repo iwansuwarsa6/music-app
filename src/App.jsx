@@ -138,6 +138,29 @@ function MainApp() {
     };
   }, []);
 
+  // 🔥 JURUS UNLOCK AUDIO iOS / ANDROID 🔥
+  // Memancing izin OS agar MP3 Siluman legal diputar kapan saja di background
+  useEffect(() => {
+      const unlockAudio = () => {
+          if (keepAliveAudioRef.current && keepAliveAudioRef.current.paused) {
+              keepAliveAudioRef.current.play().then(() => {
+                  keepAliveAudioRef.current.pause();
+              }).catch(() => {});
+          }
+          // Copot event listener setelah izin didapat untuk hemat RAM
+          document.removeEventListener('click', unlockAudio);
+          document.removeEventListener('touchstart', unlockAudio);
+      };
+
+      document.addEventListener('click', unlockAudio);
+      document.addEventListener('touchstart', unlockAudio);
+
+      return () => {
+          document.removeEventListener('click', unlockAudio);
+          document.removeEventListener('touchstart', unlockAudio);
+      };
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearchHistory, setShowSearchHistory] = useState(false);
   const [liveSuggestions, setLiveSuggestions] = useState([]);
@@ -212,14 +235,10 @@ function MainApp() {
       isAdzanPlayingRef.current = false;
       setActivePrayerName(null);
       adzanEndTimeRef.current = 0;
-
-      // Matikan audio siluman
-      if (keepAliveAudioRef.current) {
-          keepAliveAudioRef.current.pause();
-      }
       
       if (wasPlayingBeforeAdzan.current) {
           if (mediaModeRef.current === 'video') {
+              if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
               usePlayerStore.setState({ isPlaying: true });
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
               showToast('▶️ Waktu Adzan selesai. Melanjutkan video...');
@@ -227,16 +246,23 @@ function MainApp() {
               const active = getActiveAudio();
               if (active) {
                   active.currentTime = adzanPausedTimeRef.current; 
-                  usePlayerStore.setState({ isPlaying: true });
-                  showToast('▶️ Gas lagi! Waktu Adzan selesai.');
                   
-                  active.play().catch(() => {
+                  // 🔥 JURUS OVERLAP: Play main audio DULU, baru matikan MP3 Siluman 🔥
+                  active.play().then(() => {
+                      if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
+                      usePlayerStore.setState({ isPlaying: true });
+                      showToast('▶️ Gas lagi! Waktu Adzan selesai.');
+                  }).catch(() => {
+                      if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
                       usePlayerStore.setState({ isPlaying: false });
                       showToast('⚠️ Ketuk Play manual untuk melanjutkan.');
                   });
+              } else {
+                  if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
               }
           }
       } else {
+          if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
           showToast('▶️ Waktu Adzan selesai.');
       }
   };
