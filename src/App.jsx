@@ -282,9 +282,8 @@ function MainApp() {
                   adzanPausedTimeRef.current = active.currentTime;
                   adzanOriginalLoopRef.current = active.loop;
                   
-                  // Putar mp3 kosong yang suaranya ada tapi "hening" dan di-loop. OS anggap ini legal.
                   active.src = SILENT_MP3;
-                  active.muted = false; // DILARANG MUTE NATIVE, OS AKAN SUSPEND!
+                  active.muted = false; 
                   active.volume = 1;
                   active.loop = true; 
                   active.play().catch(()=>{});
@@ -452,6 +451,7 @@ function MainApp() {
       
       usePlayerStore.getState().playNext(isShuffle);
 
+      // 🔥 FIX PWA BACKGROUND: Sync Audio Injection 🔥
       const newSong = usePlayerStore.getState().currentSong;
       const active = getActiveAudio();
       if (newSong && active) {
@@ -470,6 +470,7 @@ function MainApp() {
       } else {
           usePlayerStore.getState().playPrev();
 
+          // 🔥 FIX PWA BACKGROUND: Sync Audio Injection 🔥
           const newSong = usePlayerStore.getState().currentSong;
           const active = getActiveAudio();
           if (newSong && active) {
@@ -1088,6 +1089,7 @@ function MainApp() {
       }
   }, [activeTab, displayArtist, isOffline]);
 
+  // 🔥 UPDATE JURUS ANTI-INTERUPSI REACT 🔥
   useEffect(() => {
     if (!currentSong?.id) {
         setIsLiked(false);
@@ -1097,12 +1099,20 @@ function MainApp() {
 
     const expectedUrl = `${API_BASE}/api/audio?id=${currentSong.id}`;
     const activeAudio = getActiveAudio();
-    const isAlreadyPlaying = activeAudio && (activeAudio.src === expectedUrl || activeAudio.src.includes(currentSong.id)) && !activeAudio.paused;
+    
+    // Cek apakah Audio sudah nyangkut ke URL lagu yang benar (Hasil injeksi onEnded/Next/Prev)
+    const isSrcAlreadyCorrect = activeAudio && (activeAudio.src === expectedUrl || activeAudio.src.includes(currentSong.id));
 
-    if (isAlreadyPlaying) {
+    if (isSrcAlreadyCorrect) {
+        // KALO SUDAH BENAR, JANGAN DI-LOAD ULANG!
+        // Langsung aja pastikan dia ke-play
         setMediaMode('audio');
         setIsBuffering(false);
+        if (activeAudio.paused && isPlaying && !isAdzanPlayingRef.current) {
+             activeAudio.play().catch(()=>{});
+        }
     } else {
+        // CUMA JALAN KALAU USER KLIK LAGU SECARA MANUAL DARI LIST
         setCurrentTime(0);
         currentTimeRef.current = 0;
         setDuration(0);
@@ -1115,11 +1125,10 @@ function MainApp() {
         const likedSongs = JSON.parse(localStorage.getItem('ytm_liked_songs') || '[]');
         setIsLiked(likedSongs.some(song => song.id === currentSong.id));
         
-        if (activeAudio && !activeAudio.src.includes(currentSong.id)) {
+        if (activeAudio) {
             setIsBuffering(true);
+            // Panggil API secara Asinkron (hanya pas diklik)
             loadAudioSource(activeAudio, currentSong.id, isPlaying && !isAdzanPlayingRef.current);
-        } else if (activeAudio && isPlaying && !isAdzanPlayingRef.current) {
-            activeAudio.play().catch(()=>{});
         }
     }
 
@@ -1379,7 +1388,8 @@ function MainApp() {
       if (err.code === 1 || err.code === 20 || err.message?.includes('aborted')) return; 
       
       console.error("Audio Error Murni:", err);
-      if (mediaMode === 'audio' && currentSong?.id && !e.target.src.includes('data:audio')) {
+      // Jangan timpa isPlaying menjadi false kalau lagi proses adzan
+      if (mediaMode === 'audio' && currentSong?.id && !e.target.src.includes('data:audio') && !isAdzanPlayingRef.current) {
           setIsBuffering(false);
           usePlayerStore.setState({ isPlaying: false });
           showToast("❌ Sinyal audio terputus. Ketuk Play untuk mengulang.");
