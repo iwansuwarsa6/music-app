@@ -26,6 +26,8 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
   </svg>
 );
 
+const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
+
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
@@ -441,6 +443,15 @@ function MainApp() {
       if (dismissAdzanIfActive()) return; 
       
       usePlayerStore.getState().playNext(isShuffle);
+
+      // 🔥 FIX PWA BACKGROUND: Sync Audio Injection 🔥
+      const newSong = usePlayerStore.getState().currentSong;
+      const active = getActiveAudio();
+      if (newSong && active) {
+          active.src = `${API_BASE}/api/audio?id=${newSong.id}`;
+          active.load();
+          active.play().catch(()=>{});
+      }
   };
 
   const handlePrevLocal = (e) => {
@@ -451,6 +462,15 @@ function MainApp() {
           handleSeek({ target: { value: 0 } });
       } else {
           usePlayerStore.getState().playPrev();
+
+          // 🔥 FIX PWA BACKGROUND: Sync Audio Injection 🔥
+          const newSong = usePlayerStore.getState().currentSong;
+          const active = getActiveAudio();
+          if (newSong && active) {
+              active.src = `${API_BASE}/api/audio?id=${newSong.id}`;
+              active.load();
+              active.play().catch(()=>{});
+          }
       }
   };
 
@@ -820,7 +840,8 @@ function MainApp() {
             sessionStorage.setItem(cacheKey, JSON.stringify(mix)); 
             usePlayerStore.setState(state => {
                 const existingIds = new Set(state.queue.map(q => q.id));
-                const newUnique = mix.filter(m => !existingIds.has(m.id));
+                const newUnique = parsedMix.filter(m => !existingIds.has(m.id));
+                if (newUnique.length === 0) return state; 
                 return { queue: [...state.queue, ...newUnique] }; 
             });
         }
@@ -1335,6 +1356,13 @@ function MainApp() {
   const handleCanPlay = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
+      
+      // 🔥 Balikin posisi menit lagu sehabis adzan selesai 🔥
+      if (isRestoringAdzanRef.current && !e.target.src.includes('data:audio')) {
+          e.target.currentTime = adzanPausedTimeRef.current;
+          isRestoringAdzanRef.current = false;
+      }
+
       if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) {
           e.target.play().catch(()=>{});
       }
@@ -1376,11 +1404,22 @@ function MainApp() {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
 
+      // Abaikan MP3 siluman yang habis
+      if (e.target.src.includes('data:audio')) return;
+
       if (usePlayerStore.getState().repeatMode === 'one') {
           e.target.currentTime = 0;
           e.target.play();
       } else {
           usePlayerStore.getState().playNext(isShuffle);
+
+          // 🔥 FIX PWA BACKGROUND: Sync Audio Injection 🔥
+          const newSong = usePlayerStore.getState().currentSong;
+          if (newSong) {
+              e.target.src = `${API_BASE}/api/audio?id=${newSong.id}`;
+              e.target.load();
+              e.target.play().catch(()=>{});
+          }
       }
   };
 
