@@ -173,7 +173,7 @@ function MainApp() {
   const audioRef = useRef(null);
   const getActiveAudio = () => audioRef.current;
 
-  // 🔥 VARIABLE SISTEM ADZAN (MUTE & LOOP) 🔥
+  // 🔥 VARIABLE SISTEM ADZAN (MUTE & LOOP NATURAL) 🔥
   const adzanPausedTimeRef = useRef(0);
   const adzanEndTimeRef = useRef(0);
   const adzanOriginalLoopRef = useRef(false);
@@ -240,12 +240,18 @@ function MainApp() {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
               showToast('▶️ Waktu Adzan selesai. Melanjutkan video...');
           } else {
-              if (active) {
-                  // 🔥 JURUS DEWA KEMBALI NORMAL 🔥
-                  active.muted = false;
-                  active.volume = 1;
-                  active.loop = adzanOriginalLoopRef.current; // Balikin settingan asli
-                  active.currentTime = adzanPausedTimeRef.current; // Rewind lagu ke posisi sebelum adzan
+              if (active && currentSong?.id) {
+                  // Bypass manual click: langsung tembak URL tanpa jeda
+                  active.src = `${API_BASE}/api/audio?id=${currentSong.id}`;
+                  active.loop = adzanOriginalLoopRef.current;
+                  active.play().catch(()=>{});
+                  
+                  // Pasang pendeteksi metadata agar menit lagu balik akurat
+                  const restoreTime = () => {
+                      active.currentTime = adzanPausedTimeRef.current;
+                      active.removeEventListener('loadedmetadata', restoreTime);
+                  };
+                  active.addEventListener('loadedmetadata', restoreTime);
                   
                   usePlayerStore.setState({ isPlaying: true });
                   showToast('▶️ Gas lagi! Waktu Adzan selesai.');
@@ -272,14 +278,16 @@ function MainApp() {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
           } else {
               if (active) {
-                  // 🔥 JURUS DEWA: MUTE & LOOP (TANPA PAUSE!) 🔥
-                  // Dengan begini OS HP iOS/Android tidak akan mematikan proses ini.
+                  // 🔥 JURUS HIJACK BACKGROUND iOS/Android 🔥
                   adzanPausedTimeRef.current = active.currentTime;
                   adzanOriginalLoopRef.current = active.loop;
                   
-                  active.muted = true;
-                  active.volume = 0;
+                  // Putar mp3 kosong yang suaranya ada tapi "hening" dan di-loop. OS anggap ini legal.
+                  active.src = SILENT_MP3;
+                  active.muted = false; // DILARANG MUTE NATIVE, OS AKAN SUSPEND!
+                  active.volume = 1;
                   active.loop = true; 
+                  active.play().catch(()=>{});
               }
           }
       }
@@ -444,7 +452,6 @@ function MainApp() {
       
       usePlayerStore.getState().playNext(isShuffle);
 
-      // 🔥 FIX PWA BACKGROUND: Sync Audio Injection 🔥
       const newSong = usePlayerStore.getState().currentSong;
       const active = getActiveAudio();
       if (newSong && active) {
@@ -463,7 +470,6 @@ function MainApp() {
       } else {
           usePlayerStore.getState().playPrev();
 
-          // 🔥 FIX PWA BACKGROUND: Sync Audio Injection 🔥
           const newSong = usePlayerStore.getState().currentSong;
           const active = getActiveAudio();
           if (newSong && active) {
@@ -1321,7 +1327,9 @@ function MainApp() {
       
       if (isAdzanPlayingRef.current && adzanEndTimeRef.current > 0) {
           if (Date.now() >= adzanEndTimeRef.current) {
-              dismissAdzanPause();
+              // 🔥 LEPASKAN LOOP AGAR MP3 SILUMAN MATI SECARA NATURAL 🔥
+              // Ini syarat wajib agar iOS/Android mengizinkan lagu asli di-play lagi di background
+              e.target.loop = false;
               return; 
           }
       }
@@ -1356,12 +1364,6 @@ function MainApp() {
   const handleCanPlay = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
-      
-      // 🔥 Balikin posisi menit lagu sehabis adzan selesai 🔥
-      if (isRestoringAdzanRef.current && !e.target.src.includes('data:audio')) {
-          e.target.currentTime = adzanPausedTimeRef.current;
-          isRestoringAdzanRef.current = false;
-      }
 
       if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) {
           e.target.play().catch(()=>{});
@@ -1377,7 +1379,7 @@ function MainApp() {
       if (err.code === 1 || err.code === 20 || err.message?.includes('aborted')) return; 
       
       console.error("Audio Error Murni:", err);
-      if (mediaMode === 'audio' && currentSong?.id && e.target.src) {
+      if (mediaMode === 'audio' && currentSong?.id && !e.target.src.includes('data:audio')) {
           setIsBuffering(false);
           usePlayerStore.setState({ isPlaying: false });
           showToast("❌ Sinyal audio terputus. Ketuk Play untuk mengulang.");
@@ -1404,7 +1406,33 @@ function MainApp() {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
 
-      // Abaikan MP3 siluman yang habis
+      // 🔥 KUNCI UTAMA BACKGROUND PLAY ADZAN 🔥
+      // Setelah MP3 Siluman sengaja dimatikan loop-nya, event onEnded ini akan tertembak secara natural oleh OS.
+      if (isAdzanPlayingRef.current) {
+          isAdzanPlayingRef.current = false;
+          setActivePrayerName(null);
+          adzanEndTimeRef.current = 0;
+
+          if (wasPlayingBeforeAdzan.current && currentSong?.id) {
+              // Hajar langsung inject URL aslinya ke src
+              e.target.src = `${API_BASE}/api/audio?id=${currentSong.id}`;
+              e.target.loop = adzanOriginalLoopRef.current;
+              // OS ngizinin ini 100% di background karena terikat event onEnded
+              e.target.play().catch(()=>{});
+              
+              // Tunggu metadata sedetik buat balikin menit aslinya
+              const restoreTime = () => {
+                  e.target.currentTime = adzanPausedTimeRef.current;
+                  e.target.removeEventListener('loadedmetadata', restoreTime);
+              };
+              e.target.addEventListener('loadedmetadata', restoreTime);
+
+              usePlayerStore.setState({ isPlaying: true });
+              showToast('▶️ Gas lagi! Waktu Adzan selesai.');
+          }
+          return;
+      }
+
       if (e.target.src.includes('data:audio')) return;
 
       if (usePlayerStore.getState().repeatMode === 'one') {
@@ -1413,7 +1441,7 @@ function MainApp() {
       } else {
           usePlayerStore.getState().playNext(isShuffle);
 
-          // 🔥 FIX PWA BACKGROUND: Sync Audio Injection 🔥
+          // 🔥 FIX PWA BACKGROUND: Sync Audio Injection untuk next track biasa 🔥
           const newSong = usePlayerStore.getState().currentSong;
           if (newSong) {
               e.target.src = `${API_BASE}/api/audio?id=${newSong.id}`;
