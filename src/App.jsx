@@ -26,8 +26,6 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
   </svg>
 );
 
-const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
-
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
@@ -173,10 +171,10 @@ function MainApp() {
   const audioRef = useRef(null);
   const getActiveAudio = () => audioRef.current;
 
-  // 🔥 VARIABLE SISTEM ADZAN 🔥
+  // 🔥 VARIABLE SISTEM ADZAN (MUTE & LOOP) 🔥
   const adzanPausedTimeRef = useRef(0);
   const adzanEndTimeRef = useRef(0);
-  const isRestoringAdzanRef = useRef(false); // Flag untuk balikin waktu lagu
+  const adzanOriginalLoopRef = useRef(false);
   const workerRef = useRef(null); 
   
   const API_BASE = "https://music-app-production-60db.up.railway.app";
@@ -236,24 +234,22 @@ function MainApp() {
           const active = getActiveAudio();
           
           if (mediaModeRef.current === 'video') {
-              if (active) { active.pause(); active.src = ''; }
               usePlayerStore.setState({ isPlaying: true });
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
               showToast('▶️ Waktu Adzan selesai. Melanjutkan video...');
           } else {
               if (active) {
-                  active.loop = false;
-                  isRestoringAdzanRef.current = true; // Tandai minta kembalikan waktu
+                  // 🔥 JURUS DEWA KEMBALI NORMAL 🔥
+                  active.muted = false;
+                  active.volume = 1;
+                  active.loop = adzanOriginalLoopRef.current; // Balikin settingan asli
+                  active.currentTime = adzanPausedTimeRef.current; // Rewind lagu ke posisi sebelum adzan
                   
-                  // Load ulang audio aslinya ke dalam elemen yang sama
-                  loadAudioSource(active, currentSong.id, true);
                   usePlayerStore.setState({ isPlaying: true });
                   showToast('▶️ Gas lagi! Waktu Adzan selesai.');
               }
           }
       } else {
-          const active = getActiveAudio();
-          if (active) { active.pause(); active.src = ''; }
           showToast('▶️ Waktu Adzan selesai.');
       }
   };
@@ -272,20 +268,16 @@ function MainApp() {
           const active = getActiveAudio();
           if (mediaModeRef.current === 'video') {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
-              if (active) {
-                  active.src = SILENT_MP3;
-                  active.loop = true;
-                  active.play().catch(()=>{});
-              }
           } else {
               if (active) {
-                  // Simpan waktu terakhir lagu
+                  // 🔥 JURUS DEWA: MUTE & LOOP (TANPA PAUSE!) 🔥
+                  // Dengan begini OS HP iOS/Android tidak akan mematikan proses ini.
                   adzanPausedTimeRef.current = active.currentTime;
-                  // 🔥 JURUS HIJACK AUDIO UTAMA 🔥
-                  // Timpa langsung dengan MP3 kosong tanpa di-pause! OS akan mengira lagu masih jalan.
-                  active.src = SILENT_MP3;
-                  active.loop = true;
-                  active.play().catch(()=>{});
+                  adzanOriginalLoopRef.current = active.loop;
+                  
+                  active.muted = true;
+                  active.volume = 0;
+                  active.loop = true; 
               }
           }
       }
@@ -1306,7 +1298,6 @@ function MainApp() {
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
       
-      // Kalo adzan lagi jalan, pantau terus timernya dari pergerakan mp3 kosong
       if (isAdzanPlayingRef.current && adzanEndTimeRef.current > 0) {
           if (Date.now() >= adzanEndTimeRef.current) {
               dismissAdzanPause();
@@ -1321,7 +1312,6 @@ function MainApp() {
               currentTimeRef.current = newTime;
           }
 
-          // Cek jadwal Adzan Real-time
           if (adzanMode && prayerTimes.length > 0) {
               const now = new Date();
               const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
@@ -1345,13 +1335,6 @@ function MainApp() {
   const handleCanPlay = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
-      
-      // 🔥 Balikin posisi menit lagu sehabis adzan selesai 🔥
-      if (isRestoringAdzanRef.current && !e.target.src.includes('data:audio')) {
-          e.target.currentTime = adzanPausedTimeRef.current;
-          isRestoringAdzanRef.current = false;
-      }
-
       if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) {
           e.target.play().catch(()=>{});
       }
@@ -1392,9 +1375,6 @@ function MainApp() {
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
-      
-      // Abaikan MP3 siluman yang habis (walaupun sudah diset loop)
-      if (e.target.src.includes('data:audio')) return;
 
       if (usePlayerStore.getState().repeatMode === 'one') {
           e.target.currentTime = 0;
@@ -1420,7 +1400,7 @@ function MainApp() {
           </div>
       )}
 
-      {/* ⚠️ KINI HANYA ADA 1 AUDIO UTAMA (SILUMAN DIMASUKKAN KE SINI SAAT ADZAN) ⚠️ */}
+      {/* ⚠️ KINI HANYA ADA 1 AUDIO UTAMA ⚠️ */}
       <audio
         ref={audioRef} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
