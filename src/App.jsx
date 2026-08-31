@@ -70,7 +70,6 @@ function MainApp() {
 
   // ======================================================================
   // 🔥 PERBAIKAN: SEMUA VARIABEL DECLARATION PINDAH KE ATAS SINI 🔥
-  // Agar React tidak bingung saat mengeksekusi useEffect di bawah
   // ======================================================================
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('upnext'); 
@@ -93,6 +92,8 @@ function MainApp() {
 
   const iframeRef = useRef(null);
   const audioRef = useRef(null);
+  // 🔥 KEMBALIKAN AUDIO SILUMAN 🔥
+  const keepAliveAudioRef = useRef(null);
   const getActiveAudio = () => audioRef.current;
 
   const nextSongBlobUrlRef = useRef(null);
@@ -205,11 +206,17 @@ function MainApp() {
     };
   }, []);
 
+  // 🔥 UNLOCK KEDUA AUDIO BERSAMAAN SAAT DISENTUH 🔥
   useEffect(() => {
       const unlockAudio = () => {
           const active = getActiveAudio();
+          const silent = keepAliveAudioRef.current;
+
           if (active && active.paused && !currentSong?.id) {
               active.play().then(() => active.pause()).catch(() => {});
+          }
+          if (silent && silent.paused) {
+              silent.play().then(() => silent.pause()).catch(() => {});
           }
           document.removeEventListener('click', unlockAudio);
           document.removeEventListener('touchstart', unlockAudio);
@@ -223,34 +230,6 @@ function MainApp() {
           document.removeEventListener('touchstart', unlockAudio);
       };
   }, [currentSong]);
-
-  // 🔥 JURUS PRE-FETCH: SIAPIN LAGU BERIKUTNYA DI BELAKANG LAYAR 🔥
-  useEffect(() => {
-      if (!currentSong || queue.length === 0 || isOffline) return;
-      
-      const st = usePlayerStore.getState();
-      const nextIdx = st.isShuffle 
-          ? Math.floor(Math.random() * queue.length)
-          : (st.currentIndex + 1) % queue.length;
-      
-      const nextSongObj = queue[nextIdx];
-
-      if (nextSongObj && nextSongObj.id) {
-          const nextUrl = `${API_BASE}/api/audio?id=${nextSongObj.id}`;
-          
-          fetch(nextUrl)
-              .then(res => res.blob())
-              .then(blob => {
-                  if (nextSongBlobUrlRef.current && nextSongBlobUrlRef.current.startsWith('blob:')) {
-                      URL.revokeObjectURL(nextSongBlobUrlRef.current);
-                  }
-                  nextSongBlobUrlRef.current = URL.createObjectURL(blob);
-              })
-              .catch(() => {
-                  nextSongBlobUrlRef.current = nextUrl;
-              });
-      }
-  }, [currentSong?.id, queue, currentIndex, isShuffle, isOffline]);
 
   const showToast = (msg) => {
       setToastMsg(msg);
@@ -271,6 +250,7 @@ function MainApp() {
               usePlayerStore.setState({ isPlaying: true });
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
               showToast('▶️ Waktu Adzan selesai. Melanjutkan video...');
+              if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
           } else {
               if (active) {
                   active.muted = false;
@@ -279,9 +259,11 @@ function MainApp() {
                   active.currentTime = adzanPausedTimeRef.current; 
                   usePlayerStore.setState({ isPlaying: true });
                   showToast('▶️ Gas lagi! Waktu Adzan selesai.');
+                  if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
               }
           }
       } else {
+          if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
           showToast('▶️ Waktu Adzan selesai.');
       }
   };
@@ -310,6 +292,8 @@ function MainApp() {
                   active.loop = true; 
               }
           }
+          // 🔥 NYALAIN AUDIO SILUMAN BUAT NAHAN BACKGROUND SAAT ADZAN 🔥
+          if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       }
       
       showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 5 menit.`);
@@ -468,12 +452,9 @@ function MainApp() {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
       
-      const active = getActiveAudio();
-      if (active && nextSongBlobUrlRef.current) {
-          active.src = nextSongBlobUrlRef.current;
-          active.play().catch(()=>{});
-      }
-      
+      // 🔥 NYALAKAN AUDIO SILUMAN BUAT NAHAN BACKGROUND 🔥
+      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
+
       usePlayerStore.getState().playNext(isShuffle);
   };
 
@@ -484,16 +465,9 @@ function MainApp() {
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
       } else {
+          // 🔥 NYALAKAN AUDIO SILUMAN BUAT NAHAN BACKGROUND 🔥
+          if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
           usePlayerStore.getState().playPrev();
-          const st = usePlayerStore.getState();
-          const prevSong = st.currentSong;
-          const active = getActiveAudio();
-          
-          if (prevSong && active) {
-              active.src = `${API_BASE}/api/audio?id=${prevSong.id}`;
-              active.load();
-              active.play().catch(()=>{});
-          }
       }
   };
 
@@ -527,6 +501,7 @@ function MainApp() {
           return; 
       }
       
+      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       usePlayerStore.getState().playSong(qSong, queue, idx);
       setIsExpanded(true); 
   };
@@ -541,6 +516,8 @@ function MainApp() {
           return; 
       }
       
+      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
+
       let cleanQueue = [];
       let usedTitles = new Set();
       
@@ -861,7 +838,7 @@ function MainApp() {
             sessionStorage.setItem(cacheKey, JSON.stringify(mix)); 
             usePlayerStore.setState(state => {
                 const existingIds = new Set(state.queue.map(q => q.id));
-                const newUnique = parsedMix.filter(m => !existingIds.has(m.id));
+                const newUnique = mix.filter(m => !existingIds.has(m.id));
                 if (newUnique.length === 0) return state; 
                 return { queue: [...state.queue, ...newUnique] }; 
             });
@@ -1293,13 +1270,6 @@ function MainApp() {
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
 
-      if (isAdzanPlayingRef.current && adzanEndTimeRef.current > 0) {
-          if (Date.now() >= adzanEndTimeRef.current) {
-              dismissAdzanPause();
-              return; 
-          }
-      }
-
       if (!isDragging && mediaMode === 'audio' && !isAdzanPlayingRef.current) {
           const newTime = e.target.currentTime;
           if (Math.abs(currentTimeRef.current - newTime) >= 0.5) {
@@ -1361,6 +1331,9 @@ function MainApp() {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
       if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: true });
+
+      // 🔥 MATIKAN AUDIO SILUMAN KARENA LAGU UTAMA UDAH JALAN 🔥
+      if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
   };
   
   const handlePause = (e) => {
@@ -1372,15 +1345,13 @@ function MainApp() {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
 
+      // 🔥 NYALAKAN AUDIO SILUMAN SEGERA SAAT LAGU ASLI HABIS 🔥
+      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
+
       if (usePlayerStore.getState().repeatMode === 'one') {
           e.target.currentTime = 0;
           e.target.play().catch(()=>{});
       } else {
-          if (nextSongBlobUrlRef.current) {
-              e.target.src = nextSongBlobUrlRef.current;
-              e.target.play().catch(()=>{});
-          }
-          
           usePlayerStore.getState().playNext(isShuffle);
       }
   };
@@ -1401,7 +1372,15 @@ function MainApp() {
           </div>
       )}
 
-      {/* ⚠️ KINI HANYA ADA 1 AUDIO UTAMA (100% Native Sync) ⚠️ */}
+      {/* 🔥 PEMUTAR AUDIO SILUMAN UNTUK NAHAN BACKGROUND 🔥 */}
+      <audio 
+         ref={keepAliveAudioRef} 
+         src={SILENT_MP3} 
+         loop 
+         playsInline 
+         className="hidden" 
+      />
+
       <audio
         ref={audioRef} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
