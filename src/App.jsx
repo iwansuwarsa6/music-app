@@ -26,8 +26,6 @@ const MosqueIcon = ({ size = 24, className = "" }) => (
   </svg>
 );
 
-const SILENT_MP3 = "data:audio/mp3;base64,//OExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq";
-
 const isNonMusic = (title) => {
   if (!title) return false;
   const t = title.toLowerCase();
@@ -74,7 +72,6 @@ function MainApp() {
   const [lyricsMode, setLyricsMode] = useState('synced'); 
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
   useEffect(() => {
@@ -138,7 +135,6 @@ function MainApp() {
     };
   }, []);
 
-  // 🔥 JURUS UNLOCK AUDIO iOS / ANDROID 🔥
   useEffect(() => {
       const unlockAudio = () => {
           const active = getActiveAudio();
@@ -173,10 +169,9 @@ function MainApp() {
   const audioRef = useRef(null);
   const getActiveAudio = () => audioRef.current;
 
-  // 🔥 VARIABLE SISTEM ADZAN (MUTE & LOOP NATURAL) 🔥
+  // 🔥 VARIABLE SISTEM ADZAN (MUTE MURNI) 🔥
   const adzanPausedTimeRef = useRef(0);
   const adzanEndTimeRef = useRef(0);
-  const adzanOriginalLoopRef = useRef(false);
   const workerRef = useRef(null); 
   
   const API_BASE = "https://music-app-production-60db.up.railway.app";
@@ -240,20 +235,11 @@ function MainApp() {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
               showToast('▶️ Waktu Adzan selesai. Melanjutkan video...');
           } else {
-              if (active && currentSong?.id) {
-                  // Bypass manual click: langsung tembak URL tanpa jeda
-                  active.src = `${API_BASE}/api/audio?id=${currentSong.id}`;
-                  active.loop = adzanOriginalLoopRef.current;
-                  active.play().catch(()=>{});
-                  
-                  // Pasang pendeteksi metadata agar menit lagu balik akurat
-                  const restoreTime = () => {
-                      active.currentTime = adzanPausedTimeRef.current;
-                      active.removeEventListener('loadedmetadata', restoreTime);
-                  };
-                  active.addEventListener('loadedmetadata', restoreTime);
-                  
-                  usePlayerStore.setState({ isPlaying: true });
+              if (active) {
+                  // 🔥 JURUS UNMUTE & REWIND 🔥
+                  active.muted = false;
+                  active.volume = 1;
+                  active.currentTime = adzanPausedTimeRef.current; 
                   showToast('▶️ Gas lagi! Waktu Adzan selesai.');
               }
           }
@@ -271,22 +257,15 @@ function MainApp() {
       setActivePrayerName(prayerName);
 
       if (wasPlayingBeforeAdzan.current) {
-          usePlayerStore.setState({ isPlaying: false }); 
-          
           const active = getActiveAudio();
           if (mediaModeRef.current === 'video') {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
           } else {
               if (active) {
-                  // 🔥 JURUS HIJACK BACKGROUND iOS/Android 🔥
+                  // 🔥 JURUS MUTE MURNI BACKGROUND PLAY 🔥
                   adzanPausedTimeRef.current = active.currentTime;
-                  adzanOriginalLoopRef.current = active.loop;
-                  
-                  active.src = SILENT_MP3;
-                  active.muted = false; 
-                  active.volume = 1;
-                  active.loop = true; 
-                  active.play().catch(()=>{});
+                  active.muted = true;
+                  active.volume = 0;
               }
           }
       }
@@ -449,16 +428,21 @@ function MainApp() {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
       
-      usePlayerStore.getState().playNext(isShuffle);
-
-      // 🔥 FIX PWA BACKGROUND: Sync Audio Injection 🔥
-      const newSong = usePlayerStore.getState().currentSong;
+      const st = usePlayerStore.getState();
+      const nextIdx = st.isShuffle 
+          ? Math.floor(Math.random() * st.queue.length)
+          : (st.currentIndex + 1) % st.queue.length;
+      
+      const nextSong = st.queue[nextIdx];
       const active = getActiveAudio();
-      if (newSong && active) {
-          active.src = `${API_BASE}/api/audio?id=${newSong.id}`;
+      
+      if (nextSong && active) {
+          active.src = `${API_BASE}/api/audio?id=${nextSong.id}`;
           active.load();
           active.play().catch(()=>{});
       }
+      
+      st.playNext(isShuffle);
   };
 
   const handlePrevLocal = (e) => {
@@ -468,16 +452,18 @@ function MainApp() {
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
       } else {
-          usePlayerStore.getState().playPrev();
-
-          // 🔥 FIX PWA BACKGROUND: Sync Audio Injection 🔥
-          const newSong = usePlayerStore.getState().currentSong;
+          const st = usePlayerStore.getState();
+          const prevIdx = (st.currentIndex - 1 + st.queue.length) % st.queue.length;
+          const prevSong = st.queue[prevIdx];
           const active = getActiveAudio();
-          if (newSong && active) {
-              active.src = `${API_BASE}/api/audio?id=${newSong.id}`;
+          
+          if (prevSong && active) {
+              active.src = `${API_BASE}/api/audio?id=${prevSong.id}`;
               active.load();
               active.play().catch(()=>{});
           }
+
+          st.playPrev();
       }
   };
 
@@ -1046,49 +1032,6 @@ function MainApp() {
       return () => { clearTimeout(t1); };
   }, [mediaMode, isPlaying, currentSong?.id]);
 
-  useEffect(() => {
-      if (activeTab === 'artist' && displayArtist && displayArtist !== "Artis") {
-          if (isOffline) {
-              setIsLoadingRelated(false);
-              setRelatedSongs([]);
-              return;
-          }
-
-          const cacheKey = `related_${displayArtist}`;
-          const cachedRelated = sessionStorage.getItem(cacheKey);
-          
-          if (cachedRelated) {
-              setRelatedSongs(JSON.parse(cachedRelated));
-              return;
-          }
-
-          setIsLoadingRelated(true);
-          fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(displayArtist + " official audio")}`)
-              .then(res => res.json())
-              .then(data => {
-                  if (data?.data) {
-                      let usedRelatedTitles = new Set();
-                      const tracks = data.data.filter(t => t.type === 'video' && !isBadMix(t.title)).slice(0, 15).map(t => {
-                          const vid = t.id || t.videoId || (t.url ? t.url.split('v=')[1] : null);
-                          let cleanT = t.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
-                          if (cleanT.includes('-')) cleanT = cleanT.split('-')[1];
-                          
-                          let tCheck = cleanT.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
-                          let isDup = Array.from(usedRelatedTitles).some(seen => seen.includes(tCheck) || tCheck.includes(seen));
-                          if (isDup || tCheck.length <= 3) return null;
-                          usedRelatedTitles.add(tCheck);
-
-                          return { id: vid, title: cleanT.trim(), artist: displayArtist, image: t.thumbnail, url: `https://www.youtube.com/watch?v=${vid}` };
-                      }).filter(t => t !== null && t.id);
-                      setRelatedSongs(tracks);
-                      sessionStorage.setItem(cacheKey, JSON.stringify(tracks)); 
-                  }
-              })
-              .catch(err => console.error(err))
-              .finally(() => setIsLoadingRelated(false));
-      }
-  }, [activeTab, displayArtist, isOffline]);
-
   // 🔥 UPDATE JURUS ANTI-INTERUPSI REACT 🔥
   useEffect(() => {
     if (!currentSong?.id) {
@@ -1105,7 +1048,6 @@ function MainApp() {
 
     if (isSrcAlreadyCorrect) {
         // KALO SUDAH BENAR, JANGAN DI-LOAD ULANG!
-        // Langsung aja pastikan dia ke-play
         setMediaMode('audio');
         setIsBuffering(false);
         if (activeAudio.paused && isPlaying && !isAdzanPlayingRef.current) {
@@ -1127,7 +1069,6 @@ function MainApp() {
         
         if (activeAudio) {
             setIsBuffering(true);
-            // Panggil API secara Asinkron (hanya pas diklik)
             loadAudioSource(activeAudio, currentSong.id, isPlaying && !isAdzanPlayingRef.current);
         }
     }
@@ -1333,15 +1274,6 @@ function MainApp() {
 
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
-      
-      if (isAdzanPlayingRef.current && adzanEndTimeRef.current > 0) {
-          if (Date.now() >= adzanEndTimeRef.current) {
-              // 🔥 LEPASKAN LOOP AGAR MP3 SILUMAN MATI SECARA NATURAL 🔥
-              // Ini syarat wajib agar iOS/Android mengizinkan lagu asli di-play lagi di background
-              e.target.loop = false;
-              return; 
-          }
-      }
 
       if (!isDragging && mediaMode === 'audio' && !isAdzanPlayingRef.current) {
           const newTime = e.target.currentTime;
@@ -1388,8 +1320,7 @@ function MainApp() {
       if (err.code === 1 || err.code === 20 || err.message?.includes('aborted')) return; 
       
       console.error("Audio Error Murni:", err);
-      // Jangan timpa isPlaying menjadi false kalau lagi proses adzan
-      if (mediaMode === 'audio' && currentSong?.id && !e.target.src.includes('data:audio') && !isAdzanPlayingRef.current) {
+      if (mediaMode === 'audio' && currentSong?.id && !isAdzanPlayingRef.current) {
           setIsBuffering(false);
           usePlayerStore.setState({ isPlaying: false });
           showToast("❌ Sinyal audio terputus. Ketuk Play untuk mengulang.");
@@ -1416,48 +1347,27 @@ function MainApp() {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
 
-      // 🔥 KUNCI UTAMA BACKGROUND PLAY ADZAN 🔥
-      // Setelah MP3 Siluman sengaja dimatikan loop-nya, event onEnded ini akan tertembak secara natural oleh OS.
-      if (isAdzanPlayingRef.current) {
-          isAdzanPlayingRef.current = false;
-          setActivePrayerName(null);
-          adzanEndTimeRef.current = 0;
-
-          if (wasPlayingBeforeAdzan.current && currentSong?.id) {
-              // Hajar langsung inject URL aslinya ke src
-              e.target.src = `${API_BASE}/api/audio?id=${currentSong.id}`;
-              e.target.loop = adzanOriginalLoopRef.current;
-              // OS ngizinin ini 100% di background karena terikat event onEnded
-              e.target.play().catch(()=>{});
-              
-              // Tunggu metadata sedetik buat balikin menit aslinya
-              const restoreTime = () => {
-                  e.target.currentTime = adzanPausedTimeRef.current;
-                  e.target.removeEventListener('loadedmetadata', restoreTime);
-              };
-              e.target.addEventListener('loadedmetadata', restoreTime);
-
-              usePlayerStore.setState({ isPlaying: true });
-              showToast('▶️ Gas lagi! Waktu Adzan selesai.');
-          }
-          return;
-      }
-
-      if (e.target.src.includes('data:audio')) return;
-
       if (usePlayerStore.getState().repeatMode === 'one') {
           e.target.currentTime = 0;
           e.target.play();
       } else {
-          usePlayerStore.getState().playNext(isShuffle);
-
-          // 🔥 FIX PWA BACKGROUND: Sync Audio Injection untuk next track biasa 🔥
-          const newSong = usePlayerStore.getState().currentSong;
-          if (newSong) {
-              e.target.src = `${API_BASE}/api/audio?id=${newSong.id}`;
+          // 🔥 FIX PWA BACKGROUND: Sync Audio Injection 100% Native 🔥
+          // Kita hajar src audionya LANGSUNG SEKARANG JUGA sebelum React sadar!
+          const st = usePlayerStore.getState();
+          const nextIdx = st.isShuffle 
+              ? Math.floor(Math.random() * st.queue.length)
+              : (st.currentIndex + 1) % st.queue.length;
+          
+          const nextSong = st.queue[nextIdx];
+          
+          if (nextSong) {
+              e.target.src = `${API_BASE}/api/audio?id=${nextSong.id}`;
               e.target.load();
               e.target.play().catch(()=>{});
           }
+
+          // Setelah audio terselamatkan di background, baru kita biarin React update UI
+          st.playNext(st.isShuffle);
       }
   };
 
@@ -1477,7 +1387,7 @@ function MainApp() {
           </div>
       )}
 
-      {/* ⚠️ KINI HANYA ADA 1 AUDIO UTAMA ⚠️ */}
+      {/* ⚠️ KINI HANYA ADA 1 AUDIO UTAMA (ANTI INTERUPSI BACKGROUND) ⚠️ */}
       <audio
         ref={audioRef} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
