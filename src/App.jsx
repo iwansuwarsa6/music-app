@@ -67,7 +67,11 @@ function MainApp() {
   const { currentSong, isPlaying, togglePlay, playNext, playPrev, playSong, queue, currentIndex } = usePlayerStore();
   const location = useLocation();
   const navigate = useNavigate();
-  
+
+  // ======================================================================
+  // 🔥 PERBAIKAN: SEMUA VARIABEL DECLARATION PINDAH KE ATAS SINI 🔥
+  // Agar React tidak bingung saat mengeksekusi useEffect di bawah
+  // ======================================================================
   const [isExpanded, setIsExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState('upnext'); 
   const [mediaMode, setMediaMode] = useState('audio'); 
@@ -75,6 +79,70 @@ function MainApp() {
 
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchHistory, setShowSearchHistory] = useState(false);
+  const [liveSuggestions, setLiveSuggestions] = useState([]);
+  const [textSuggestions, setTextSuggestions] = useState([]);
+  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
+  
+  const [searchHistory, setSearchHistory] = useState(() => {
+    const saved = localStorage.getItem('ytm_search_history');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const iframeRef = useRef(null);
+  const audioRef = useRef(null);
+  const getActiveAudio = () => audioRef.current;
+
+  const nextSongBlobUrlRef = useRef(null);
+  const API_BASE = "https://music-app-production-60db.up.railway.app";
+
+  const adzanPausedTimeRef = useRef(0);
+  const adzanEndTimeRef = useRef(0);
+  const adzanOriginalLoopRef = useRef(false);
+  const workerRef = useRef(null); 
+  
+  const [currentTime, setCurrentTime] = useState(0);
+  const currentTimeRef = useRef(0);
+  const [duration, setDuration] = useState(0); 
+  const [isDragging, setIsDragging] = useState(false);
+  
+  const [audioStreamUrl, setAudioStreamUrl] = useState(null);
+  const [isBuffering, setIsBuffering] = useState(false);
+
+  const [lyrics, setLyrics] = useState([]);
+  const [activeLyricIndex, setActiveLyricIndex] = useState(-1);
+  const [isLoadingLyrics, setIsLoadingLyrics] = useState(false);
+  const lyricsContainerRef = useRef(null);
+  
+  const activeQueueRef = useRef(null);
+  const [lyricOffset, setLyricOffset] = useState(0);
+  const [lrclibDuration, setLrclibDuration] = useState(0); 
+  const [isSyncMode, setIsSyncMode] = useState(false);
+  
+  const [isLiked, setIsLiked] = useState(false);
+  const [isShuffle, setIsShuffle] = useState(false);
+  const repeatMode = usePlayerStore(state => state.repeatMode || 'off'); 
+
+  const [toastMsg, setToastMsg] = useState("");
+  const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, song: null });
+
+  const [adzanMode, setAdzanMode] = useState(() => JSON.parse(localStorage.getItem('ytm_adzan_mode') || 'false'));
+  const [prayerTimes, setPrayerTimes] = useState([]); 
+  const [activePrayerName, setActivePrayerName] = useState(null); 
+  
+  const lastAdzanTriggered = useRef("");
+  const wasPlayingBeforeAdzan = useRef(false);
+  const isAdzanPlayingRef = useRef(false); 
+
+  const mediaModeRef = useRef(mediaMode);
+
+  const [relatedSongs, setRelatedSongs] = useState([]);
+  const [isLoadingRelated, setIsLoadingRelated] = useState(false);
+  // ======================================================================
+
+  useEffect(() => { mediaModeRef.current = mediaMode; }, [mediaMode]);
 
   useEffect(() => {
       if ('serviceWorker' in navigator) {
@@ -137,7 +205,6 @@ function MainApp() {
     };
   }, []);
 
-  // 🔥 JURUS UNLOCK AUDIO iOS / ANDROID 🔥
   useEffect(() => {
       const unlockAudio = () => {
           const active = getActiveAudio();
@@ -156,69 +223,6 @@ function MainApp() {
           document.removeEventListener('touchstart', unlockAudio);
       };
   }, [currentSong]);
-
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showSearchHistory, setShowSearchHistory] = useState(false);
-  const [liveSuggestions, setLiveSuggestions] = useState([]);
-  const [textSuggestions, setTextSuggestions] = useState([]);
-  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState(false);
-  
-  const [searchHistory, setSearchHistory] = useState(() => {
-    const saved = localStorage.getItem('ytm_search_history');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const iframeRef = useRef(null);
-  const audioRef = useRef(null);
-  const getActiveAudio = () => audioRef.current;
-
-  const nextSongBlobUrlRef = useRef(null);
-  const API_BASE = "https://music-app-production-60db.up.railway.app";
-
-  // 🔥 VARIABLE SISTEM ADZAN (MUTE & REWIND MURNI) 🔥
-  const adzanPausedTimeRef = useRef(0);
-  const adzanEndTimeRef = useRef(0);
-  const adzanOriginalLoopRef = useRef(false);
-  const workerRef = useRef(null); 
-  
-  const [currentTime, setCurrentTime] = useState(0);
-  const currentTimeRef = useRef(0);
-  const [duration, setDuration] = useState(0); 
-  const [isDragging, setIsDragging] = useState(false);
-  
-  const [audioStreamUrl, setAudioStreamUrl] = useState(null);
-  const [isBuffering, setIsBuffering] = useState(false);
-
-  const [lyrics, setLyrics] = useState([]);
-  const [activeLyricIndex, setActiveLyricIndex] = useState(-1);
-  const [isLoadingLyrics, setIsLoadingLyrics] = useState(false);
-  const lyricsContainerRef = useRef(null);
-  
-  const activeQueueRef = useRef(null);
-  const [lyricOffset, setLyricOffset] = useState(0);
-  const [lrclibDuration, setLrclibDuration] = useState(0); 
-  const [isSyncMode, setIsSyncMode] = useState(false);
-  
-  const [isLiked, setIsLiked] = useState(false);
-  const [isShuffle, setIsShuffle] = useState(false);
-  const repeatMode = usePlayerStore(state => state.repeatMode || 'off'); 
-
-  const [toastMsg, setToastMsg] = useState("");
-  const [contextMenu, setContextMenu] = useState({ isOpen: false, x: 0, y: 0, song: null });
-
-  const [adzanMode, setAdzanMode] = useState(() => JSON.parse(localStorage.getItem('ytm_adzan_mode') || 'false'));
-  const [prayerTimes, setPrayerTimes] = useState([]); 
-  const [activePrayerName, setActivePrayerName] = useState(null); 
-  
-  const lastAdzanTriggered = useRef("");
-  const wasPlayingBeforeAdzan = useRef(false);
-  const isAdzanPlayingRef = useRef(false); 
-
-  const mediaModeRef = useRef(mediaMode);
-  useEffect(() => { mediaModeRef.current = mediaMode; }, [mediaMode]);
-
-  const [relatedSongs, setRelatedSongs] = useState([]);
-  const [isLoadingRelated, setIsLoadingRelated] = useState(false);
 
   // 🔥 JURUS PRE-FETCH: SIAPIN LAGU BERIKUTNYA DI BELAKANG LAYAR 🔥
   useEffect(() => {
@@ -269,12 +273,10 @@ function MainApp() {
               showToast('▶️ Waktu Adzan selesai. Melanjutkan video...');
           } else {
               if (active) {
-                  // 🔥 JURUS DEWA KEMBALI NORMAL 🔥
                   active.muted = false;
                   active.volume = 1;
-                  active.loop = adzanOriginalLoopRef.current; // Balikin settingan asli
-                  active.currentTime = adzanPausedTimeRef.current; // Rewind lagu ke posisi sebelum adzan
-                  
+                  active.loop = adzanOriginalLoopRef.current;
+                  active.currentTime = adzanPausedTimeRef.current; 
                   usePlayerStore.setState({ isPlaying: true });
                   showToast('▶️ Gas lagi! Waktu Adzan selesai.');
               }
@@ -300,8 +302,6 @@ function MainApp() {
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
           } else {
               if (active) {
-                  // 🔥 JURUS DEWA: MUTE & LOOP (TANPA PAUSE!) 🔥
-                  // Dengan begini OS HP iOS/Android tidak akan mematikan proses ini.
                   adzanPausedTimeRef.current = active.currentTime;
                   adzanOriginalLoopRef.current = active.loop;
                   
@@ -1061,17 +1061,10 @@ function MainApp() {
   }, [mediaMode, isPlaying, currentSong?.id]);
 
   useEffect(() => {
-    if (!currentSong?.id) {
-        setIsLiked(false);
-        setAudioStreamUrl(null);
-        return;
-    }
-
-    const expectedUrl = `${API_BASE}/api/audio?id=${currentSong.id}`;
+    const expectedUrl = `${API_BASE}/api/audio?id=${currentSong?.id}`;
     const activeAudio = getActiveAudio();
     
-    // Cek apakah Audio sudah nyangkut ke URL lagu yang benar (Dari inject onEnded)
-    const isSrcAlreadyCorrect = activeAudio && (activeAudio.src === expectedUrl || activeAudio.src.includes(currentSong.id));
+    const isSrcAlreadyCorrect = activeAudio && (activeAudio.src === expectedUrl || activeAudio.src.includes(currentSong?.id));
 
     if (isSrcAlreadyCorrect) {
         setMediaMode('audio');
@@ -1079,7 +1072,7 @@ function MainApp() {
         if (activeAudio.paused && isPlaying && !isAdzanPlayingRef.current) {
              activeAudio.play().catch(()=>{});
         }
-    } else {
+    } else if (currentSong?.id) {
         setCurrentTime(0);
         currentTimeRef.current = 0;
         setDuration(0);
