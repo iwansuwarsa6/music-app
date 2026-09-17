@@ -89,10 +89,11 @@ function MainApp() {
 
   const iframeRef = useRef(null);
   
-  // 🔥 1 AUDIO + 1 SILUMAN 🔥
+  // 🔥 AUDIO ENGINE & LOCK SYSTEM 🔥
   const audioRef = useRef(null);
   const getActiveAudio = () => audioRef.current;
   const keepAliveAudioRef = useRef(null);
+  const isTransitioningRef = useRef(false); // 🔥 JURUS GEMBOK ANTI PAUSE PALSU!
   
   const nextAudioUrlRef = useRef(null);
   const API_BASE = "https://music-app-production-60db.up.railway.app";
@@ -141,7 +142,6 @@ function MainApp() {
 
   useEffect(() => { mediaModeRef.current = mediaMode; }, [mediaMode]);
 
-  // 🔥 SISTEM PRELOAD PELURU LAGU SELANJUTNYA (FULL DOWNLOAD BACKGROUND) 🔥
   useEffect(() => {
       if (queue.length === 0) return;
       let nextIdx = currentIndex + 1;
@@ -157,7 +157,6 @@ function MainApp() {
                           nextAudioUrlRef.current = URL.createObjectURL(blob) + `#id=${nextSong.id}`;
                       });
                   } else {
-                      // 🔥 KEKUATAN BARU: DOWNLOAD LAGU SELANJUTNYA DIEM-DIEM 🔥
                       fetch(originalUrl).then(networkRes => {
                           if (networkRes.ok) {
                               cache.put(originalUrl, networkRes.clone());
@@ -224,7 +223,6 @@ function MainApp() {
     };
   }, []);
 
-  // 🔥 INTERAKSI PERTAMA (UNLOCK AUDIO BACKGROUND) 🔥
   useEffect(() => {
       const unlockAudio = () => {
           const active = getActiveAudio();
@@ -397,7 +395,10 @@ function MainApp() {
 
   const loadAudioSource = async (audioEl, songId, autoPlay = false) => {
     if (!audioEl || !songId) return;
+    
+    isTransitioningRef.current = true; // 🔥 GEMBOK PAUSE
     const originalUrl = `${API_BASE}/api/audio?id=${songId}`;
+    
     try {
         const cache = await caches.open('rncmusic-offline-audio');
         const cachedRes = await cache.match(originalUrl);
@@ -411,13 +412,18 @@ function MainApp() {
     if (autoPlay && !isAdzanPlayingRef.current) {
         audioEl.play().then(() => {
             usePlayerStore.setState({ isPlaying: true });
-        }).catch(()=>{});
+            isTransitioningRef.current = false; // BUKA GEMBOK
+        }).catch(()=>{ isTransitioningRef.current = false; });
+    } else {
+        isTransitioningRef.current = false;
     }
   };
 
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
+
+      isTransitioningRef.current = true; // 🔥 GEMBOK PAUSE
 
       const st = usePlayerStore.getState();
       let nextIdx = st.currentIndex + 1;
@@ -427,10 +433,12 @@ function MainApp() {
       if (nextSong) {
           const active = getActiveAudio();
           if (active) {
+              if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
               active.src = nextAudioUrlRef.current || `${API_BASE}/api/audio?id=${nextSong.id}`;
-              active.play().catch(()=>{});
-          }
-      }
+              active.play().finally(() => { isTransitioningRef.current = false; }).catch(()=>{});
+          } else { isTransitioningRef.current = false; }
+      } else { isTransitioningRef.current = false; }
+      
       st.playNext(isShuffle);
   };
 
@@ -440,7 +448,9 @@ function MainApp() {
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
       } else {
+          isTransitioningRef.current = true; // 🔥 GEMBOK PAUSE
           usePlayerStore.getState().playPrev();
+          setTimeout(() => { isTransitioningRef.current = false; }, 1000);
       }
   };
 
@@ -1120,22 +1130,22 @@ function MainApp() {
       setIsBuffering(false);
       if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: true });
 
-      // 🔥 MATIKAN SILUMAN KALO AUDIO UTAMA UDAH JALAN 🔥
       if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
   };
   
+  // 🔥 MENGABAIKAN PAUSE PALSU SAAT GANTI LAGU 🔥
   const handlePause = (e) => {
       if (e.target !== getActiveAudio()) return;
+      if (isTransitioningRef.current) return; // 🔥 MANTRA ANTI PAUSE XOS INFINIX 🔥
       if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: false });
   };
   
-  // 🔥 FUNGSI INJEKSI SINKRONUS + AUDIO SILUMAN 🔥
+  // 🔥 FUNGSI INJEKSI SINKRONUS SUPER CEPAT 🔥
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
       const activeAudio = getActiveAudio();
       if (e.target !== activeAudio) return; 
 
-      // 🔥 NYALAKAN AUDIO SILUMAN BUAT COVER WAKTU LOADING BACKEND 🔥
       if (keepAliveAudioRef.current) {
           keepAliveAudioRef.current.play().catch(()=>{});
       }
@@ -1146,13 +1156,33 @@ function MainApp() {
           activeAudio.currentTime = 0;
           activeAudio.play().catch(()=>{});
       } else {
+          isTransitioningRef.current = true; // 🔥 GEMBOK PAUSE DIKUNCI
+
           let nextIdx = st.currentIndex + 1;
           if (isShuffle) nextIdx = Math.floor(Math.random() * st.queue.length);
           const nextSong = st.queue[nextIdx];
 
           if (nextSong) {
+              // 🔥 TEMBAK NOTIFIKASI DULUAN SEBELUM SRC DIGANTI BIAR OS GAK BINGUNG 🔥
+              if ('mediaSession' in navigator) {
+                  navigator.mediaSession.metadata = new MediaMetadata({
+                      title: nextSong.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim(),
+                      artist: nextSong.artist,
+                      album: 'RnCmusic Premium',
+                      artwork: [{ src: nextSong.image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }]
+                  });
+                  navigator.mediaSession.playbackState = 'playing';
+              }
+
               activeAudio.src = nextAudioUrlRef.current || `${API_BASE}/api/audio?id=${nextSong.id}`;
-              activeAudio.play().catch(err => console.log("Auto-next Background Blocked:", err));
+              activeAudio.play().then(() => {
+                  isTransitioningRef.current = false; // GEMBOK DIBUKA
+              }).catch(err => {
+                  console.log("Auto-next Background Blocked:", err);
+                  isTransitioningRef.current = false;
+              });
+          } else {
+              isTransitioningRef.current = false;
           }
           
           st.playNext(isShuffle);
