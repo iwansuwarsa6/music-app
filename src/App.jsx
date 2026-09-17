@@ -89,14 +89,12 @@ function MainApp() {
 
   const iframeRef = useRef(null);
   
-  // 🔥 KEMBALI KE 1 AUDIO (PALING STABIL BUAT BACKGROUND HP) 🔥
+  // 🔥 1 AUDIO + 1 SILUMAN 🔥
   const audioRef = useRef(null);
   const getActiveAudio = () => audioRef.current;
   const keepAliveAudioRef = useRef(null);
   
-  // 🔥 PENYIMPAN PELURU URL NEXT SONG (SINKRONUS INJECTION) 🔥
   const nextAudioUrlRef = useRef(null);
-  
   const API_BASE = "https://music-app-production-60db.up.railway.app";
 
   const adzanPausedTimeRef = useRef(0);
@@ -143,7 +141,7 @@ function MainApp() {
 
   useEffect(() => { mediaModeRef.current = mediaMode; }, [mediaMode]);
 
-  // 🔥 SISTEM PRELOAD PELURU LAGU SELANJUTNYA (ANTI-DELAY BACKGROUND) 🔥
+  // 🔥 SISTEM PRELOAD PELURU LAGU SELANJUTNYA (FULL DOWNLOAD BACKGROUND) 🔥
   useEffect(() => {
       if (queue.length === 0) return;
       let nextIdx = currentIndex + 1;
@@ -159,7 +157,15 @@ function MainApp() {
                           nextAudioUrlRef.current = URL.createObjectURL(blob) + `#id=${nextSong.id}`;
                       });
                   } else {
-                      nextAudioUrlRef.current = originalUrl;
+                      // 🔥 KEKUATAN BARU: DOWNLOAD LAGU SELANJUTNYA DIEM-DIEM 🔥
+                      fetch(originalUrl).then(networkRes => {
+                          if (networkRes.ok) {
+                              cache.put(originalUrl, networkRes.clone());
+                              networkRes.blob().then(blob => {
+                                  nextAudioUrlRef.current = URL.createObjectURL(blob) + `#id=${nextSong.id}`;
+                              });
+                          }
+                      }).catch(() => { nextAudioUrlRef.current = originalUrl; });
                   }
               }).catch(() => { nextAudioUrlRef.current = originalUrl; });
           }).catch(() => { nextAudioUrlRef.current = originalUrl; });
@@ -409,7 +415,6 @@ function MainApp() {
     }
   };
 
-  // 🔥 FUNGSI NEXT YANG DIMODIFIKASI BIAR INJECT SINKRONUS 🔥
   const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
@@ -422,7 +427,6 @@ function MainApp() {
       if (nextSong) {
           const active = getActiveAudio();
           if (active) {
-              // Suntik URL hasil preload atau tembak original langsung (SYNC)
               active.src = nextAudioUrlRef.current || `${API_BASE}/api/audio?id=${nextSong.id}`;
               active.play().catch(()=>{});
           }
@@ -892,7 +896,6 @@ function MainApp() {
     if (isAlreadyPlaying) {
         setMediaMode('audio'); setIsBuffering(false);
     } else {
-        // Jangan reset state kalau cuma di-inject dari handleAudioEnded
         const isFromPreload = activeAudio && activeAudio.src.includes(currentSong.id);
         if (!isFromPreload) {
             setCurrentTime(0); currentTimeRef.current = 0; setDuration(0); setLyricOffset(0); setIsSyncMode(false); setLrclibDuration(0); setMediaMode('audio'); setLyricsMode('synced'); 
@@ -1045,7 +1048,7 @@ function MainApp() {
         artwork: [{ src: currentSong.image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }]
       });
 
-      // 🔥 JURUS KUNCI DYNAMIC ISLAND INFINIX BIAR GAK ILANG 🔥
+      // 🔥 KUNCI MAGIC RING INFINIX BIAR GAK ILANG 🔥
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
 
       navigator.mediaSession.setActionHandler('play', () => { handleTogglePlayLocal(null); });
@@ -1116,6 +1119,9 @@ function MainApp() {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
       if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: true });
+
+      // 🔥 MATIKAN SILUMAN KALO AUDIO UTAMA UDAH JALAN 🔥
+      if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
   };
   
   const handlePause = (e) => {
@@ -1123,11 +1129,16 @@ function MainApp() {
       if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: false });
   };
   
-  // 🔥 FUNGSI INJEKSI SINKRONUS AUTO NEXT BACKGROUND HP 🔥
+  // 🔥 FUNGSI INJEKSI SINKRONUS + AUDIO SILUMAN 🔥
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
       const activeAudio = getActiveAudio();
       if (e.target !== activeAudio) return; 
+
+      // 🔥 NYALAKAN AUDIO SILUMAN BUAT COVER WAKTU LOADING BACKEND 🔥
+      if (keepAliveAudioRef.current) {
+          keepAliveAudioRef.current.play().catch(()=>{});
+      }
 
       const st = usePlayerStore.getState();
 
@@ -1140,7 +1151,6 @@ function MainApp() {
           const nextSong = st.queue[nextIdx];
 
           if (nextSong) {
-              // ⚡️ INJEKSI SYNCHRONOUS: Paksa jalan sebelum OS tidur ⚡️
               activeAudio.src = nextAudioUrlRef.current || `${API_BASE}/api/audio?id=${nextSong.id}`;
               activeAudio.play().catch(err => console.log("Auto-next Background Blocked:", err));
           }
@@ -1164,10 +1174,8 @@ function MainApp() {
           </div>
       )}
 
-      {/* AUDIO SILUMAN UNTUK NAHAN OS HP */}
       <audio ref={keepAliveAudioRef} src={SILENT_MP3} loop playsInline className="hidden" />
 
-      {/* 🔥 MAIN AUDIO (SINGLE INJECTION) 🔥 */}
       <audio
         ref={audioRef} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
