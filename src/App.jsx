@@ -93,7 +93,9 @@ function MainApp() {
   const audioRef = useRef(null);
   const getActiveAudio = () => audioRef.current;
   const keepAliveAudioRef = useRef(null);
-  const isTransitioningRef = useRef(false); // 🔥 JURUS GEMBOK ANTI PAUSE PALSU!
+  
+  const isTransitioningRef = useRef(false); 
+  const isSwappingRef = useRef(false); // 🔥 GEMBOK BAJAK WAKTU BARU!
   
   const nextAudioUrlRef = useRef(null);
   const API_BASE = "https://music-app-production-60db.up.railway.app";
@@ -396,7 +398,7 @@ function MainApp() {
   const loadAudioSource = async (audioEl, songId, autoPlay = false) => {
     if (!audioEl || !songId) return;
     
-    isTransitioningRef.current = true; // 🔥 GEMBOK PAUSE
+    isTransitioningRef.current = true;
     const originalUrl = `${API_BASE}/api/audio?id=${songId}`;
     
     try {
@@ -412,18 +414,19 @@ function MainApp() {
     if (autoPlay && !isAdzanPlayingRef.current) {
         audioEl.play().then(() => {
             usePlayerStore.setState({ isPlaying: true });
-            isTransitioningRef.current = false; // BUKA GEMBOK
+            isTransitioningRef.current = false;
         }).catch(()=>{ isTransitioningRef.current = false; });
     } else {
         isTransitioningRef.current = false;
     }
   };
 
-  const handleNextLocal = (e) => {
+  // 🔥 NEXT DENGAN PARAMETER PREEMPTION 🔥
+  const handleNextLocal = (e, isFromPreemption = false) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
 
-      isTransitioningRef.current = true; // 🔥 GEMBOK PAUSE
+      isTransitioningRef.current = true;
 
       const st = usePlayerStore.getState();
       let nextIdx = st.currentIndex + 1;
@@ -431,11 +434,26 @@ function MainApp() {
       const nextSong = st.queue[nextIdx];
 
       if (nextSong) {
+          let cleanTitle = (nextSong.title || 'Musik Baru').replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+          let cleanArtist = (nextSong.artist || 'Artis').replace(/vevo|official|topic|music|channel|records/gi, '').trim();
+
+          if ('mediaSession' in navigator) {
+              navigator.mediaSession.metadata = new MediaMetadata({
+                  title: cleanTitle,
+                  artist: cleanArtist,
+                  album: 'RnCmusic Premium',
+                  artwork: [{ src: nextSong.image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }]
+              });
+              navigator.mediaSession.playbackState = 'playing';
+          }
+
           const active = getActiveAudio();
           if (active) {
-              if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
               active.src = nextAudioUrlRef.current || `${API_BASE}/api/audio?id=${nextSong.id}`;
-              active.play().finally(() => { isTransitioningRef.current = false; }).catch(()=>{});
+              active.play().finally(() => { 
+                  isTransitioningRef.current = false; 
+                  if (isFromPreemption) setTimeout(() => { isSwappingRef.current = false; }, 1500);
+              }).catch(()=>{ isTransitioningRef.current = false; });
           } else { isTransitioningRef.current = false; }
       } else { isTransitioningRef.current = false; }
       
@@ -448,7 +466,7 @@ function MainApp() {
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
       } else {
-          isTransitioningRef.current = true; // 🔥 GEMBOK PAUSE
+          isTransitioningRef.current = true;
           usePlayerStore.getState().playPrev();
           setTimeout(() => { isTransitioningRef.current = false; }, 1000);
       }
@@ -1058,7 +1076,6 @@ function MainApp() {
         artwork: [{ src: currentSong.image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }]
       });
 
-      // 🔥 KUNCI MAGIC RING INFINIX BIAR GAK ILANG 🔥
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
 
       navigator.mediaSession.setActionHandler('play', () => { handleTogglePlayLocal(null); });
@@ -1071,6 +1088,7 @@ function MainApp() {
     }
   }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying]);
 
+  // 🔥 JURUS BAJAK WAKTU (PREEMPTION) DITAMBAH DI SINI 🔥
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
       if (isAdzanPlayingRef.current) {
@@ -1086,9 +1104,28 @@ function MainApp() {
 
       if (!isDragging && mediaMode === 'audio') {
           const newTime = e.target.currentTime;
+          const currentDur = e.target.duration;
+
           if (Math.abs(currentTimeRef.current - newTime) >= 0.5) {
               setCurrentTime(newTime);
               currentTimeRef.current = newTime;
+          }
+
+          // 🔥 JURUS BAJAK WAKTU (GAPLESS PREEMPTION) 🔥
+          // Paksa ganti lagu 0.5 detik SEBELUM lagu habis!
+          // Jangan nunggu event onEnded dari browser!
+          if (currentDur > 0 && currentDur - newTime <= 0.5 && !isSwappingRef.current) {
+              isSwappingRef.current = true; // Kunci gembok biar gak kedobelan
+              
+              const st = usePlayerStore.getState();
+              if (st.repeatMode === 'one') {
+                  e.target.currentTime = 0;
+                  e.target.play().finally(() => { 
+                      setTimeout(() => { isSwappingRef.current = false; }, 1000); 
+                  }).catch(()=>{});
+              } else {
+                  handleNextLocal(null, true); // true = dipanggil dari preemption
+              }
           }
       }
   };
@@ -1133,61 +1170,23 @@ function MainApp() {
       if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
   };
   
-  // 🔥 MENGABAIKAN PAUSE PALSU SAAT GANTI LAGU 🔥
   const handlePause = (e) => {
       if (e.target !== getActiveAudio()) return;
-      if (isTransitioningRef.current) return; // 🔥 MANTRA ANTI PAUSE XOS INFINIX 🔥
+      if (isTransitioningRef.current) return; 
       if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: false });
   };
   
-  // 🔥 FUNGSI INJEKSI SINKRONUS + UPDATE METADATA UTUH 🔥
+  // 🔥 FUNGSI ENDED SEBAGAI BACKUP AJA (KARENA UDAH DIBAJAK DI TIMEUPDATE) 🔥
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
-      const activeAudio = getActiveAudio();
-      if (e.target !== activeAudio) return; 
-
-      // ❌ AUDIO SILUMAN DIHAPUS DARI SINI BIAR FOKUS NOTIF GAK KECURI!
-
+      if (isSwappingRef.current) return; // Kalau udah dibajak sama TimeUpdate, acuhkan aja event ini
+      
       const st = usePlayerStore.getState();
-
       if (st.repeatMode === 'one') {
-          activeAudio.currentTime = 0;
-          activeAudio.play().catch(()=>{});
+          const active = getActiveAudio();
+          if(active) { active.currentTime = 0; active.play().catch(()=>{}); }
       } else {
-          isTransitioningRef.current = true; // 🔥 GEMBOK PAUSE DIKUNCI
-
-          let nextIdx = st.currentIndex + 1;
-          if (isShuffle) nextIdx = Math.floor(Math.random() * st.queue.length);
-          const nextSong = st.queue[nextIdx];
-
-          if (nextSong) {
-              // 🔥 BERSIHKAN JUDUL & ARTIS UNTUK NOTIFIKASI MAGIC RING 🔥
-              let cleanTitle = (nextSong.title || 'Musik Baru').replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
-              let cleanArtist = (nextSong.artist || 'Artis').replace(/vevo|official|topic|music|channel|records/gi, '').trim();
-
-              // ⚡️ PAKSA UPDATE MEDIA SESSION & PLAYBACK STATE SUPAYA NOTIF TETEP MUNCUL ⚡️
-              if ('mediaSession' in navigator) {
-                  navigator.mediaSession.metadata = new MediaMetadata({
-                      title: cleanTitle,
-                      artist: cleanArtist,
-                      album: 'RnCmusic Premium',
-                      artwork: [{ src: nextSong.image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }]
-                  });
-                  navigator.mediaSession.playbackState = 'playing';
-              }
-
-              activeAudio.src = nextAudioUrlRef.current || `${API_BASE}/api/audio?id=${nextSong.id}`;
-              activeAudio.play().then(() => {
-                  isTransitioningRef.current = false; // GEMBOK DIBUKA KEMBALI
-              }).catch(err => {
-                  console.log("Auto-next Background Blocked:", err);
-                  isTransitioningRef.current = false;
-              });
-          } else {
-              isTransitioningRef.current = false;
-          }
-          
-          st.playNext(isShuffle);
+          handleNextLocal(null, false);
       }
   };
 
