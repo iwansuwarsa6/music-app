@@ -89,10 +89,12 @@ function MainApp() {
 
   const iframeRef = useRef(null);
   
-  // 🔥 1 AUDIO MURNI (STANDAR YOUTUBE WEB) 🔥
+  // 🔥 AUDIO ENGINE MURNI 🔥
   const audioRef = useRef(null);
   const getActiveAudio = () => audioRef.current;
-  const keepAliveAudioRef = useRef(null); // Hanya untuk Adzan
+  
+  // 🔥 ALWAYS-ON SILENT ENGINE 🔥
+  const keepAliveAudioRef = useRef(null);
   const isTransitioningRef = useRef(false);
   
   const nextAudioUrlRef = useRef(null);
@@ -142,7 +144,7 @@ function MainApp() {
 
   useEffect(() => { mediaModeRef.current = mediaMode; }, [mediaMode]);
 
-  // 🔥 PRELOAD LAGU SELANJUTNYA KE DALAM CACHE MEMORY 🔥
+  // PRELOAD LAGU SELANJUTNYA 
   useEffect(() => {
       if (queue.length === 0) return;
       let nextIdx = currentIndex + 1;
@@ -158,7 +160,6 @@ function MainApp() {
                           nextAudioUrlRef.current = URL.createObjectURL(blob) + `#id=${nextSong.id}`;
                       });
                   } else {
-                      // Fetch diam-diam di latar belakang
                       fetch(originalUrl).then(networkRes => {
                           if (networkRes.ok) {
                               cache.put(originalUrl, networkRes.clone());
@@ -260,7 +261,6 @@ function MainApp() {
               usePlayerStore.setState({ isPlaying: true });
               iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
               showToast('▶️ Waktu Adzan selesai. Melanjutkan video...');
-              if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
           } else {
               if (active) {
                   active.muted = false;
@@ -269,11 +269,10 @@ function MainApp() {
                   active.currentTime = adzanPausedTimeRef.current; 
                   usePlayerStore.setState({ isPlaying: true });
                   showToast('▶️ Gas lagi! Waktu Adzan selesai.');
-                  if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
+                  if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
               }
           }
       } else {
-          if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
           showToast('▶️ Waktu Adzan selesai.');
       }
   };
@@ -300,7 +299,7 @@ function MainApp() {
                   active.loop = true; 
               }
           }
-          if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
+          if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause(); // MATIIN SILUMAN PAS ADZAN
       }
       showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 5 menit.`);
       adzanEndTimeRef.current = Date.now() + (isTest ? 10000 : 300000);
@@ -415,6 +414,7 @@ function MainApp() {
     if (autoPlay && !isAdzanPlayingRef.current) {
         audioEl.play().then(() => {
             usePlayerStore.setState({ isPlaying: true });
+            if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
             isTransitioningRef.current = false;
         }).catch(()=>{ isTransitioningRef.current = false; });
     } else {
@@ -426,7 +426,7 @@ function MainApp() {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
 
-      isTransitioningRef.current = true;
+      isTransitioningRef.current = true; 
 
       const st = usePlayerStore.getState();
       let nextIdx = st.currentIndex + 1;
@@ -448,7 +448,10 @@ function MainApp() {
                   navigator.mediaSession.playbackState = 'playing';
               }
               active.src = nextAudioUrlRef.current || `${API_BASE}/api/audio?id=${nextSong.id}`;
-              active.play().finally(() => { isTransitioningRef.current = false; }).catch(()=>{ isTransitioningRef.current = false; });
+              active.play().finally(() => { 
+                  isTransitioningRef.current = false; 
+                  if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{}); // JAGA SILUMAN
+              }).catch(()=>{ isTransitioningRef.current = false; });
           } else { isTransitioningRef.current = false; }
       } else { isTransitioningRef.current = false; }
       
@@ -473,6 +476,7 @@ function MainApp() {
 
       if (isPlaying) {
           getActiveAudio()?.pause();
+          if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause(); // MATIIN SILUMAN KALO DI-PAUSE MANUAL
           if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), '*');
           togglePlay();
       } else {
@@ -482,6 +486,7 @@ function MainApp() {
           } else {
               active?.play().then(() => {
                   usePlayerStore.setState({ isPlaying: true });
+                  if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{}); // NYALAKAN SILUMAN KEMBALI
               }).catch(()=>{});
           }
           if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
@@ -924,7 +929,6 @@ function MainApp() {
             setCurrentTime(0); currentTimeRef.current = 0; setDuration(0); setLyricOffset(0); setIsSyncMode(false); setLrclibDuration(0); setMediaMode('audio'); setLyricsMode('synced'); 
             setIsBuffering(true);
             
-            // Set source ke Active Engine
             activeAudio.src = expectedUrl;
             activeAudio.load();
             if (isPlaying && !isAdzanPlayingRef.current) activeAudio.play().catch(()=>{});
@@ -1144,20 +1148,38 @@ function MainApp() {
   const handlePlaying = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
-      if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: true });
+      if (!isAdzanPlayingRef.current) {
+          usePlayerStore.setState({ isPlaying: true });
+          
+          // 🔥 ALWAYS-ON SILENT ENGINE: JAGA MAGIC RING 🔥
+          if (keepAliveAudioRef.current && keepAliveAudioRef.current.paused) {
+              keepAliveAudioRef.current.play().catch(()=>{});
+          }
+      }
   };
   
   const handlePause = (e) => {
       if (e.target !== getActiveAudio()) return;
       if (isTransitioningRef.current) return; 
-      if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: false });
+      if (!isAdzanPlayingRef.current) {
+          usePlayerStore.setState({ isPlaying: false });
+          
+          // SILUMAN BARU BOLEH MATI KALAU USER BENERAN PAUSE MUSIKNYA
+          if (keepAliveAudioRef.current) {
+              keepAliveAudioRef.current.pause();
+          }
+      }
   };
   
-  // 🔥 FUNGSI SAKTI NATIVE ON-ENDED ALA YOUTUBE WEB 🔥
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
       const activeAudio = getActiveAudio();
       if (e.target !== activeAudio) return; 
+
+      // 🔥 PASTIKAN AUDIO SILUMAN TETAP JALAN BUAT COVER NOTIF OS 🔥
+      if (keepAliveAudioRef.current && keepAliveAudioRef.current.paused) {
+          keepAliveAudioRef.current.play().catch(()=>{});
+      }
 
       const st = usePlayerStore.getState();
 
@@ -1165,14 +1187,13 @@ function MainApp() {
           activeAudio.currentTime = 0;
           activeAudio.play().catch(()=>{});
       } else {
-          isTransitioningRef.current = true; // KUNCI PAUSE
+          isTransitioningRef.current = true; // KUNCI EVENT PAUSE PALSU DARI BROWSER
 
           let nextIdx = st.currentIndex + 1;
           if (isShuffle) nextIdx = Math.floor(Math.random() * st.queue.length);
           const nextSong = st.queue[nextIdx];
 
           if (nextSong) {
-              // 1. UPDATE MAGIC RING DULUAN SECARA INSTAN!
               let cleanTitle = (nextSong.title || 'Musik Baru').replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
               let cleanArtist = (nextSong.artist || 'Artis').replace(/vevo|official|topic|music|channel|records/gi, '').trim();
 
@@ -1186,7 +1207,6 @@ function MainApp() {
                   navigator.mediaSession.playbackState = 'playing';
               }
 
-              // 2. SUNTIK URL & GAS PLAY BARENGAN!
               activeAudio.src = nextAudioUrlRef.current || `${API_BASE}/api/audio?id=${nextSong.id}`;
               activeAudio.play().then(() => {
                   isTransitioningRef.current = false;
@@ -1198,7 +1218,6 @@ function MainApp() {
               isTransitioningRef.current = false;
           }
           
-          // 3. UPDATE REACT UI (BELAKANGAN)
           st.playNext(isShuffle);
       }
   };
@@ -1218,10 +1237,10 @@ function MainApp() {
           </div>
       )}
 
-      {/* AUDIO SILUMAN HANYA BUAT ADZAN SEKARANG */}
+      {/* 🔥 ALWAYS-ON SILENT ENGINE 🔥 */}
       <audio ref={keepAliveAudioRef} src={SILENT_MP3} loop playsInline className="hidden" />
 
-      {/* 🔥 1 AUDIO MURNI 🔥 */}
+      {/* 🔥 MAIN ENGINE 🔥 */}
       <audio
         ref={audioRef} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
