@@ -444,7 +444,9 @@ function MainApp() {
     
     audioEl.load();
     if (autoPlay && !isAdzanPlayingRef.current) {
-        audioEl.play().catch(()=>{});
+        audioEl.play().then(() => {
+            usePlayerStore.setState({ isPlaying: true });
+        }).catch(()=>{});
     }
   };
 
@@ -452,9 +454,6 @@ function MainApp() {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
       
-      // 🔥 NYALAKAN AUDIO SILUMAN BUAT NAHAN BACKGROUND 🔥
-      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
-
       usePlayerStore.getState().playNext(isShuffle);
   };
 
@@ -465,8 +464,6 @@ function MainApp() {
       if (currentTime > 3) {
           handleSeek({ target: { value: 0 } });
       } else {
-          // 🔥 NYALAKAN AUDIO SILUMAN BUAT NAHAN BACKGROUND 🔥
-          if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
           usePlayerStore.getState().playPrev();
       }
   };
@@ -484,7 +481,9 @@ function MainApp() {
           if (active && currentSong && !active.src.includes(currentSong.id)) {
               loadAudioSource(active, currentSong.id, true);
           } else {
-              active?.play().catch(()=>{});
+              active?.play().then(() => {
+                  usePlayerStore.setState({ isPlaying: true });
+              }).catch(()=>{});
           }
           if (mediaMode === 'video') iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
           togglePlay();
@@ -501,7 +500,6 @@ function MainApp() {
           return; 
       }
       
-      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       usePlayerStore.getState().playSong(qSong, queue, idx);
       setIsExpanded(true); 
   };
@@ -516,8 +514,6 @@ function MainApp() {
           return; 
       }
       
-      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
-
       let cleanQueue = [];
       let usedTitles = new Set();
       
@@ -839,7 +835,6 @@ function MainApp() {
             usePlayerStore.setState(state => {
                 const existingIds = new Set(state.queue.map(q => q.id));
                 const newUnique = mix.filter(m => !existingIds.has(m.id));
-                if (newUnique.length === 0) return state; 
                 return { queue: [...state.queue, ...newUnique] }; 
             });
         }
@@ -1038,18 +1033,63 @@ function MainApp() {
   }, [mediaMode, isPlaying, currentSong?.id]);
 
   useEffect(() => {
-    const expectedUrl = `${API_BASE}/api/audio?id=${currentSong?.id}`;
-    const activeAudio = getActiveAudio();
-    
-    const isSrcAlreadyCorrect = activeAudio && (activeAudio.src === expectedUrl || activeAudio.src.includes(currentSong?.id));
+      if (activeTab === 'artist' && displayArtist && displayArtist !== "Artis") {
+          if (isOffline) {
+              setIsLoadingRelated(false);
+              setRelatedSongs([]);
+              return;
+          }
 
-    if (isSrcAlreadyCorrect) {
+          const cacheKey = `related_${displayArtist}`;
+          const cachedRelated = sessionStorage.getItem(cacheKey);
+          
+          if (cachedRelated) {
+              setRelatedSongs(JSON.parse(cachedRelated));
+              return;
+          }
+
+          setIsLoadingRelated(true);
+          fetch(`https://api.siputzx.my.id/api/s/youtube?query=${encodeURIComponent(displayArtist + " official audio")}`)
+              .then(res => res.json())
+              .then(data => {
+                  if (data?.data) {
+                      let usedRelatedTitles = new Set();
+                      const tracks = data.data.filter(t => t.type === 'video' && !isBadMix(t.title)).slice(0, 15).map(t => {
+                          const vid = t.id || t.videoId || (t.url ? t.url.split('v=')[1] : null);
+                          let cleanT = t.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '');
+                          if (cleanT.includes('-')) cleanT = cleanT.split('-')[1];
+                          
+                          let tCheck = cleanT.toLowerCase().replace(/[^a-z0-9\s]/gi, '').replace(/(official|lyric|audio|video|music)/gi, '').trim();
+                          let isDup = Array.from(usedRelatedTitles).some(seen => seen.includes(tCheck) || tCheck.includes(seen));
+                          if (isDup || tCheck.length <= 3) return null;
+                          usedRelatedTitles.add(tCheck);
+
+                          return { id: vid, title: cleanT.trim(), artist: displayArtist, image: t.thumbnail, url: `https://www.youtube.com/watch?v=${vid}` };
+                      }).filter(t => t !== null && t.id);
+                      setRelatedSongs(tracks);
+                      sessionStorage.setItem(cacheKey, JSON.stringify(tracks)); 
+                  }
+              })
+              .catch(err => console.error(err))
+              .finally(() => setIsLoadingRelated(false));
+      }
+  }, [activeTab, displayArtist, isOffline]);
+
+  useEffect(() => {
+    if (!currentSong?.id) {
+        setIsLiked(false);
+        setAudioStreamUrl(null);
+        return;
+    }
+
+    const expectedUrl = `${API_BASE}/api/audio?id=${currentSong.id}`;
+    const activeAudio = getActiveAudio();
+    const isAlreadyPlaying = activeAudio && (activeAudio.src === expectedUrl || activeAudio.src.includes(currentSong.id)) && !activeAudio.paused;
+
+    if (isAlreadyPlaying) {
         setMediaMode('audio');
         setIsBuffering(false);
-        if (activeAudio.paused && isPlaying && !isAdzanPlayingRef.current) {
-             activeAudio.play().catch(()=>{});
-        }
-    } else if (currentSong?.id) {
+    } else {
         setCurrentTime(0);
         currentTimeRef.current = 0;
         setDuration(0);
@@ -1062,9 +1102,11 @@ function MainApp() {
         const likedSongs = JSON.parse(localStorage.getItem('ytm_liked_songs') || '[]');
         setIsLiked(likedSongs.some(song => song.id === currentSong.id));
         
-        if (activeAudio) {
+        if (activeAudio && !activeAudio.src.includes(currentSong.id)) {
             setIsBuffering(true);
             loadAudioSource(activeAudio, currentSong.id, isPlaying && !isAdzanPlayingRef.current);
+        } else if (activeAudio && isPlaying && !isAdzanPlayingRef.current) {
+            activeAudio.play().catch(()=>{});
         }
     }
 
@@ -1269,25 +1311,25 @@ function MainApp() {
 
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
+      
+      if (isAdzanPlayingRef.current) {
+          if (Date.now() >= adzanEndTimeRef.current) {
+              dismissAdzanPause();
+              return;
+          }
 
-      if (!isDragging && mediaMode === 'audio' && !isAdzanPlayingRef.current) {
+          // Kunci lagu biar muter di tempat (treadmill) biar OS nggak nidurin PWA lu
+          if (e.target.currentTime > adzanPausedTimeRef.current + 0.5) {
+              e.target.currentTime = adzanPausedTimeRef.current;
+          }
+          return; 
+      }
+
+      if (!isDragging && mediaMode === 'audio') {
           const newTime = e.target.currentTime;
           if (Math.abs(currentTimeRef.current - newTime) >= 0.5) {
               setCurrentTime(newTime);
               currentTimeRef.current = newTime;
-          }
-
-          if (adzanMode && prayerTimes.length > 0) {
-              const now = new Date();
-              const timeStr = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-              
-              if (lastAdzanTriggered.current !== timeStr) {
-                  const matchedPrayer = prayerTimes.find(p => p.time === timeStr);
-                  if (matchedPrayer) {
-                      lastAdzanTriggered.current = timeStr;
-                      fireAdzanPauseRef.current(matchedPrayer.name, false);
-                  }
-              }
           }
       }
   };
@@ -1300,8 +1342,8 @@ function MainApp() {
   const handleCanPlay = (e) => {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
-
-      if (isPlaying && mediaMode === 'audio' && !isAdzanPlayingRef.current) {
+      // Auto-play selama UI statusnya on
+      if (isPlaying && mediaMode === 'audio') {
           e.target.play().catch(()=>{});
       }
   };
@@ -1315,8 +1357,9 @@ function MainApp() {
       if (err.code === 1 || err.code === 20 || err.message?.includes('aborted')) return; 
       
       console.error("Audio Error Murni:", err);
-      if (mediaMode === 'audio' && currentSong?.id && !isAdzanPlayingRef.current) {
+      if (mediaMode === 'audio' && currentSong?.id && e.target.src) {
           setIsBuffering(false);
+          // Kalau koneksi di latar belakang mati, pause aja, jangan dipaksa lompat!
           usePlayerStore.setState({ isPlaying: false });
           showToast("❌ Sinyal audio terputus. Ketuk Play untuk mengulang.");
       }
@@ -1331,9 +1374,6 @@ function MainApp() {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
       if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: true });
-
-      // 🔥 MATIKAN AUDIO SILUMAN KARENA LAGU UTAMA UDAH JALAN 🔥
-      if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
   };
   
   const handlePause = (e) => {
@@ -1345,12 +1385,9 @@ function MainApp() {
       if (mediaMode !== 'audio') return;
       if (e.target !== getActiveAudio()) return; 
 
-      // 🔥 NYALAKAN AUDIO SILUMAN SEGERA SAAT LAGU ASLI HABIS 🔥
-      if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
-
       if (usePlayerStore.getState().repeatMode === 'one') {
           e.target.currentTime = 0;
-          e.target.play().catch(()=>{});
+          e.target.play();
       } else {
           usePlayerStore.getState().playNext(isShuffle);
       }
@@ -1372,7 +1409,7 @@ function MainApp() {
           </div>
       )}
 
-      {/* 🔥 PEMUTAR AUDIO SILUMAN UNTUK NAHAN BACKGROUND 🔥 */}
+      {/* 🔥 AUDIO SILUMAN BUAT NGE-HACK BACKGROUND OS 🔥 */}
       <audio 
          ref={keepAliveAudioRef} 
          src={SILENT_MP3} 
@@ -1381,6 +1418,7 @@ function MainApp() {
          className="hidden" 
       />
 
+      {/* ⚠️ HANYA ADA 1 AUDIO SEKARANG ⚠️ */}
       <audio
         ref={audioRef} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
