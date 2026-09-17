@@ -1140,15 +1140,13 @@ function MainApp() {
       if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: false });
   };
   
-  // 🔥 FUNGSI INJEKSI SINKRONUS SUPER CEPAT 🔥
+  // 🔥 FUNGSI INJEKSI SINKRONUS + UPDATE METADATA UTUH 🔥
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
       const activeAudio = getActiveAudio();
       if (e.target !== activeAudio) return; 
 
-      if (keepAliveAudioRef.current) {
-          keepAliveAudioRef.current.play().catch(()=>{});
-      }
+      // ❌ AUDIO SILUMAN DIHAPUS DARI SINI BIAR FOKUS NOTIF GAK KECURI!
 
       const st = usePlayerStore.getState();
 
@@ -1163,11 +1161,15 @@ function MainApp() {
           const nextSong = st.queue[nextIdx];
 
           if (nextSong) {
-              // 🔥 TEMBAK NOTIFIKASI DULUAN SEBELUM SRC DIGANTI BIAR OS GAK BINGUNG 🔥
+              // 🔥 BERSIHKAN JUDUL & ARTIS UNTUK NOTIFIKASI MAGIC RING 🔥
+              let cleanTitle = (nextSong.title || 'Musik Baru').replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+              let cleanArtist = (nextSong.artist || 'Artis').replace(/vevo|official|topic|music|channel|records/gi, '').trim();
+
+              // ⚡️ PAKSA UPDATE MEDIA SESSION & PLAYBACK STATE SUPAYA NOTIF TETEP MUNCUL ⚡️
               if ('mediaSession' in navigator) {
                   navigator.mediaSession.metadata = new MediaMetadata({
-                      title: nextSong.title.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim(),
-                      artist: nextSong.artist,
+                      title: cleanTitle,
+                      artist: cleanArtist,
                       album: 'RnCmusic Premium',
                       artwork: [{ src: nextSong.image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }]
                   });
@@ -1176,7 +1178,7 @@ function MainApp() {
 
               activeAudio.src = nextAudioUrlRef.current || `${API_BASE}/api/audio?id=${nextSong.id}`;
               activeAudio.play().then(() => {
-                  isTransitioningRef.current = false; // GEMBOK DIBUKA
+                  isTransitioningRef.current = false; // GEMBOK DIBUKA KEMBALI
               }).catch(err => {
                   console.log("Auto-next Background Blocked:", err);
                   isTransitioningRef.current = false;
