@@ -1044,6 +1044,10 @@ function MainApp() {
         album: 'RnCmusic Premium',
         artwork: [{ src: currentSong.image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }]
       });
+
+      // 🔥 JURUS KUNCI DYNAMIC ISLAND INFINIX BIAR GAK ILANG 🔥
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+
       navigator.mediaSession.setActionHandler('play', () => { handleTogglePlayLocal(null); });
       navigator.mediaSession.setActionHandler('pause', () => { handleTogglePlayLocal(null); });
       navigator.mediaSession.setActionHandler('previoustrack', () => handlePrevLocal(null));
