@@ -93,9 +93,7 @@ function MainApp() {
   const audioRef = useRef(null);
   const getActiveAudio = () => audioRef.current;
   const keepAliveAudioRef = useRef(null);
-  
-  const isTransitioningRef = useRef(false); 
-  const isSwappingRef = useRef(false); // 🔥 GEMBOK BAJAK WAKTU BARU!
+  const isTransitioningRef = useRef(false);
   
   const nextAudioUrlRef = useRef(null);
   const API_BASE = "https://music-app-production-60db.up.railway.app";
@@ -144,6 +142,7 @@ function MainApp() {
 
   useEffect(() => { mediaModeRef.current = mediaMode; }, [mediaMode]);
 
+  // 🔥 PRELOAD LAGU SELANJUTNYA (ANTI-LOADING) 🔥
   useEffect(() => {
       if (queue.length === 0) return;
       let nextIdx = currentIndex + 1;
@@ -299,6 +298,7 @@ function MainApp() {
                   active.loop = true; 
               }
           }
+          // SILUMAN NYALA HANYA PAS ADZAN!
           if (keepAliveAudioRef.current) keepAliveAudioRef.current.play().catch(()=>{});
       }
       showToast(isTest ? `🔊 Test: Waktu Adzan ${prayerName} Tiba! (10 Detik)` : `🕌 Waktu Adzan ${prayerName} tiba! Musik dijeda 5 menit.`);
@@ -421,8 +421,7 @@ function MainApp() {
     }
   };
 
-  // 🔥 NEXT DENGAN PARAMETER PREEMPTION 🔥
-  const handleNextLocal = (e, isFromPreemption = false) => {
+  const handleNextLocal = (e) => {
       if (e) e.stopPropagation();
       if (dismissAdzanIfActive()) return; 
 
@@ -434,26 +433,20 @@ function MainApp() {
       const nextSong = st.queue[nextIdx];
 
       if (nextSong) {
-          let cleanTitle = (nextSong.title || 'Musik Baru').replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
-          let cleanArtist = (nextSong.artist || 'Artis').replace(/vevo|official|topic|music|channel|records/gi, '').trim();
-
-          if ('mediaSession' in navigator) {
-              navigator.mediaSession.metadata = new MediaMetadata({
-                  title: cleanTitle,
-                  artist: cleanArtist,
-                  album: 'RnCmusic Premium',
-                  artwork: [{ src: nextSong.image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }]
-              });
-              navigator.mediaSession.playbackState = 'playing';
-          }
-
           const active = getActiveAudio();
           if (active) {
+              if ('mediaSession' in navigator) {
+                  let cleanTitle = (nextSong.title || 'Musik Baru').replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+                  let cleanArtist = (nextSong.artist || 'Artis').replace(/vevo|official|topic|music|channel|records/gi, '').trim();
+                  navigator.mediaSession.metadata = new MediaMetadata({
+                      title: cleanTitle,
+                      artist: cleanArtist,
+                      album: 'RnCmusic Premium',
+                      artwork: [{ src: nextSong.image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }]
+                  });
+              }
               active.src = nextAudioUrlRef.current || `${API_BASE}/api/audio?id=${nextSong.id}`;
-              active.play().finally(() => { 
-                  isTransitioningRef.current = false; 
-                  if (isFromPreemption) setTimeout(() => { isSwappingRef.current = false; }, 1500);
-              }).catch(()=>{ isTransitioningRef.current = false; });
+              active.play().finally(() => { isTransitioningRef.current = false; }).catch(()=>{});
           } else { isTransitioningRef.current = false; }
       } else { isTransitioningRef.current = false; }
       
@@ -1067,6 +1060,7 @@ function MainApp() {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  // 🔥 JAGA METADATA SAAT PLAY/PAUSE DARI HP 🔥
   useEffect(() => {
     if ('mediaSession' in navigator && currentSong) {
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -1088,7 +1082,7 @@ function MainApp() {
     }
   }, [currentSong, displayTitle, displayArtist, isShuffle, isPlaying]);
 
-  // 🔥 JURUS BAJAK WAKTU (PREEMPTION) DITAMBAH DI SINI 🔥
+  // 🔥 TIMEUPDATE DIBERSIHKAN DARI BAJAK WAKTU (MURNI UPDATE UI AJA) 🔥
   const handleTimeUpdate = (e) => {
       if (e.target !== getActiveAudio()) return;
       if (isAdzanPlayingRef.current) {
@@ -1104,28 +1098,9 @@ function MainApp() {
 
       if (!isDragging && mediaMode === 'audio') {
           const newTime = e.target.currentTime;
-          const currentDur = e.target.duration;
-
           if (Math.abs(currentTimeRef.current - newTime) >= 0.5) {
               setCurrentTime(newTime);
               currentTimeRef.current = newTime;
-          }
-
-          // 🔥 JURUS BAJAK WAKTU (GAPLESS PREEMPTION) 🔥
-          // Paksa ganti lagu 0.5 detik SEBELUM lagu habis!
-          // Jangan nunggu event onEnded dari browser!
-          if (currentDur > 0 && currentDur - newTime <= 0.5 && !isSwappingRef.current) {
-              isSwappingRef.current = true; // Kunci gembok biar gak kedobelan
-              
-              const st = usePlayerStore.getState();
-              if (st.repeatMode === 'one') {
-                  e.target.currentTime = 0;
-                  e.target.play().finally(() => { 
-                      setTimeout(() => { isSwappingRef.current = false; }, 1000); 
-                  }).catch(()=>{});
-              } else {
-                  handleNextLocal(null, true); // true = dipanggil dari preemption
-              }
           }
       }
   };
@@ -1166,8 +1141,6 @@ function MainApp() {
       if (e.target !== getActiveAudio()) return;
       setIsBuffering(false);
       if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: true });
-
-      if (keepAliveAudioRef.current) keepAliveAudioRef.current.pause();
   };
   
   const handlePause = (e) => {
@@ -1176,17 +1149,53 @@ function MainApp() {
       if (!isAdzanPlayingRef.current) usePlayerStore.setState({ isPlaying: false });
   };
   
-  // 🔥 FUNGSI ENDED SEBAGAI BACKUP AJA (KARENA UDAH DIBAJAK DI TIMEUPDATE) 🔥
+  // 🔥 FUNGSI SAKTI NATIVE ON-ENDED ALA YOUTUBE WEB 🔥
   const handleAudioEnded = (e) => {
       if (mediaMode !== 'audio') return;
-      if (isSwappingRef.current) return; // Kalau udah dibajak sama TimeUpdate, acuhkan aja event ini
-      
+      const activeAudio = getActiveAudio();
+      if (e.target !== activeAudio) return; 
+
       const st = usePlayerStore.getState();
+
       if (st.repeatMode === 'one') {
-          const active = getActiveAudio();
-          if(active) { active.currentTime = 0; active.play().catch(()=>{}); }
+          activeAudio.currentTime = 0;
+          activeAudio.play().catch(()=>{});
       } else {
-          handleNextLocal(null, false);
+          isTransitioningRef.current = true; // KUNCI PAUSE
+
+          let nextIdx = st.currentIndex + 1;
+          if (isShuffle) nextIdx = Math.floor(Math.random() * st.queue.length);
+          const nextSong = st.queue[nextIdx];
+
+          if (nextSong) {
+              // 1. UPDATE MAGIC RING DULUAN SECARA INSTAN!
+              let cleanTitle = (nextSong.title || 'Musik Baru').replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+              let cleanArtist = (nextSong.artist || 'Artis').replace(/vevo|official|topic|music|channel|records/gi, '').trim();
+
+              if ('mediaSession' in navigator) {
+                  navigator.mediaSession.metadata = new MediaMetadata({
+                      title: cleanTitle,
+                      artist: cleanArtist,
+                      album: 'RnCmusic Premium',
+                      artwork: [{ src: nextSong.image || 'https://via.placeholder.com/512', sizes: '512x512', type: 'image/jpeg' }]
+                  });
+                  navigator.mediaSession.playbackState = 'playing';
+              }
+
+              // 2. SUNTIK URL & GAS PLAY BARENGAN!
+              activeAudio.src = nextAudioUrlRef.current || `${API_BASE}/api/audio?id=${nextSong.id}`;
+              activeAudio.play().then(() => {
+                  isTransitioningRef.current = false;
+              }).catch(err => {
+                  console.log("Auto-next Background Blocked:", err);
+                  isTransitioningRef.current = false;
+              });
+          } else {
+              isTransitioningRef.current = false;
+          }
+          
+          // 3. UPDATE REACT UI (BELAKANGAN)
+          st.playNext(isShuffle);
       }
   };
 
@@ -1205,8 +1214,10 @@ function MainApp() {
           </div>
       )}
 
+      {/* AUDIO SILUMAN HANYA BUAT ADZAN SEKARANG */}
       <audio ref={keepAliveAudioRef} src={SILENT_MP3} loop playsInline className="hidden" />
 
+      {/* 🔥 1 AUDIO MURNI 🔥 */}
       <audio
         ref={audioRef} playsInline preload="auto"
         onTimeUpdate={handleTimeUpdate} onLoadedMetadata={handleLoadedMetadata}
